@@ -18,6 +18,39 @@
 plugins {
     id 'org.springframework.boot' version '3.3.4' apply false
     id 'io.spring.dependency-management' version '1.1.6' apply false
+    id 'jacoco'
+}
+
+repositories { mavenCentral() }   // for the root-level jacoco tooling
+
+apply from: 'gradle/coverage.gradle'
+
+// Aggregated coverage across all modules + the gate (US-01.4.1 T-01.4.1.2).
+// Run:  ./gradlew coverageReport coverageGate
+tasks.register('coverageReport', JacocoReport) {
+    dependsOn subprojects.collect { it.tasks.named('test') }
+    dependsOn subprojects.collect { it.tasks.named('jacocoTestReport') }
+    executionData fileTree(rootDir) { include '**/build/jacoco/test.exec' }
+    classDirectories.setFrom(files(subprojects.collect { sp ->
+        sp.fileTree("${sp.buildDir}/classes/java/main") { exclude coverageExclusions }
+    }))
+    sourceDirectories.setFrom(files(subprojects.collect { "${it.projectDir}/src/main/java" }))
+    reports { xml.required = true; html.required = true }
+}
+
+tasks.register('coverageGate', JacocoCoverageVerification) {
+    dependsOn tasks.named('coverageReport')
+    executionData fileTree(rootDir) { include '**/build/jacoco/test.exec' }
+    classDirectories.setFrom(files(subprojects.collect { sp ->
+        sp.fileTree("${sp.buildDir}/classes/java/main") { exclude coverageExclusions }
+    }))
+    sourceDirectories.setFrom(files(subprojects.collect { "${it.projectDir}/src/main/java" }))
+    violationRules {
+        rule {
+            limit { counter = 'LINE';   value = 'COVEREDRATIO'; minimum = coverageMinimumLine }
+            limit { counter = 'BRANCH'; value = 'COVEREDRATIO'; minimum = coverageMinimumBranch }
+        }
+    }
 }
 
 subprojects {
@@ -46,5 +79,18 @@ subprojects {
     test {
         useJUnitPlatform()
         testLogging { events 'failed', 'skipped' }
+        // CI split (US-01.4.1): -PunitOnly runs everything except *IT;
+        // -PitOnly runs only *IT. No property = full suite (local default).
+        if (project.hasProperty('unitOnly'))  { exclude '**/*IT.class' }
+        if (project.hasProperty('itOnly'))    { include '**/*IT.class' }
+        // AC-5: no retry-until-green, ever.
+    }
+
+    apply plugin: 'jacoco'
+    jacoco { toolVersion = '0.8.12' }
+    test.finalizedBy tasks.named('jacocoTestReport')
+    jacocoTestReport {
+        dependsOn test
+        reports { xml.required = true; html.required = true }
     }
 }
