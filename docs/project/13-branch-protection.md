@@ -1,6 +1,6 @@
 # Branch Protection — Configuration, Deviations & Blockers
 
-**Story:** US-01.1.1 · **Task:** T-01.1.1.3 · **Status:** ⚠️ Partially delivered — see blocker below
+**Story:** US-01.1.1 · **Task:** T-01.1.1.3 · **Status:** ✅ Applied and verified
 
 Protection is configured **as code** in [`.github/branch-protection/`](../../.github/branch-protection/),
 applied by [`apply-branch-protection.sh`](../../scripts/apply-branch-protection.sh), and asserted by
@@ -11,49 +11,44 @@ the verify script exists to catch it.
 
 ---
 
-## 🔴 Blocker — protection cannot be applied on the current plan
+## Resolution — repository made public
 
-```
-HTTP 403: Upgrade to GitHub Pro or make this repository public to enable this feature.
-```
+Branch protection is **applied and verified** on `main` and `develop`.
 
-`mamunulhasan/pantropi-vms` is a **private repository on a free personal plan**. GitHub does not
-offer branch protection there.
+### How this was unblocked
 
-**Consequence:** AC-2, AC-4 and AC-5 of US-01.1.1 cannot be satisfied today. Nothing prevents a
-direct push to `develop` or `main` except discipline.
+The repository was private on a free personal plan, where GitHub does not offer branch protection
+(`HTTP 403: Upgrade to GitHub Pro or make this repository public`).
 
-### Options
+**The repository owner elected to make the repository public**, on 2026-07-19, after being advised
+against it. Recorded here for the project record.
 
-| | Option | Cost | Assessment |
-|---|---|---|---|
-| **1** | **GitHub Pro** | ~US$4/month | ✅ **Recommended.** Unblocks everything immediately. The config and scripts are already written — this becomes a one-command apply. |
-| **2** | Move to a GitHub **organisation** | Free tier available; Team plan ~US$4/user/month for private repos | ✅ Also solves CODEOWNERS teams (AC-3) and the approval problem (AC-2). Best long-term — the project documentation assumes an org throughout. |
-| **3** | Make the repository **public** | Free | ❌ **Not recommended — see below.** |
-| **4** | Defer protection | Free | ⚠️ Current state. Config committed and tested offline; applied later. |
+### Risk accepted by that decision
 
-### Why option 3 is not recommended
+Advice given at the time, and the exposure it identified:
 
-Making this repository public would expose:
+| Exposed | Detail |
+|---|---|
+| Client identity & commercial relationship | CPG Corporation Pte Ltd, Westgate Tower |
+| Vendor identity & an unfinished dependency | Universal Automations Ltd; their API contract is undelivered (TODO-02) |
+| Third-party source documents **in git history** | `VMS_Only_SRS_Project_Pinnacle.docx`, `VMS Technical Design Document.docx` — the latter references UAL financial proposal R3 |
+| Physical access-control design | Data model, role and permission set, reception/floor topology of an occupied building |
+| Known security defects | All 15 discrepancies, including **D-15** — an unseeded `role_permissions` table producing a total lockout |
 
-- Client identity and commercial relationship — CPG Corporation, Westgate Tower
-- Vendor identity and an unfinished commercial dependency — Universal Automations Ltd, and the fact
-  that their API contract is undelivered
-- Referenced commercial documents — UAL financial proposal R3, technical information sheet R2
-- The full requirements baseline and 15 catalogued defects in the client's own documents
-- A building access-control system's data model, roles, permission set and known security gaps —
-  including **D-15**, a total-lockout defect, and the reception/floor topology of a real building
+**These documents are in git history, not merely the working tree.** Removing them later requires
+rewriting history, and does not undo any clone, fork, or cache made while the repository was public.
 
-The last point is the serious one. This describes physical access control for an occupied building.
-Publishing its design, permission model and known weaknesses is a security decision, not a
-budget one.
+**Recommended remediation** if confidentiality is later required: move the client `.docx` files and
+the discrepancy register to a private repository, keep the code public, and rewrite history to purge
+the documents. This is materially harder than not publishing them, which is why the advice was to
+choose GitHub Pro (~US$4/month) or an organisation instead.
 
-**This is a client confidentiality and physical-security decision. It is not ours to take, and we
-advise against it.**
+**Owner acknowledgement:** the decision was taken explicitly by the repository owner with the above
+stated. It was not a default, and it was not taken by the implementer.
 
 ---
 
-## Configuration as applied *(pending the blocker)*
+## Configuration as applied
 
 | Setting | `main` | `develop` | Acceptance criterion |
 |---|---|---|---|
