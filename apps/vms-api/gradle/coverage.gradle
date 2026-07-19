@@ -1,0 +1,21 @@
+// Coverage baseline — US-01.4.1 · T-01.4.1.2 (AC-2)
+//
+// THE REVIEWED BASELINE FILE. The CI coverage gate enforces these minima; raising
+// them is welcome, lowering them is a reviewed decision in a PR that must justify
+// itself. Exclusions live here, never as inline suppressions.
+//
+// Deviation from the backlog's "non-regression vs develop" wording, recorded in the
+// US-01.4.1 PR: a fixed ratchet is deterministic and reviewable; a dynamic baseline
+// fetch is neither. Ratchet these values up as the codebase grows.
+
+// Current honest floor: the only production logic yet written is the reference
+// port/adapter pair (US-01.2.1) — fully covered. Wiring/bootstrap classes are
+// excluded from the denominator below.
+ext.coverageMinimumLine   = 0.80
+ext.coverageMinimumBranch = 0.60
+
+ext.coverageExclusions = [
+        '**/bootstrap/VmsApplication*',     // main() launcher
+        '**/*Config*',                      // Spring wiring, no logic
+        '**/package-info*',
+]

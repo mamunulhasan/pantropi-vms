@@ -1,10 +1,10 @@
 {
   "_comment": "Branch protection for `develop` — US-01.1.1 T-01.1.1.3. Applied by scripts/apply-branch-protection.sh, asserted by scripts/verify-branch-protection.sh. Do not edit on GitHub directly; edit here and re-apply so the configuration stays reviewable and restorable.",
 
-  "_strict_note": "required_status_checks.strict = true enforces 'branch must be up to date before merging' (AC-2). First required check registered: commit-lint (US-01.1.2). Remaining contexts land with the CI pipeline (US-01.4.x): build, unit-tests, integration-tests, coverage, architecture-fitness, sast, dependency-scan.",
+  "_strict_note": "required_status_checks.strict = true enforces 'branch must be up to date before merging' (AC-2). Full pipeline registered (US-01.4.1): build, unit and integration tests, coverage gate, CodeQL SAST, dependency review, secret scan — plus commit-lint (US-01.1.2) and architecture-fitness (US-01.2.2). DEV-02 is closed.",
   "required_status_checks": {
     "strict": true,
-    "contexts": ["commit-lint", "architecture-fitness"]
+    "contexts": ["commit-lint", "architecture-fitness", "build", "unit-tests", "integration-tests", "coverage", "sast-codeql", "dependency-review", "secret-scan"]
   },
 
   "_enforce_admins_note": "AC-4 — administrators cannot push directly to develop.",
