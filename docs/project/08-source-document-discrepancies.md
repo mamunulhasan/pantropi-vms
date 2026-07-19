@@ -60,8 +60,19 @@ ID, and requires all traceability references to be qualified — `FR-VMS-10 (SRS
 audit logging, and most of the reporting suite — a large fraction of the delivered system. Building
 them means inventing requirements, which project rule 2 forbids.
 
-**Mitigation in force.** Epics EPIC-03 and EPIC-14 are created but held in `status/blocked` until
-D-01 resolves.
+**Mitigation in force.** The affected scope is planned and estimated but carries the
+`provenance/tdd-derived` label and is **not authorized for implementation** until D-01 resolves:
+EPIC-04 (master data, entirely unbacked), EPIC-10 (host management), EPIC-19 (analytics & export),
+plus features F-03.1, F-03.3, F-05.1, F-07.5, F-08.4, F-09.7, F-17.3/4/5 and F-18.4.
+
+Measured across the decomposed backlog: **62 of 178 user stories are `TDD-DERIVED` (35%)**, and a
+further **11 are `BLOCKED` on other open questions (6%)** — so **73 stories, 41% of the backlog,
+cannot be implemented today.** The remaining 105 (59%) are `SRS`, `SRS-NFR`, `SRS-CON` or `ENABLER`
+and are authorized.
+
+The concentration matters more than the total: Phase 1 is 18 TDD-derived of 42 stories, and Phase 4
+is 19 of 36. Phase 2 is only 12 of 45 — which is why it is the phase that can be delivered and
+demonstrated while D-01 remains open.
 
 ---
 
@@ -161,6 +172,107 @@ months later. Likely benign (revision of an older proposal), but flagged for doc
 
 ---
 
+## D-10 🟠 `notification_logs` cannot hold retry state, though the schema solves the same problem elsewhere
+
+`vms.notification_logs` has `delivery_status` (`queued`/`sent`/`delivered`/`failed`) but **no
+`attempt_count`, `last_error`, `next_retry_at`, or idempotency key**.
+
+`vms.acs_requests` solves the structurally identical outbound-delivery-with-retry problem and has
+**all four**. The asymmetry looks like an oversight rather than a decision.
+
+**Impact.** A failed notification can be observed but not systematically retried, and a redelivered
+domain event would produce a duplicate notification with nothing to deduplicate against. TDD §8
+requires delivery-status recording and says failures raise system alerts — but retry is not
+expressible in the current table.
+
+**Disposition needed.** Either extend `notification_logs` to match the `acs_requests` pattern, or
+confirm that a service-owned dispatch table is the intended design. The backlog currently assumes
+the latter.
+
+---
+
+## D-11 🟠 `access_events` has no location column, so historic reports silently rewrite themselves
+
+`vms.access_events` records `gate_ref` as free text and carries no building, floor, or tenant
+reference.
+
+**Impact.** FR-REP-01 (SRS B1) requires visitor activity reports combining VMS data with ACS access
+events. Any per-floor or per-tenant breakdown must join through `visitor → request → tenant → floor`,
+which resolves against **present-day** master data. When a tenant moves floors, every historical
+report retroactively re-attributes their past visits to the new floor.
+
+This is a classic slowly-changing-dimension problem. It is invisible until someone notices last
+quarter's numbers changed.
+
+**Disposition needed.** Either denormalise location onto the event at write time, or accept that
+historic reports reflect current organisational structure — and say so in the report headers.
+
+---
+
+## D-12 🟠 The schema seeds permissions for capabilities no requirement asks for
+
+`vms.permissions` seeds:
+
+| Permission | Capability | Requirement |
+|---|---|---|
+| `credential.override` | Manual credential override | **None** — see D-06, TODO-04 |
+| `report.export` | Export reports to Excel/PDF | **None** — SRS §3.8 requires neither format, TODO-16 |
+
+**Impact.** Both grant access to functionality that has no SRS backing. Seeding a permission is a
+quiet way of asserting that a capability exists. If TODO-04 and TODO-16 resolve as descopes, these
+rows must be removed, not left dormant — a dormant permission is a latent authorization surface.
+
+---
+
+## D-13 🟡 `vms.hosts` is attributed to a requirement about something else
+
+The schema comments `vms.hosts` as *"Tenant-side hosts who receive visitors **(FR-VMS-06)**"*. But
+FR-VMS-06 (SRS B1) is about VMS storing the **credential reference returned by ACS** — it says
+nothing about hosts.
+
+**Impact.** Host *management* has no SRS requirement at all, which is why EPIC-10 is `TDD-DERIVED`.
+Note however that FR-NOT-01 and FR-NOT-02 (SRS B1) both require notifying "the host", so *some* host
+concept is genuinely implied by the SRS even though its management is not specified. The gap is
+narrower than it first appears, but it is real.
+
+---
+
+## D-14 🟡 D-04's numbering drift also appears in the schema, not just the TDD
+
+`vms.acs_api_log` is commented *"Request/response audit trail for ACS integration **(FR-API-04)**"*.
+`FR-API-04` does not exist in the SRS; the correct reference is **FR-API-02** (SRS B1), "log all API
+requests to and responses from ACS".
+
+**Impact.** Confirms the `FR-API-*` renumbering (D-04) propagated into the database schema, which
+strengthens the case that both the TDD and schema were written against SRS v2 (D-01).
+
+---
+
+## D-15 🔴 `role_permissions` is never seeded — the schema ships a total lockout
+
+Schema §14 seeds **5 roles** and **11 permissions**, but seeds **zero rows into
+`vms.role_permissions`**. Every role therefore holds no permissions.
+
+**Impact.** Combined with deny-by-default authorization — which NFR-SEC-01 (SRS B1) and OWASP both
+require — a freshly migrated database authorizes **nobody to do anything, including the System
+Administrator**. There is no bootstrap path: the account that would grant permissions lacks
+permission to grant them.
+
+This is not a design ambiguity like D-05; it is a defect in the published schema. It surfaces the
+moment the first environment is stood up.
+
+**Also unresolved:** even with the mechanism fixed, *which* role gets *which* permission is
+unstated. The role descriptions imply a grant matrix (e.g. `MASTER_ADMIN` → `visitor.approve`,
+`credential.issue`), but inferring it means inventing authorization policy — the most
+security-sensitive thing to guess at. Note that two of the eleven permissions
+(`credential.override`, `report.export`) grant capabilities with no SRS requirement at all (D-12).
+
+**Disposition needed.** A client-confirmed role→permission grant matrix, plus a seeded bootstrap
+administrator. Until then the backlog carries this as an explicit task with a *proposed* matrix
+clearly marked as requiring confirmation.
+
+---
+
 ## Disposition log
 
 | ID | Severity | Raised | Owner | Status | Resolution |
@@ -174,3 +286,9 @@ months later. Likely benign (revision of an older proposal), but flagged for doc
 | D-07 | 🟡 | 2026-07-19 | Pantropi doc control | **Open** | — |
 | D-08 | 🔴 | 2026-07-19 | Client / UAL | **Open** | — |
 | D-09 | 🟡 | 2026-07-19 | Pantropi doc control | **Open** | — |
+| D-10 | 🟠 | 2026-07-19 | Pantropi doc control | **Open** | `notification_logs` lacks retry state |
+| D-11 | 🟠 | 2026-07-19 | Pantropi doc control / client | **Open** | `access_events` lacks location — historic reports drift |
+| D-12 | 🟠 | 2026-07-19 | Client | **Open** | Permissions seeded for unrequirmented capabilities |
+| D-13 | 🟡 | 2026-07-19 | Pantropi doc control | **Open** | `vms.hosts` mis-attributed to FR-VMS-06 |
+| D-14 | 🟡 | 2026-07-19 | Pantropi doc control | **Open** | `FR-API-04` cited in schema; does not exist |
+| D-15 | 🔴 | 2026-07-19 | **Client** | **Open** | `role_permissions` unseeded — schema ships a total lockout |

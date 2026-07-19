@@ -15,8 +15,19 @@ through a documented API, and ACS remains the system of record for physical acce
 
 ## 📌 Project status
 
-**Phase:** M0 — Inception & Requirements Baseline
+**Phase:** Inception complete — backlog baselined, awaiting dependency resolution
 **Application code:** none yet, by design.
+
+**Delivery structure:** 4 Phases → 19 Epics → 93 Features → User Stories → Development Tasks.
+Full decomposition in [`docs/project/backlog/`](docs/project/backlog/).
+
+| Phase | Milestone | Release | Gated? |
+|---|---|---|---|
+| 1 | Platform Foundation | 0.1.0 | Partly — EPIC-04 on TODO-01 |
+| 2 | Visitor Registration & Pass Generation | 0.2.0 ⭐ **client demo** | No (simulator) |
+| 3 | Entry Verification & ACS Integration | 0.3.0 / 0.4.0 | 🔴 Stage B on TODO-02 |
+| 4 | Reporting & Notification | 0.5.0 | Partly |
+| — | Hardening & Production | 1.0.0 | — |
 
 Requirements analysis is complete. Two blocking dependencies must be resolved by the client and the
 ACS vendor before sustained implementation can begin:
@@ -46,9 +57,13 @@ not depend on the blockers above. See the [milestone plan](docs/project/04-miles
 |---|---|
 | [Requirements Catalogue](docs/project/01-requirements-catalogue.md) | You need to know what we may build. **Nothing outside this document gets implemented.** |
 | [Traceability Matrix](docs/project/02-traceability-matrix.md) | You need to prove a requirement is covered, or check nothing unbacked is being built |
-| [Epics & Backlog](docs/project/03-epics-and-backlog.md) | You are planning a sprint |
-| [Milestones & Release Plan](docs/project/04-milestones-and-release-plan.md) | You need the delivery sequence and its dependencies |
+| [Epic & Feature Index](docs/project/backlog/00-epic-feature-index.md) | You need the backlog skeleton — 19 epics, 93 features |
+| [Phase Backlogs](docs/project/backlog/) | You are planning a sprint — full story and task decomposition |
 | [Workflow & Branching](docs/project/05-workflow-and-branching.md) | You are about to write code |
+| [Repository Structure](docs/project/09-repository-structure.md) | You need to know where code goes |
+| [Branch Strategy](docs/project/10-branch-strategy.md) | You are branching, merging or releasing |
+| [Labels & Project Board](docs/project/11-labels-and-project-board.md) | You are managing the board |
+| [Release Plan](docs/project/12-release-plan.md) | You need release contents and exit criteria |
 | [Open Questions](docs/project/07-open-questions.md) | A requirement is ambiguous — check here before guessing |
 | [Source Document Discrepancies](docs/project/08-source-document-discrepancies.md) | The three documents disagree and you need to know which wins |
 | [ADRs](docs/adr/) | You need the reasoning behind an architectural decision |
