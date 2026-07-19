@@ -58,7 +58,7 @@ stated. It was not a default, and it was not taken by the implementer.
 | Dismiss stale approvals | ✅ | ✅ | AC-5 |
 | Require conversation resolution | ✅ | ✅ | AC-2 |
 | Require branch up to date | ✅ | ✅ | AC-2 |
-| Required status checks | *(none yet)* | *(none yet)* | AC-2 — deferred to US-01.4.x |
+| Required status checks | `commit-lint` | `commit-lint` | AC-2 — partially; rest with US-01.4.x |
 | Include administrators | ✅ | ✅ | AC-4 |
 | Require linear history | ❌ *(deliberate)* | ✅ | — |
 | Force pushes | blocked | blocked | — |
@@ -82,18 +82,19 @@ second collaborator or an organisation exists. Option 2 above resolves this and 
 **Risk accepted meanwhile:** no enforced second pair of eyes. Review discipline is procedural, not
 technical.
 
-### DEV-02 — No required status checks
+### DEV-02 — Required status checks incomplete *(shrinking)*
 
 **Against:** AC-2 (all required status checks pass)
 
-`contexts` is deliberately empty. No CI pipeline exists until US-01.4.x. Requiring a check that
-never reports would block every merge permanently.
+**`commit-lint` is now registered and required** on both branches (US-01.1.2): Conventional
+Commits, the story-id rule, and the D-02 qualified-reference rule are mechanically enforced on
+every PR. Local hook available via `scripts/install-git-hooks.sh`.
 
-**Resolution:** when the pipeline lands, add to both configs and re-apply:
+**Remaining:** the build/test pipeline lands with US-01.4.x; add to both configs and re-apply:
 
 ```
 build · unit-tests · integration-tests · coverage · architecture-fitness
-commit-lint · sast · dependency-scan
+sast · dependency-scan
 ```
 
 The **architecture-fitness** check is the important one — it enforces the ACS boundary rule
