@@ -15,5 +15,13 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
+    // US-01.5.1 — versioned migrations. JDBC + Flyway; no JPA yet.
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Real PostgreSQL without Docker: Zonky embedded-postgres (US-01.5.1 ITs)
+    testImplementation 'io.zonky.test:embedded-postgres:2.0.7'
 }

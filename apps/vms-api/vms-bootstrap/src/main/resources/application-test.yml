@@ -1,2 +1,9 @@
 # Profile: test (US-01.2.1 · T-01.2.1.3)
 # CI / integration tests. Random port is set by the test harness.
+
+# US-01.5.1: no database in this profile until US-01.3.1 (docker compose)
+# delivers one. Flyway + DataSource auto-config excluded so the app still
+# boots DB-less; migration ITs run their own embedded PostgreSQL.
+spring.autoconfigure.exclude:
+  - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+  - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
