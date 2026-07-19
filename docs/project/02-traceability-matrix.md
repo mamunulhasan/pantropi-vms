@@ -149,7 +149,7 @@ Every pull request must:
 
 | Story | Requirement | Tasks | Key modules | Tests | PR | Merged | Release |
 |---|---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — | — |
+| US-01.1.1 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.1.1.1/2/3 | `.gitattributes`, `.github/CODEOWNERS`, `.github/branch-protection/`, `scripts/{apply,verify,test}-branch-protection.sh` | unit 22/22; integration 2/2 branches; AC-4 proven live (GH006) | #27 | pending | 0.1.0 |
 
 ---
 

@@ -1,0 +1,67 @@
+# Line-ending normalisation — Project Pinnacle VMS
+#
+# Without this, Windows checkouts commit CRLF and Linux CI sees a whole-file
+# diff on every change. Normalise to LF in the repository; Git converts on
+# checkout per platform.
+#
+# US-01.1.1 · T-01.1.1.1
+
+# Default: treat as text, store LF in the repo
+* text=auto eol=lf
+
+# ---- Explicitly text -------------------------------------------------------
+*.java      text eol=lf
+*.kt        text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.xml       text eol=lf
+*.sql       text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.properties text eol=lf
+*.gradle    text eol=lf
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+CODEOWNERS  text eol=lf
+
+# ---- Must keep CRLF (Windows tooling breaks otherwise) ---------------------
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# ---- Binary: never diff, never convert ------------------------------------
+*.docx      binary
+*.xlsx      binary
+*.pptx      binary
+*.pdf       binary
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.jar       binary
+*.zip       binary
+*.gz        binary
+*.p12       binary
+*.jks       binary
+
+# ---- Diff hints ------------------------------------------------------------
+*.java      diff=java
+*.md        diff=markdown
+
+# ---- Exclude from release archives ----------------------------------------
+.github/        export-ignore
+docs/           export-ignore
+scripts/        export-ignore
+.gitattributes  export-ignore
+.gitignore      export-ignore
