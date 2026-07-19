@@ -1,0 +1,19 @@
+// vms-bootstrap — the thin Spring Boot entry point. The ONLY module producing
+// a runnable jar (T-01.2.1.1 acceptance). Owns wiring and profiles; owns no
+// behaviour.
+//
+// US-01.2.1 · T-01.2.1.3
+
+plugins {
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+dependencies {
+    implementation project(':vms-infrastructure')
+    implementation project(':vms-interfaces')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

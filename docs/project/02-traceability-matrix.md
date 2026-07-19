@@ -150,7 +150,8 @@ Every pull request must:
 | Story | Requirement | Tasks | Key modules | Tests | PR | Merged | Release |
 |---|---|---|---|---|---|---|---|
 | US-01.1.1 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.1.1.1/2/3 | `.gitattributes`, `.github/CODEOWNERS`, `.github/branch-protection/`, `scripts/{apply,verify,test}-branch-protection.sh` | unit 22/22; integration 2/2 branches; AC-4 proven live (GH006) | [#27](https://github.com/mamunulhasan/pantropi-vms/pull/27) | 2026-07-19 | 0.1.0 |
-| US-01.1.2 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.1.2.1/2 | `scripts/lint-commit-message.sh`, `scripts/install-git-hooks.sh`, `.github/workflows/commit-lint.yml`, `.github/branch-protection/` | unit 22/22; check required + exercised on own PR | #29 | pending | 0.1.0 |
+| US-01.1.2 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.1.2.1/2 | `scripts/lint-commit-message.sh`, `scripts/install-git-hooks.sh`, `.github/workflows/commit-lint.yml`, `.github/branch-protection/` | unit 22/22; check required + exercised on own PR | [#29](https://github.com/mamunulhasan/pantropi-vms/pull/29) | 2026-07-19 | 0.1.0 |
+| US-01.2.1 | ENABLER — NFR-MNT-01, CON-01, CON-02 (SRS B1) | T-01.2.1.1/2/3 | `apps/vms-api/` — 5 Gradle modules, 34 context packages, ClockPort/SystemClockAdapter | unit 8/8 (domain purity); integration 3/3 (health UP, no business endpoints, port wiring) | #30 | pending | 0.1.0 |
 
 ---
 

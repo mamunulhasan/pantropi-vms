@@ -1,0 +1,23 @@
+# Project Pinnacle VMS — base configuration (US-01.2.1 · T-01.2.1.3)
+#
+# Profiles: local · test · staging · prod (TDD §9.3 — containerised artifacts promoted
+# unchanged; configuration injected per environment). Secrets NEVER live in these files —
+# FR-API-03 (SRS B1): they arrive from the environment / secrets manager.
+
+spring:
+  application:
+    name: vms-api
+  profiles:
+    default: local
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+server:
+  port: 8080
