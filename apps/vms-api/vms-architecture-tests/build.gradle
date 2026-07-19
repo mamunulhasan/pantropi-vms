@@ -1,0 +1,30 @@
+// vms-architecture-tests — the mechanical enforcement of the architecture.
+//
+// US-01.2.2 — these tests ARE the boundary rules. They depend on every module
+// so ArchUnit can import the full compiled codebase; they produce no artifact.
+//
+// Requirement: NFR-MNT-01 (SRS B1), CON-01 (SRS B1), CON-02 (SRS B1)
+
+plugins {
+    id 'io.spring.dependency-management'
+}
+
+// The modules under test declare version-less Spring deps against the Boot BOM;
+// import it here too so their transitive classpath resolves.
+dependencyManagement {
+    imports {
+        mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+    }
+}
+
+dependencies {
+    testImplementation project(':vms-domain')
+    testImplementation project(':vms-application')
+    testImplementation project(':vms-infrastructure')
+    testImplementation project(':vms-interfaces')
+    testImplementation project(':vms-bootstrap')
+
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+}
+
+jar.enabled = false
