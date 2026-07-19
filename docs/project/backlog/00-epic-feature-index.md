@@ -110,11 +110,11 @@ identity in place. No visitor workflow.
 | F-04.6 | Pass type master data | `TDD-DERIVED` FR-CFG-07 |
 | F-04.7 | Holiday calendar | `TDD-DERIVED` FR-CFG-08 |
 | F-04.8 | System settings | `TDD-DERIVED` FR-SET-01 |
+| F-04.9 | Master data caching & invalidation | `TDD-DERIVED` TDD §4.1 |
 
 > ⚠️ **`FR-CFG-01` is unallocated.** The requirements catalogue §5 lists `FR-CFG-01 … FR-CFG-08`,
 > but only FR-CFG-02..08 have an identifiable subject in the schema. FR-CFG-01's content is unknown
 > — it maps to no feature and cannot, until TODO-01 supplies its definition.
-| F-04.9 | Master data caching & invalidation | `TDD-DERIVED` TDD §4.1 |
 
 ### EPIC-05 — Audit, Security & Compliance Foundation
 | Feature | Title | Provenance |
