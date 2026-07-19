@@ -80,14 +80,23 @@ jobs:
           name: coverage-report
           path: apps/vms-api/build/reports/jacoco/coverageReport/
 
-  dependency-review:
-    name: dependency-review
+  dependency-scan:
+    name: dependency-scan
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    defaults: { run: { working-directory: . } }
+    permissions:
+      contents: write   # dependency-submission writes the resolved graph
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      # Resolve the real Gradle build and submit its dependency graph, so the
+      # scan sees transitive deps. Without this, GitHub's graph is empty for
+      # Gradle and any review passes vacuously (found while proving AC-3).
+      - uses: gradle/actions/dependency-submission@v4
+        with:
+          build-root-directory: apps/vms-api
       - name: Fail on new high/critical advisories (AC-3)
+        if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
