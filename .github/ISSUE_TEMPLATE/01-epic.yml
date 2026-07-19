@@ -1,0 +1,93 @@
+name: "1 · Epic"
+description: "A large body of work traceable to one or more SRS requirements."
+title: "[EPIC-NN] "
+labels: ["type/epic"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Traceability chain:** Requirement → Milestone → **Epic** → Feature → User Story → Task → Code → Test → PR → Release
+
+        An epic must trace to at least one requirement in
+        [`docs/project/01-requirements-catalogue.md`](../../docs/project/01-requirements-catalogue.md).
+        If it does not, it must be justified as an **enabler** below.
+
+  - type: input
+    id: requirements
+    attributes:
+      label: SRS requirement IDs
+      description: "Comma-separated, qualified with the baseline. Enter `NONE` for an enabler epic."
+      placeholder: "FR-VMS-01 (SRS B1), FR-VMS-02 (SRS B1)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: enabler
+    attributes:
+      label: Enabler justification
+      description: "Required only if requirement IDs are `NONE`. Which NFR or constraint makes this necessary? What user-visible behaviour does it deliberately NOT ship?"
+    validations:
+      required: false
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: "What capability does this epic deliver, and to whom?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: In scope / out of scope
+      description: "Be explicit about the boundary. Reference SRS §1.2 for system-level exclusions."
+      value: |
+        **In scope**
+        -
+
+        **Out of scope**
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: features
+    attributes:
+      label: Features
+      description: "Link child feature issues. Add them as they are created."
+      value: |
+        - [ ] #
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Epic acceptance criteria
+      description: "How do we know the epic is done? These should be demonstrable to the client."
+    validations:
+      required: true
+
+  - type: textarea
+    id: blocked
+    attributes:
+      label: Open questions / blockers
+      description: "Reference TODO IDs from docs/project/07-open-questions.md. If any BLOCKING TODO applies, this epic cannot be decomposed into user stories."
+      placeholder: "TODO-02 (ACS API contract) — blocks F-xx.x"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Definition of Ready
+      options:
+        - label: "Every requirement ID above exists in the requirements catalogue, or an enabler justification is given"
+          required: true
+        - label: "No functionality is proposed that is absent from the SRS (project rule 2)"
+          required: true
+        - label: "Added to the traceability matrix (`docs/project/02-traceability-matrix.md`)"
+          required: true
+        - label: "Assigned to exactly one milestone"
+          required: true

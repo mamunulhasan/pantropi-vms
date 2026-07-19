@@ -1,0 +1,81 @@
+name: "5 · Bug"
+description: "Defect in delivered behaviour."
+title: "[BUG] "
+labels: ["type/bug"]
+body:
+  - type: input
+    id: requirement
+    attributes:
+      label: Requirement violated
+      description: "Which requirement does the current behaviour breach? If none, this may be a change request, not a bug."
+      placeholder: "FR-VMS-02 (SRS B1)"
+    validations:
+      required: true
+
+  - type: input
+    id: story
+    attributes:
+      label: Originating user story
+      placeholder: "#56 (US-04.2.2)"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "S1 — Blocks visitor entry or credential issuance in production"
+        - "S2 — Major function unusable, workaround exists"
+        - "S3 — Minor function affected"
+        - "S4 — Cosmetic"
+      default: 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options: [Development, Staging, Production]
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: Expected vs actual
+      value: |
+        **Expected (per requirement):**
+        **Actual:**
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: "Logs, correlation ids, screenshots. For ACS issues include the acs_request id and the logged request/response (FR-API-02)."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Checks
+      options:
+        - label: "A regression test reproducing this defect will be added before the fix"
+          required: true
+        - label: "No personal data (visitor names, emails, phones, ID references) pasted into this issue"
+          required: true

@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Requirements catalogue
+    url: https://github.com/mamunulhasan/pantropi-vms/blob/develop/docs/project/01-requirements-catalogue.md
+    about: "Every requirement, with provenance. Nothing may be built that is not in here."
+  - name: Open questions (TODO list)
+    url: https://github.com/mamunulhasan/pantropi-vms/blob/develop/docs/project/07-open-questions.md
+    about: "Known ambiguities awaiting client or vendor input. Check here before raising a clarification."
+  - name: Source document discrepancies
+    url: https://github.com/mamunulhasan/pantropi-vms/blob/develop/docs/project/08-source-document-discrepancies.md
+    about: "Conflicts between the SRS, TDD and database schema."
+  - name: Contributing guide
+    url: https://github.com/mamunulhasan/pantropi-vms/blob/develop/CONTRIBUTING.md
+    about: "Branching, Conventional Commits, PR requirements, Definition of Done."

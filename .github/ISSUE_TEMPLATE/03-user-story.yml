@@ -1,0 +1,131 @@
+name: "3 · User Story"
+description: "A single, independently valuable behaviour. THE UNIT OF WORK — only one is implemented at a time."
+title: "[US-NN.N.N] "
+labels: ["type/user-story"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Traceability chain:** Requirement → Milestone → Epic → Feature → **User Story** → Task → Code → Test → PR → Release
+
+        > ⚠️ **Project rule: never implement more than one user story at a time.**
+        > Before starting, confirm no other user story is `status/in-progress` for you.
+
+  - type: input
+    id: feature
+    attributes:
+      label: Parent feature
+      placeholder: "#34 (F-04.1)"
+    validations:
+      required: true
+
+  - type: input
+    id: requirements
+    attributes:
+      label: SRS requirement IDs
+      placeholder: "FR-VMS-01 (SRS B1)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      value: |
+        **As a** <role from SRS §2.2>
+        **I want** <capability>
+        **So that** <value>
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria (Given / When / Then)
+      description: "Each criterion must be independently testable. These become the integration tests."
+      value: |
+        ### AC-1
+        **Given**
+        **When**
+        **Then**
+
+        ### AC-2
+        **Given**
+        **When**
+        **Then**
+    validations:
+      required: true
+
+  - type: textarea
+    id: negative
+    attributes:
+      label: Negative & edge cases
+      description: "Failure paths, authorisation denials, invalid input, ACS unavailable. Required — these are where defects live."
+    validations:
+      required: true
+
+  - type: textarea
+    id: security
+    attributes:
+      label: Security considerations (OWASP)
+      description: "AuthN/AuthZ, input validation, PII handling, audit events emitted, injection surface. State 'none' only with a reason."
+      value: |
+        - **Authorisation required:**
+        - **Personal data touched:**
+        - **Audit events emitted:**
+        - **OWASP Top 10 categories considered:**
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Development tasks
+      value: |
+        - [ ] #
+    validations:
+      required: false
+
+  - type: textarea
+    id: design
+    attributes:
+      label: Design notes
+      description: "Clean Architecture layer(s) touched, domain model impact, API contract, DDD aggregate/bounded context."
+      value: |
+        **Layers touched:**
+        **Aggregate / bounded context:**
+        **API contract change:**
+        **Database migration required:** yes / no
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: dor
+    attributes:
+      label: Definition of Ready
+      options:
+        - label: "Traces to a requirement via a parent feature"
+          required: true
+        - label: "Acceptance criteria are testable and unambiguous"
+          required: true
+        - label: "No blocking TODO applies, or the blocker is explicitly scoped out of this story"
+          required: true
+        - label: "Estimated by the team"
+          required: true
+        - label: "Adds no behaviour beyond the stated requirement (project rule 2)"
+          required: true
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: "All acceptance criteria met and demonstrated"
+        - label: "Unit tests written and passing"
+        - label: "Integration tests written and passing"
+        - label: "No unrelated code modified (project rule)"
+        - label: "Documentation updated"
+        - label: "Traceability matrix row updated with task, code, test and PR links"
+        - label: "Conventional Commits used throughout"
+        - label: "Code reviewed and approved"
+        - label: "Security review considerations addressed"

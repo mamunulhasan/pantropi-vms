@@ -1,0 +1,65 @@
+name: "6 · Spike / Clarification"
+description: "Time-boxed investigation, or a requirement ambiguity needing client or vendor input."
+title: "[SPIKE] "
+labels: ["type/spike", "needs-clarification"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Project rule 3: **if requirements are ambiguous, raise a clarification instead of guessing.**
+
+        If this corresponds to an entry in
+        [`docs/project/07-open-questions.md`](../../docs/project/07-open-questions.md), reference its
+        TODO id rather than restating it.
+
+  - type: input
+    id: todo
+    attributes:
+      label: Related TODO id
+      placeholder: "TODO-02"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Who must answer this?
+      options:
+        - "Client — CPG Corporation"
+        - "ACS vendor — Universal Automations Ltd"
+        - "Pantropi — document control"
+        - "Pantropi — engineering (technical spike)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: "State precisely what is unclear and quote the source document text that is ambiguous."
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: What is blocked
+      description: "Which epics, features or stories cannot proceed, and what happens if we guess wrong?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options considered
+      description: "Present the readings we can see, and our recommendation. Do not implement one before the answer arrives."
+    validations:
+      required: false
+
+  - type: input
+    id: timebox
+    attributes:
+      label: Time box (technical spikes only)
+      placeholder: "2 days"
+    validations:
+      required: false

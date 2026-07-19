@@ -1,0 +1,83 @@
+name: "2 · Feature"
+description: "A coherent, independently deployable slice of an epic."
+title: "[F-NN.N] "
+labels: ["type/feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Traceability chain:** Requirement → Milestone → Epic → **Feature** → User Story → Task → Code → Test → PR → Release
+
+        Project rule: **every feature must be independently deployable.**
+
+  - type: input
+    id: epic
+    attributes:
+      label: Parent epic
+      placeholder: "#12 (EPIC-04)"
+    validations:
+      required: true
+
+  - type: input
+    id: requirements
+    attributes:
+      label: SRS requirement IDs
+      placeholder: "FR-VMS-01 (SRS B1)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: "What does this feature do? Quote the requirement text where it helps."
+    validations:
+      required: true
+
+  - type: textarea
+    id: stories
+    attributes:
+      label: User stories
+      value: |
+        - [ ] #
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Feature acceptance criteria
+    validations:
+      required: true
+
+  - type: textarea
+    id: deployability
+    attributes:
+      label: Independent deployability
+      description: "How does this ship without breaking anything else? Feature flag name, migration strategy, backward compatibility."
+      value: |
+        **Feature flag:** `vms.feature.`
+        **Migration strategy:**
+        **Backward compatibility:**
+    validations:
+      required: true
+
+  - type: textarea
+    id: blocked
+    attributes:
+      label: Open questions / blockers
+      placeholder: "TODO-xx"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Definition of Ready
+      options:
+        - label: "Traces to a requirement in the catalogue, via a parent epic"
+          required: true
+        - label: "Independently deployable — flag and migration strategy stated"
+          required: true
+        - label: "Traceability matrix updated"
+          required: true

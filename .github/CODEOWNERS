@@ -1,0 +1,36 @@
+# CODEOWNERS — Project Pinnacle VMS
+#
+# Every path has an owner. Ownership is by architectural responsibility, not convenience.
+# Replace the placeholder handles below with real GitHub usernames or teams before enabling
+# branch protection. See TODO in docs/project/05-workflow-and-branching.md.
+
+# ---- Default -----------------------------------------------------------------
+*                                   @pantropi/vms-maintainers
+
+# ---- Requirements & governance ----------------------------------------------
+# Changing a requirement, the traceability matrix, or the open-questions register
+# is a governance action, not an engineering one.
+/docs/project/                      @pantropi/vms-architects @pantropi/vms-product
+/docs/VMS_Only_SRS_Project_Pinnacle.docx   @pantropi/vms-product
+/docs/VMS Technical Design Document.docx   @pantropi/vms-architects
+/docs/adr/                          @pantropi/vms-architects
+
+# ---- Schema ------------------------------------------------------------------
+# The schema is a source-of-truth document. Changes need architect sign-off.
+/docs/vms_schema_postgresql.sql     @pantropi/vms-architects
+**/migration/                       @pantropi/vms-architects
+
+# ---- ACS integration ---------------------------------------------------------
+# The single choke-point for all ACS calls (CON-01, CON-02, NFR-MNT-01).
+# A change here can breach the SRS scope boundary — architect review is mandatory.
+**/acs/                             @pantropi/vms-architects
+**/integration/acs/                 @pantropi/vms-architects
+
+# ---- Security ----------------------------------------------------------------
+**/security/                        @pantropi/vms-security
+**/auth/                            @pantropi/vms-security
+
+# ---- Project & CI configuration ---------------------------------------------
+/.github/                           @pantropi/vms-maintainers
+/CONTRIBUTING.md                    @pantropi/vms-maintainers
+/CLAUDE.md                          @pantropi/vms-architects

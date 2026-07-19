@@ -1,0 +1,87 @@
+# ---- Build output -----------------------------------------------------------
+target/
+build/
+out/
+dist/
+*.jar
+*.war
+*.class
+
+# ---- Node / Next.js ---------------------------------------------------------
+node_modules/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+
+# ---- Environment & secrets --------------------------------------------------
+# ACS API credentials and notification-gateway keys live in a secrets manager,
+# never in this repository (FR-API-03, TDD §6.3, §7).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+secrets/
+application-local.yml
+application-local.properties
+
+# ---- IDE --------------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+.settings/
+.project
+.classpath
+*.sublime-*
+
+# ---- OS ---------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Logs & temp ------------------------------------------------------------
+*.log
+logs/
+tmp/
+temp/
+*.pid
+
+# ---- Test & tooling output --------------------------------------------------
+.gradle/
+.mvn/wrapper/maven-wrapper.jar
+surefire-reports/
+failsafe-reports/
+jacoco.exec
+.scannerwork/
+test-results/
+playwright-report/
+
+# ---- Local infrastructure ---------------------------------------------------
+docker-compose.override.yml
+.pgdata/
+.redisdata/
+.kafkadata/
+
+# ---- Working documents ------------------------------------------------------
+~$*.docx
+~$*.xlsx
+*.tmp
+.scratch/
+
+# ---- Never commit visitor personal data -------------------------------------
+# Production or UAT data exports must never enter version control (NFR-CMP-01).
+*.dump
+*.sql.gz
+data-export/

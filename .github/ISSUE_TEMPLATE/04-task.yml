@@ -1,0 +1,61 @@
+name: "4 · Development Task"
+description: "A concrete unit of implementation work under a user story."
+title: "[TASK] "
+labels: ["type/task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Traceability chain:** … → User Story → **Task** → Code → Test → PR → Release
+
+  - type: input
+    id: story
+    attributes:
+      label: Parent user story
+      placeholder: "#56 (US-04.1.1)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Task kind
+      options:
+        - Domain model
+        - Application service / use case
+        - Infrastructure / persistence
+        - REST API endpoint
+        - Front end
+        - Database migration
+        - Unit tests
+        - Integration tests
+        - Documentation
+        - Build / CI
+        - Security
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs doing
+    validations:
+      required: true
+
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Checks
+      options:
+        - label: "Scope is limited to the parent story — no unrelated code touched"
+          required: true
+        - label: "Clean Architecture layer boundaries respected"
+        - label: "SOLID principles applied"
