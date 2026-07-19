@@ -1,36 +1,80 @@
 # CODEOWNERS — Project Pinnacle VMS
 #
-# Every path has an owner. Ownership is by architectural responsibility, not convenience.
-# Replace the placeholder handles below with real GitHub usernames or teams before enabling
-# branch protection. See TODO in docs/project/05-workflow-and-branching.md.
+# US-01.1.1 · T-01.1.1.2
+#
+# ---------------------------------------------------------------------------
+# CURRENT STATE — single-owner repository
+# ---------------------------------------------------------------------------
+# This repository is owned by a personal GitHub account, which cannot have
+# teams. Every path therefore maps to @mamunulhasan.
+#
+# CONSEQUENCE, stated plainly: GitHub never requests review from the author of
+# a pull request. With one owner, a CODEOWNERS rule can never be satisfied on
+# a PR that owner raised. Enabling "require review from Code Owners" on branch
+# protection today would block every merge permanently.
+#
+# So that setting is DEFERRED, not enabled — recorded as a documented
+# deviation against US-01.1.1 AC-2 and AC-3. See:
+#   docs/project/02-traceability-matrix.md  (delivery log)
+#   docs/project/13-branch-protection.md    (deviation register)
+#
+# This file is still worth having now: it declares ownership intent, and the
+# moment a second collaborator or an organisation exists it becomes
+# enforceable by flipping one protection setting.
+#
+# ---------------------------------------------------------------------------
+# WHEN THE TEAM EXISTS
+# ---------------------------------------------------------------------------
+# Move the repository to a `pantropi` organisation, create these teams, then
+# replace @mamunulhasan below:
+#
+#   @pantropi/vms-maintainers  — default owners
+#   @pantropi/vms-architects   — architecture, ACS boundary, schema, ADRs
+#   @pantropi/vms-security     — auth, RBAC, secrets, audit
+#   @pantropi/vms-product      — requirements, traceability, open questions
+#
+# Then enable "Require review from Code Owners" on `main` and `develop`, and
+# raise the ACS/security paths to two required approvals (AC-3).
+# ---------------------------------------------------------------------------
 
-# ---- Default -----------------------------------------------------------------
-*                                   @pantropi/vms-maintainers
+# ---- Default ---------------------------------------------------------------
+*                                   @mamunulhasan
 
-# ---- Requirements & governance ----------------------------------------------
-# Changing a requirement, the traceability matrix, or the open-questions register
-# is a governance action, not an engineering one.
-/docs/project/                      @pantropi/vms-architects @pantropi/vms-product
-/docs/VMS_Only_SRS_Project_Pinnacle.docx   @pantropi/vms-product
-/docs/VMS Technical Design Document.docx   @pantropi/vms-architects
-/docs/adr/                          @pantropi/vms-architects
+# ---- Requirements & governance ---------------------------------------------
+# Changing a requirement, the traceability matrix, or the open-questions
+# register is a governance action, not an engineering one.
+/docs/project/                      @mamunulhasan
+/docs/adr/                          @mamunulhasan
+/docs/VMS_Only_SRS_Project_Pinnacle.docx        @mamunulhasan
+/docs/VMS Technical Design Document.docx        @mamunulhasan
 
-# ---- Schema ------------------------------------------------------------------
+# ---- Database schema -------------------------------------------------------
 # The schema is a source-of-truth document. Changes need architect sign-off.
-/docs/vms_schema_postgresql.sql     @pantropi/vms-architects
-**/migration/                       @pantropi/vms-architects
+/docs/vms_schema_postgresql.sql     @mamunulhasan
+/db/                                @mamunulhasan
+**/migration/                       @mamunulhasan
 
-# ---- ACS integration ---------------------------------------------------------
+# ---- ACS integration -------------------------------------------------------
 # The single choke-point for all ACS calls (CON-01, CON-02, NFR-MNT-01).
-# A change here can breach the SRS scope boundary — architect review is mandatory.
-**/acs/                             @pantropi/vms-architects
-**/integration/acs/                 @pantropi/vms-architects
+# A change here can breach the SRS scope boundary. Two approvals once the
+# team exists (US-01.1.1 AC-3).
+/apps/vms-api/vms-infrastructure/**/acs/         @mamunulhasan
+/tools/acs-simulator/                            @mamunulhasan
 
-# ---- Security ----------------------------------------------------------------
-**/security/                        @pantropi/vms-security
-**/auth/                            @pantropi/vms-security
+# ---- Security --------------------------------------------------------------
+# Two approvals once the team exists (US-01.1.1 AC-3).
+/apps/vms-api/vms-infrastructure/**/security/    @mamunulhasan
+/apps/vms-api/vms-application/**/identity/       @mamunulhasan
+/apps/vms-api/vms-domain/**/identity/            @mamunulhasan
 
-# ---- Project & CI configuration ---------------------------------------------
-/.github/                           @pantropi/vms-maintainers
-/CONTRIBUTING.md                    @pantropi/vms-maintainers
-/CLAUDE.md                          @pantropi/vms-architects
+# ---- Architecture boundaries ----------------------------------------------
+# The fitness tests that enforce Clean Architecture and the ACS boundary.
+/apps/vms-api/vms-architecture-tests/            @mamunulhasan
+
+# ---- Project & CI configuration -------------------------------------------
+/.github/                           @mamunulhasan
+/scripts/                           @mamunulhasan
+/infra/                             @mamunulhasan
+/CONTRIBUTING.md                    @mamunulhasan
+/CLAUDE.md                          @mamunulhasan
+/.gitattributes                     @mamunulhasan
