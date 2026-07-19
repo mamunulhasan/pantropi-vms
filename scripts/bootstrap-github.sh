@@ -6,6 +6,7 @@
 #   1. Labels      (from .github/labels.yml — Type, Priority, Status, Component, Provenance, Blocker)
 #   2. Milestones  (Phase 1 .. Phase 4, per docs/project/12-release-plan.md)
 #   3. Epic issues (EPIC-01 .. EPIC-19, per docs/project/backlog/00-epic-feature-index.md)
+#   4. Project board + custom fields (needs the 'project' token scope)
 #
 # Features, user stories and tasks are NOT created here — there are ~93 features, 178 stories and
 # 524 tasks. Create them per-phase at sprint planning from the backlog files, so estimates stay
@@ -15,7 +16,7 @@
 #
 # Usage:
 #   ./scripts/bootstrap-github.sh [--dry-run] [--repo owner/name]
-#                                 [--skip-labels] [--skip-milestones] [--skip-epics]
+#                                 [--skip-labels] [--skip-milestones] [--skip-epics] [--skip-board]
 #
 # Re-running is safe: labels are updated in place, milestones and epics are skipped if present.
 
@@ -23,7 +24,7 @@ set -euo pipefail
 
 DRY_RUN=0
 REPO=""
-DO_LABELS=1; DO_MILESTONES=1; DO_EPICS=1
+DO_LABELS=1; DO_MILESTONES=1; DO_EPICS=1; DO_BOARD=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -32,6 +33,7 @@ while [[ $# -gt 0 ]]; do
     --skip-labels)     DO_LABELS=0 ;;
     --skip-milestones) DO_MILESTONES=0 ;;
     --skip-epics)      DO_EPICS=0 ;;
+    --skip-board)      DO_BOARD=0 ;;
     -h|--help)         sed -n '2,25p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -350,6 +352,57 @@ EOF
   echo "  → $n_epics epics"; echo
 fi
 
+# ================================================================== 4. BOARD
+if [[ $DO_BOARD -eq 1 ]]; then
+  c_info "Project board (Projects v2)"
+
+  OWNER="${REPO%%/*}"
+  BOARD_TITLE="Project Pinnacle VMS — Delivery"
+
+  if ! gh project list --owner "$OWNER" --format json >/dev/null 2>&1; then
+    c_warn "Cannot list projects — your token is missing the 'project' scope."
+    c_warn "Run:  gh auth refresh -s project,read:project"
+    c_warn "Skipping board creation. Labels, milestones and epics are unaffected."
+  else
+    existing_board="$(gh project list --owner "$OWNER" --format json \
+      -q ".projects[] | select(.title==\"$BOARD_TITLE\") | .number" 2>/dev/null || true)"
+
+    if [[ -n "$existing_board" ]]; then
+      c_skip "$BOARD_TITLE (exists, #$existing_board)"
+      PROJ="$existing_board"
+    elif [[ $DRY_RUN -eq 1 ]]; then
+      printf '\033[90m  would run:\033[0m gh project create --owner %s --title "%s"\n' "$OWNER" "$BOARD_TITLE"
+      PROJ=""
+    else
+      PROJ="$(gh project create --owner "$OWNER" --title "$BOARD_TITLE" --format json -q .number 2>/dev/null || true)"
+      if [[ -n "$PROJ" ]]; then c_ok "$BOARD_TITLE (#$PROJ)"; else c_warn "board creation failed"; fi
+    fi
+
+    # Custom fields (see docs/project/11-labels-and-project-board.md)
+    if [[ -n "${PROJ:-}" ]]; then
+      add_field() {
+        local name="$1" type="$2" opts="${3:-}"
+        if [[ -n "$opts" ]]; then
+          run gh project field-create "$PROJ" --owner "$OWNER" --name "$name" \
+            --data-type "$type" --single-select-options "$opts" >/dev/null 2>&1 \
+            && c_ok "field: $name" || c_skip "field: $name (exists or unsupported)"
+        else
+          run gh project field-create "$PROJ" --owner "$OWNER" --name "$name" \
+            --data-type "$type" >/dev/null 2>&1 \
+            && c_ok "field: $name" || c_skip "field: $name (exists or unsupported)"
+        fi
+      }
+      add_field "Story Points" NUMBER
+      add_field "Epic"         TEXT
+      add_field "Requirement"  TEXT
+      add_field "Blocked By"   TEXT
+      add_field "Phase"        SINGLE_SELECT "Phase 1,Phase 2,Phase 3,Phase 4,Hardening"
+      add_field "ACS Stage"    SINGLE_SELECT "A (simulator),B (real contract),N/A"
+    fi
+  fi
+  echo
+fi
+
 # ---------------------------------------------------------------- next steps
 c_info "Done."
 cat <<'EOF'
@@ -367,10 +420,16 @@ Remaining setup (needs repository admin — cannot be scripted via gh):
   3. Enable branch protection on `main` and `develop`:
        docs/project/10-branch-strategy.md#branch-protection
 
-  4. Create the GitHub Project (v2) board "Project Pinnacle VMS — Delivery" with columns:
-       Backlog · Ready · In Progress · Code Review · Testing · Ready for Staging · Done
-     Custom fields, views and automation: docs/project/11-labels-and-project-board.md
-     WIP limit on In Progress is 1 PER DEVELOPER — this is the "one user story at a time" rule.
+  4. The board is created by this script, but TWO things must be done in the web UI
+     because the GitHub CLI cannot do them:
+
+       a) The 7 columns. GitHub creates a default "Status" field with Todo/In Progress/Done.
+          Edit that field and set the options to:
+            Backlog · Ready · In Progress · Code Review · Testing · Ready for Staging · Done
+
+       b) Views, WIP limits and automation — see docs/project/11-labels-and-project-board.md
+          The WIP limit on In Progress is 1 PER DEVELOPER. That is the "one user story at
+          a time" rule expressed as a board constraint.
 
   5. Raise Spike issues for the 4 BLOCKING open questions and assign owners:
        TODO-01  SRS v2 missing .......... CPG / Pantropi document control
