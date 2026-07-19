@@ -9,6 +9,11 @@ spring:
     name: vms-api
   profiles:
     default: local
+  flyway:
+    schemas: vms
+    default-schema: vms
+    clean-disabled: true       # forward-only, every profile (T-01.5.1.1)
+    validate-on-migrate: true  # checksum tamper aborts startup (AC-5)
 
 management:
   endpoints:
