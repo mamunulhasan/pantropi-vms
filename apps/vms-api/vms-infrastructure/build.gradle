@@ -21,4 +21,5 @@ dependencyManagement {
 dependencies {
     api project(':vms-application')
     implementation 'org.springframework:spring-context'
+    implementation 'org.apache.logging.log4j:log4j-core:2.14.1' // SEEDED VIOLATION - AC-3 proof, never merge
 }
