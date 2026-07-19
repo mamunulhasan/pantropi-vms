@@ -1,0 +1,44 @@
+# commit-lint — Conventional Commits + traceability gate.
+#
+# US-01.1.2 · T-01.1.2.1 — the CI half of the shared linter. Lints every
+# hand-authored commit in the PR range with scripts/lint-commit-message.sh
+# (the same script the local hook runs). Registered as a REQUIRED status
+# check on `develop` and `main` — the first entry in the branch-protection
+# contexts list (shrinks deviation DEV-02).
+
+name: commit-lint
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  commit-lint:
+    name: commit-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need base..head history to enumerate PR commits
+
+      - name: Lint every commit in the PR
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          echo "Linting commits in $BASE..$HEAD"
+          FAILED=0
+          for sha in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            echo "── $sha"
+            if ! git log -1 --format=%B "$sha" | bash scripts/lint-commit-message.sh -; then
+              FAILED=$((FAILED+1))
+            fi
+          done
+          if [ "$FAILED" -gt 0 ]; then
+            echo ""
+            echo "✗ $FAILED commit(s) violate the commit rules."
+            echo "  Rules: docs/project/05-workflow-and-branching.md §3"
+            echo "  Fix with: git rebase -i and reword, then force-push the PR branch."
+            exit 1
+          fi
+          echo "✓ all commits pass"

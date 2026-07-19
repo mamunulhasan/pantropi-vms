@@ -4,7 +4,7 @@
   "_strict_note": "Same as develop: strict=true gives 'up to date before merging'; contexts empty until CI exists (US-01.4.x).",
   "required_status_checks": {
     "strict": true,
-    "contexts": []
+    "contexts": ["commit-lint"]
   },
 
   "_enforce_admins_note": "AC-4 — administrators cannot push directly to main.",
