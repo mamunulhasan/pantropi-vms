@@ -58,7 +58,7 @@ stated. It was not a default, and it was not taken by the implementer.
 | Dismiss stale approvals | ✅ | ✅ | AC-5 |
 | Require conversation resolution | ✅ | ✅ | AC-2 |
 | Require branch up to date | ✅ | ✅ | AC-2 |
-| Required status checks | `commit-lint` | `commit-lint` | AC-2 — partially; rest with US-01.4.x |
+| Required status checks | `commit-lint`, `architecture-fitness` | `commit-lint`, `architecture-fitness` | AC-2 — partially; rest with US-01.4.x |
 | Include administrators | ✅ | ✅ | AC-4 |
 | Require linear history | ❌ *(deliberate)* | ✅ | — |
 | Force pushes | blocked | blocked | — |
@@ -90,11 +90,13 @@ technical.
 Commits, the story-id rule, and the D-02 qualified-reference rule are mechanically enforced on
 every PR. Local hook available via `scripts/install-git-hooks.sh`.
 
+**`architecture-fitness` is now also registered and required** (US-01.2.2): the layer rules and
+the ACS-boundary rule fail a PR mechanically.
+
 **Remaining:** the build/test pipeline lands with US-01.4.x; add to both configs and re-apply:
 
 ```
-build · unit-tests · integration-tests · coverage · architecture-fitness
-sast · dependency-scan
+build · unit-tests · integration-tests · coverage · sast · dependency-scan
 ```
 
 The **architecture-fitness** check is the important one — it enforces the ACS boundary rule

@@ -1,0 +1,41 @@
+# architecture-fitness — the boundary rules as a merge gate.
+#
+# US-01.2.2 · T-01.2.2.3 — runs the ArchUnit suite (vms-architecture-tests) on
+# every PR and is REQUIRED on `develop` and `main`. A layer violation or an ACS
+# type outside the integration boundary cannot merge — this is the mechanical
+# enforcement of NFR-MNT-01, CON-01 and CON-02 (SRS B1), and the standing
+# mitigation for the unpublished ACS contract (TODO-02, ADR-0002).
+
+name: architecture-fitness
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  architecture-fitness:
+    name: architecture-fitness
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/vms-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run architecture fitness tests
+        run: ./gradlew :vms-architecture-tests:test --console=plain
+
+      - name: Publish rule report on failure
+        if: failure()
+        run: |
+          echo "## Architecture violations" >> "$GITHUB_STEP_SUMMARY"
+          grep -rho 'message="[^"]*"' vms-architecture-tests/build/test-results/test/TEST-*.xml \
+            | sed 's/&#10;/\n/g;s/&#13;//g;s/&#39;/'"'"'/g;s/^message="//;s/"$//' \
+            | head -60 >> "$GITHUB_STEP_SUMMARY" || true

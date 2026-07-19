@@ -4,7 +4,7 @@
   "_strict_note": "required_status_checks.strict = true enforces 'branch must be up to date before merging' (AC-2). First required check registered: commit-lint (US-01.1.2). Remaining contexts land with the CI pipeline (US-01.4.x): build, unit-tests, integration-tests, coverage, architecture-fitness, sast, dependency-scan.",
   "required_status_checks": {
     "strict": true,
-    "contexts": ["commit-lint"]
+    "contexts": ["commit-lint", "architecture-fitness"]
   },
 
   "_enforce_admins_note": "AC-4 — administrators cannot push directly to develop.",
