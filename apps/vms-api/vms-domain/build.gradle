@@ -1,0 +1,9 @@
+// vms-domain — the innermost layer.
+//
+// US-01.2.1 · AC-1, AC-5: NO dependencies. Not on other modules, not on
+// Spring, not on JPA, not on anything. Pure Java 21. If a class here needs
+// a framework, the class is in the wrong layer.
+
+dependencies {
+    // deliberately empty
+}

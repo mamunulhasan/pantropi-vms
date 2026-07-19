@@ -1,0 +1,11 @@
+// vms-application — use cases and PORTS.
+//
+// US-01.2.1 · AC-3: outbound needs are expressed as port interfaces here and
+// implemented as adapters in vms-infrastructure. Depends inward on domain
+// only. No Spring on this classpath either — application classes are wired
+// by configuration in outer layers, never annotated as components
+// (T-01.2.1.3 acceptance).
+
+dependencies {
+    api project(':vms-domain')
+}

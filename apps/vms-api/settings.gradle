@@ -1,0 +1,9 @@
+// Project Pinnacle VMS — backend build
+// US-01.2.1 · T-01.2.1.1
+rootProject.name = 'vms-api'
+
+include 'vms-domain'
+include 'vms-application'
+include 'vms-infrastructure'
+include 'vms-interfaces'
+include 'vms-bootstrap'

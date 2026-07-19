@@ -1,0 +1,50 @@
+// Project Pinnacle VMS — root build.
+//
+// US-01.2.1 · T-01.2.1.1 — Clean Architecture multi-module build.
+//
+// Dependency direction (enforced by the per-module dependency blocks below,
+// and mechanically by the fitness tests of US-01.2.2):
+//
+//   interfaces ──┐
+//                ├──► application ──► domain        domain depends on NOTHING
+//   infrastructure ┘
+//
+// THE LOAD-BEARING RULE: vms-domain carries no Spring, no JPA, no framework
+// of any kind on its compile classpath (AC-1, AC-5). A framework annotation
+// in domain is a compile error, not a review comment.
+//
+// Requirement: NFR-MNT-01 (SRS B1), CON-01 (SRS B1), CON-02 (SRS B1)
+
+plugins {
+    id 'org.springframework.boot' version '3.3.4' apply false
+    id 'io.spring.dependency-management' version '1.1.6' apply false
+}
+
+subprojects {
+    apply plugin: 'java-library'   // provides api() for inward module dependencies
+
+    group = 'com.pantropi.vms'
+    version = '0.1.0-SNAPSHOT'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        testImplementation platform('org.junit:junit-bom:5.10.3')
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+        testImplementation 'org.assertj:assertj-core:3.26.3'
+    }
+
+    test {
+        useJUnitPlatform()
+        testLogging { events 'failed', 'skipped' }
+    }
+}

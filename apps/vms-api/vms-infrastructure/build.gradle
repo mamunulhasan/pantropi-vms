@@ -1,0 +1,24 @@
+// vms-infrastructure — ADAPTERS: persistence, messaging, cache, email, and
+// (only here, ever) the ACS anti-corruption layer.
+//
+// US-01.2.1: depends inward on application (for the ports it implements) and
+// transitively domain. Spring context is allowed here — adapters are
+// registered as beans via @Configuration classes.
+//
+// CON-01/CON-02 (SRS B1), ADR-0002: infrastructure/**/acs is the ONLY
+// package in the codebase where an ACS-specific type may exist.
+
+plugins {
+    id 'io.spring.dependency-management'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+    }
+}
+
+dependencies {
+    api project(':vms-application')
+    implementation 'org.springframework:spring-context'
+}
