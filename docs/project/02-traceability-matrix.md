@@ -6,85 +6,128 @@ This matrix is the project's contractual record that every requirement is accoun
 nothing is built without a requirement. **It is a living document** — the Task, Code, Test, PR and
 Release columns are populated as work completes, and no PR may merge without updating its row.
 
-**Baseline:** B1 — 2026-07-19 · **Scope:** 28 SRS functional requirements
+**Baseline:** B1 — 2026-07-19
+**Scope:** 28 SRS functional requirements · 8 NFRs · 3 constraints
+**Backlog:** 4 phases · 19 epics · 93 features · **178 user stories** · **524 tasks** · **743 story points**
+
+**Status key**
+
+- ✅ **Ready** — every story authorized and unblocked
+- 🟠 **Sim-only** — buildable now against the ACS simulator, but not *verifiable* until TODO-02
+- 🟡 **Partial (n/m)** — n of m stories are workable; the rest are blocked
+- 🔴 **Blocked** — every story blocked
+
+A requirement is **Blocked** only when *all* of its stories are. Most are **Partial**: the core
+behaviour is buildable while a dependent slice — usually master data (TODO-01) — waits.
 
 ---
 
 ## Forward trace — Requirement → delivery
 
-| Requirement | Milestone | Epic | Feature | User Story | Status | Gating |
-|---|---|---|---|---|---|---|
-| **FR-VMS-01** | M2 | EPIC-04 | F-04.1 | US-04.1.1, US-04.1.2, US-04.1.3 | Ready | — |
-| **FR-VMS-02** | M2 | EPIC-04 | F-04.2 | US-04.2.1, US-04.2.2, US-04.2.3 | Ready | — |
-| **FR-VMS-03** | M2 | EPIC-04 | F-04.3 | US-04.3.1 | Ready | — |
-| **FR-VMS-04** | M3 | EPIC-05 | F-05.1 | *not written* | Partial | EPIC-04 |
-| **FR-VMS-05** | M3 | EPIC-05 | F-05.2 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-VMS-06** | M3 | EPIC-05 | F-05.3 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-VMS-07** | M3 | EPIC-05 | F-05.4, F-05.5, F-05.6 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-VMS-08** | M4 | EPIC-06 | F-06.1, F-06.2 | *not written* | 🔴 Blocked | TODO-18 |
-| **FR-VMS-09** | M4 | EPIC-06 | F-06.3 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-VMS-10** | M4 | EPIC-06 | F-06.4 | *not written* | 🔴 Blocked | TODO-03 — *may be descoped* |
-| **FR-VMS-11** | M3 | EPIC-07 | F-07.1 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-VMS-12** | M3 | EPIC-07 | F-07.2 | *not written* | 🔴 Blocked | TODO-02, TODO-09 |
-| **FR-VMS-13** | M3 | EPIC-07 | F-07.3 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-VMS-14** | M3 | EPIC-07 | F-07.4 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-VMS-15** | M4 | EPIC-08 | F-08.1, F-08.2, F-08.3 | *not written* | Ready* | TODO-17 |
-| **FR-CRD-01** | M4 | EPIC-09 | F-09.1 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-CRD-02** | M4 | EPIC-09 | F-09.2 | *not written* | 🔴 Blocked | TODO-02 |
-| **FR-CRD-03** | M4 | EPIC-09 | F-09.3, F-09.4 | *not written* | 🔴 Blocked | TODO-02, TODO-11 |
-| **FR-NOT-01** | M5 | EPIC-10 | F-10.2, F-10.3, F-10.5, F-10.6 | US-10.2.1, US-10.3.1, US-10.3.2 | Partial | TODO-05 (WhatsApp), TODO-10 |
-| **FR-NOT-02** | M5 | EPIC-10 | F-10.4 | US-10.4.1 | Partial | TODO-02 (exit events) |
-| **FR-REP-01** | M5 | EPIC-11 | F-11.1, F-11.3 | *not written* | Partial | TODO-02 (ACS events) |
-| **FR-REP-02** | M5 | EPIC-11 | F-11.2 | *not written* | Partial | EPIC-09 |
-| **FR-API-01** | M3 | EPIC-12 | F-12.3, F-12.4 | US-12.3.1, US-12.3.2 | Ready | — |
-| **FR-API-02** | M3 | EPIC-12 | F-12.5 | US-12.5.1 | Ready | — |
-| **FR-API-03** | M3 | EPIC-12 | F-12.6 | *not written* | Ready | — |
-| **FR-ADM-01** | M1 | EPIC-02 | F-02.3 | US-02.3.1 | Ready | — |
-| **FR-ADM-02** | M1 | EPIC-02 | F-02.1, F-02.4 | US-02.1.1, US-02.1.2 | Partial | TODO-08, TODO-15 |
-| **FR-ADM-03** | M2 | EPIC-13 | F-13.1, F-13.2 | *not written* | Ready | Brand assets |
+| Requirement | Phase | Epic(s) | Stories | Status | Gating |
+|---|---|---|---|---|---|
+| **FR-VMS-01** | 2 | EPIC-07 | 7 | ✅ Ready | — |
+| **FR-VMS-02** | 2, 4 | EPIC-07, EPIC-17 | 7 | 🟡 Partial (6/7) | TODO-01 |
+| **FR-VMS-03** | 2 | EPIC-08 | 5 | ✅ Ready | — |
+| **FR-VMS-04** | 2, 3 | EPIC-08, EPIC-12 | 4 | ✅ Ready | — |
+| **FR-VMS-05** | 2 | EPIC-09 | 4 | 🟠 Sim-only | TODO-02 |
+| **FR-VMS-06** | 2 | EPIC-09, EPIC-10 | 4 | 🟡 Partial (2/4) | TODO-01, TODO-02 |
+| **FR-VMS-07** | 2 | EPIC-09 | 5 | 🟡 Partial (4/5) | TODO-02, TODO-17 |
+| **FR-VMS-08** | 3 | EPIC-12, EPIC-13 | 5 | 🟡 Partial (2/5) | TODO-12, TODO-13, TODO-18 |
+| **FR-VMS-09** | 3 | EPIC-13 | 2 | 🟡 Partial (1/2) | TODO-07 |
+| **FR-VMS-10** | 3 | EPIC-13 | 2 | 🔴 Blocked | TODO-02, TODO-03, TODO-19 |
+| **FR-VMS-11** | 1, 2, 4 | EPIC-04, EPIC-08, EPIC-09, EPIC-17 | 7 | 🟡 Partial (5/7) | TODO-01, TODO-02 |
+| **FR-VMS-12** | 3 | EPIC-14 | 2 | 🔴 Blocked | TODO-02, TODO-09 |
+| **FR-VMS-13** | 1, 2 | EPIC-04, EPIC-09 | 3 | 🟡 Partial (2/3) | TODO-01, TODO-02 |
+| **FR-VMS-14** | 3 | EPIC-14 | 2 | 🟡 Partial (1/2) | TODO-07 |
+| **FR-VMS-15** | 2, 3 | EPIC-09, EPIC-12 | 3 | 🔴 Blocked | TODO-02, TODO-17 |
+| **FR-CRD-01** | 3 | EPIC-15 | 2 | ✅ Ready | — |
+| **FR-CRD-02** | 3 | EPIC-15 | 2 | 🔴 Blocked | TODO-02, TODO-11 |
+| **FR-CRD-03** | 3, 4 | EPIC-12, EPIC-15, EPIC-17 | 8 | 🟡 Partial (1/8) | TODO-01, TODO-02, TODO-10, TODO-11 |
+| **FR-NOT-01** | 2, 4 | EPIC-09, EPIC-16, EPIC-17 | 9 | 🟡 Partial (7/9) | TODO-02, TODO-05, TODO-10 |
+| **FR-NOT-02** | 3, 4 | EPIC-11, EPIC-12, EPIC-17 | 4 | 🟡 Partial (3/4) | TODO-01, TODO-02 |
+| **FR-REP-01** | 3, 4 | EPIC-11, EPIC-13, EPIC-18 | 8 | 🟡 Partial (6/8) | TODO-02, TODO-03, TODO-12, TODO-13 |
+| **FR-REP-02** | 3, 4 | EPIC-15, EPIC-18 | 2 | 🔴 Blocked | TODO-11 |
+| **FR-API-01** | 2, 3, 4 | EPIC-09, EPIC-11, EPIC-13, EPIC-17 | 10 | 🟡 Partial (7/10) | TODO-01, TODO-02, TODO-07 |
+| **FR-API-02** | 1, 3 | EPIC-05, EPIC-11, EPIC-14 | 4 | 🟡 Partial (2/4) | TODO-01, TODO-12 |
+| **FR-API-03** | 1, 3 | EPIC-05, EPIC-11 | 4 | 🟡 Partial (1/4) | TODO-02, TODO-12 |
+| **FR-ADM-01** | 1 | EPIC-02, EPIC-04 | 2 | 🟡 Partial (1/2) | TODO-01 |
+| **FR-ADM-02** | 1 | EPIC-02, EPIC-04, EPIC-06 | 7 | 🟡 Partial (2/7) | TODO-01, TODO-08, TODO-15 |
+| **FR-ADM-03** | 1, 4 | EPIC-06, EPIC-19 | 3 | 🟡 Partial (1/3) | TODO-01, TODO-16 |
 
-\* *Ready* means the requirement is clear enough to plan; a 🟡 TODO refines detail during sprint planning.
+**Coverage: 28 / 28 SRS functional requirements decomposed to user story level (100%).**
+Full story and task detail lives in [`backlog/`](backlog/); this table is the index into it.
 
 ---
 
 ## Non-functional requirement trace
 
-| Requirement | Epic(s) | Verification method | Status |
-|---|---|---|---|
-| NFR-PRF-01 | EPIC-12 | Performance test at reception UI | 🔴 **Untestable** — no target (TODO-07) |
-| NFR-REL-01 | EPIC-12, EPIC-04 | Chaos test: ACS unavailable during issuance | Ready |
-| NFR-AVL-01 | EPIC-01, EPIC-14 | Uptime monitoring; ACS-independence test | Partial — operating hours undefined |
-| NFR-SEC-01 | EPIC-02, EPIC-12, EPIC-14 | OWASP ASVS review + RBAC integration tests | Ready |
-| NFR-SCL-01 | EPIC-01 | Load test: 500 visitors/day, 120 concurrent users | Ready |
-| NFR-USA-01 | EPIC-13, EPIC-08 | Usability review with reception staff | Partial — no acceptance criteria |
-| NFR-MNT-01 | EPIC-12 | Architecture fitness test: no ACS type outside the integration module | Ready |
-| NFR-CMP-01 | EPIC-01, EPIC-14 | Data protection impact assessment | 🔴 Blocked — TODO-06, TODO-12 |
+| Requirement | Phase | Epic(s) | Verification method | Status |
+|---|---|---|---|---|
+| NFR-PRF-01 | 3 | EPIC-11 | Performance test at the reception UI | 🔴 **Untestable — no target (TODO-07)** |
+| NFR-REL-01 | 3 | EPIC-11 | Chaos test: ACS unavailable during issuance | ✅ Ready |
+| NFR-AVL-01 | 1, 3 | EPIC-01, EPIC-11 | Uptime monitoring; ACS-independence test | 🟡 Operating hours undefined |
+| NFR-SEC-01 | 1 | EPIC-02, EPIC-03, EPIC-05 | OWASP ASVS review + RBAC integration tests | ✅ Ready |
+| NFR-SCL-01 | 1 | EPIC-01 | Load test: 500 visitors/day, 120 concurrent users | ✅ Ready |
+| NFR-USA-01 | 1 | EPIC-06 | Usability review with reception staff | 🟡 No acceptance criteria; WCAG target is derived |
+| NFR-MNT-01 | 1, 3 | EPIC-01, EPIC-11 | **Architecture fitness test — no ACS type outside the integration module** | ✅ Ready |
+| NFR-CMP-01 | 1 | EPIC-05 | Data protection impact assessment | 🔴 Blocked — TODO-06, TODO-12 |
 
 | Constraint | Enforced by | Verification |
 |---|---|---|
-| CON-01 | EPIC-12 | Architecture fitness test — no hardware-specific types anywhere in the codebase |
-| CON-02 | EPIC-12 (F-12.1) | Architecture fitness test — no credential mutation path bypasses the ACS port |
-| CON-03 | EPIC-13 | Design review against client brand guidelines |
+| CON-01 | EPIC-11 | Fitness test — no hardware-specific type anywhere in the codebase |
+| CON-02 | EPIC-11 (F-11.1) | Fitness test — no credential mutation path bypasses the ACS port |
+| CON-03 | EPIC-06 (F-06.1) | Design review against client brand guidelines |
 
 ---
 
 ## Reverse trace — is anything being built without a requirement?
 
-Run at every sprint review. Any row that cannot name a requirement is either an approved enabler or
-gets closed as out-of-scope.
+Run at **every sprint review**. Any row that cannot name a requirement is either an approved enabler
+or is closed as out of scope. This is the control that makes project rule 2 real rather than
+aspirational.
 
-| Artefact | Backing requirement | Verdict |
+### Measured provenance across all 178 user stories
+
+| Provenance | Stories | Share | Implementable? |
+|---|---|---|---|
+| `SRS` | 67 | 38% | ✅ Yes |
+| `SRS-NFR` | 19 | 11% | ✅ Yes |
+| `SRS-CON` | 3 | 2% | ✅ Yes |
+| `ENABLER` | 16 | 9% | ✅ Yes — justified against an NFR |
+| `TDD-DERIVED` | 62 | 35% | ⚠️ **No — backlog only, pending TODO-01** |
+| `BLOCKED` | 11 | 6% | ⛔ No |
+
+**105 stories (59%) are authorized. 73 (41%) are not.**
+
+### Concentration by phase
+
+| Phase | Stories | TDD-derived | Blocked | Authorized |
+|---|---|---|---|---|
+| 1 — Platform Foundation | 42 | 18 | 2 | 22 (52%) |
+| 2 — Visitor Registration & Pass Generation | 45 | 12 | 0 | **33 (73%)** |
+| 3 — Entry Verification & ACS Integration | 55 | 13 | 5 | 37 (67%) |
+| 4 — Reporting & Notification | 36 | 19 | 4 | 13 (36%) |
+
+Phase 2 is the least contaminated by unbacked scope, which is exactly why it is the phase that can
+be delivered and demonstrated while TODO-01 remains open. Phase 4 is the most — only a third of it
+is authorized today.
+
+### Named unbacked artefacts
+
+| Artefact | Backing | Verdict |
 |---|---|---|
-| EPIC-01 Platform Foundation | *none* | ✅ Approved enabler — NFR-MNT-01, NFR-SCL-01, NFR-AVL-01 |
-| EPIC-14 Audit & Observability | NFR-SEC-01 (partial) | ⚠️ F-14.2 audit log is TDD/schema-only — TODO-01 |
-| EPIC-03 Master Data | *none* | 🔴 **Unbacked** — TODO-01, D-05 |
-| F-07.5 Manual override | *none* | 🔴 **Unbacked** — TODO-04, D-06 |
-| F-11.4 Excel/PDF export | *none* | ⚠️ TDD-only — TODO-16 |
-| F-08.3 Display idle/privacy state | NFR-SEC-01 (derived) | ⚠️ Derived, not stated — confirm |
-| F-13.3 WCAG 2.1 AA | NFR-USA-01 (derived) | ⚠️ Derived, not stated — confirm |
+| EPIC-01 Engineering Platform | *none* | ✅ Approved enabler — NFR-MNT-01, NFR-SCL-01, NFR-AVL-01 |
+| EPIC-04 Configuration & Master Data | *none* | 🔴 **Unbacked** — TODO-01, D-05 |
+| EPIC-10 Host Management | *none* | 🔴 **Unbacked** — D-13 |
+| EPIC-19 Analytics & Export | *none* | 🔴 **Unbacked** — TODO-16, D-03 |
+| F-14.4 Manual override | *none* | 🔴 **Must not be built** — TODO-04, D-06 |
+| F-05.1 Append-only audit log | *none* | ⚠️ TDD-only — TODO-01 |
+| F-03.1 / F-03.3 Role & permission model | *none* | ⚠️ TDD-only; **but NFR-SEC-01 does require RBAC** |
+| F-17.3/4/5 Host notify, reminders, alerts | *none* | ⚠️ TDD-only — TODO-01 |
 | `visitors.id_document_ref` | *none* | 🔴 **Unbacked** — TODO-13 |
-| `visitor_status.no_show` | *none* | 🔴 **Unbacked** — D-07 |
-| `notify_channel.in_app` | *none* | 🔴 **Unbacked** — D-07 |
+| `visitor_status.no_show`, `notify_channel.in_app` | *none* | 🔴 **Unbacked** — D-07 |
+| `credential.override`, `report.export` permissions | *none* | 🔴 **Unbacked** — D-12 |
 | Edge gateway gate verification | *contradicts SRS §1.2* | 🔴 **Out of scope** — D-08, TODO-19 |
 
 ---
@@ -93,12 +136,12 @@ gets closed as out-of-scope.
 
 Every pull request must:
 
-1. Reference its user story in the title: `feat(visitor): submit entry request (US-04.1.1)`
-2. Link the story issue, which links its feature, which links its epic, which names its requirement.
-3. Update the **Task / Code / Test / PR** columns of the delivery log below.
-4. Update documentation (project rule).
+1. Name its user story in the title — `feat(visitor): submit entry request (US-07.1.1)`
+2. Link the story issue → feature → epic → requirement
+3. Add a row to the delivery log below
+4. Update documentation
 
-A PR that cannot name a requirement does not merge.
+**A PR that cannot name a requirement does not merge.**
 
 ## Delivery log
 
@@ -116,13 +159,26 @@ A PR that cannot name a requirement does not merge.
 |---|---|---|
 | SRS FRs traced to an epic | 28 / 28 | **100%** |
 | SRS FRs traced to a feature | 28 / 28 | **100%** |
-| SRS FRs with user stories written | 9 / 28 | 32% |
-| SRS FRs ready to implement | 9 / 28 | 32% |
-| SRS FRs blocked by an open question | 15 / 28 | 54% |
+| SRS FRs decomposed to user stories | 28 / 28 | **100%** |
+| SRS FRs decomposed to tasks | 28 / 28 | **100%** |
+| SRS FRs fully ready | 4 / 28 | 14% |
+| SRS FRs sim-only (build now, verify after TODO-02) | 1 / 28 | 4% |
+| SRS FRs partially workable | 18 / 28 | 64% |
+| SRS FRs blocked outright | 5 / 28 | 18% |
 | SRS FRs implemented | 0 / 28 | 0% |
 | NFRs with a testable acceptance criterion | 5 / 8 | 63% |
-| Unbacked artefacts identified | 11 | — |
+| User stories authorized | 105 / 178 | 59% |
+| Open discrepancies | 15 | — |
+| Open questions | 19 (4 blocking) | — |
 
-**Read this honestly:** requirement *coverage* is complete — nothing has been missed. Requirement
-*readiness* is 32%, because 54% of the SRS depends on the ACS API contract (TODO-02) or on the
-missing SRS v2 (TODO-01). This is a supplier/client dependency, not a planning gap.
+**Read this honestly.** Requirement *coverage* is complete — every SRS requirement is decomposed to
+task level and nothing has been missed. Requirement *readiness* is not. Only **4 of 28 are fully ready**; **18 are partially workable** —
+their core behaviour can be built while a dependent slice waits — and **5 are blocked outright**.
+
+The dominant cause is TODO-01, not TODO-02. The missing SRS v2 touches almost every requirement,
+because master data (EPIC-04) is unbacked and nearly everything references a tenant, floor or
+reception. TODO-02 blocks less than it appears to: the anti-corruption layer (ADR-0002) converts it
+from a build blocker into a *verification* blocker for most credential work.
+
+That is a supplier and client dependency, not a planning gap — and the phase ordering is built
+around it, front-loading everything that can proceed without them.
