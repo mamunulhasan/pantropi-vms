@@ -21,7 +21,15 @@ dependencies {
     implementation 'org.flywaydb:flyway-database-postgresql'
     runtimeOnly 'org.postgresql:postgresql'
 
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     // Real PostgreSQL without Docker: Zonky embedded-postgres (US-01.5.1 ITs)
     testImplementation 'io.zonky.test:embedded-postgres:2.0.7'
+}
+
+// US-01.3.1: `./gradlew bootRun` starts the seeded local environment without further
+// arguments. Any other environment sets SPRING_PROFILES_ACTIVE explicitly.
+tasks.named('bootRun') {
+    systemProperty 'spring.profiles.active',
+            providers.systemProperty('spring.profiles.active').getOrElse('local')
 }

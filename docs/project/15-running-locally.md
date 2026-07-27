@@ -1,0 +1,134 @@
+# Running VMS Locally
+
+**Story:** US-01.3.1 (adapted) · **No Docker required**
+
+One command gives you a complete, seeded VMS with a real PostgreSQL and a user for every role.
+
+---
+
+## Start it
+
+**Once**, create the database:
+
+```sql
+CREATE DATABASE vms;
+```
+
+Then:
+
+```bash
+cd apps/vms-api
+./gradlew bootRun
+```
+
+`bootRun` activates the `local` profile automatically. Flyway applies every migration on first
+start. Takes ~15s.
+
+| | |
+|---|---|
+| API | http://localhost:8081 |
+| Health | http://localhost:8081/actuator/health |
+| Database | `jdbc:postgresql://localhost:5432/vms` — user `postgres`, password `postgres` |
+| Reset | `DROP DATABASE vms; CREATE DATABASE vms;` then restart |
+
+Port **8081**, because 8080 is commonly already in use. Your own PostgreSQL holds the data, so it
+persists across restarts and you can inspect it with pgAdmin or psql:
+
+```bash
+psql -h localhost -U postgres -d vms -c "SELECT * FROM vms.visitor_requests"
+```
+
+## Log in as any role
+
+Every account uses the same development password:
+
+```
+Password123!local
+```
+
+| Username | Role | Permissions |
+|---|---|---|
+| `sysadmin` | SYSTEM_ADMIN | `user.manage`, `masterdata.view/edit`, `settings.manage` |
+| `masteradmin` | MASTER_ADMIN | `visitor.approve`, `credential.issue`, `visitor.register`, `masterdata.view`, `report.view` |
+| `fmadmin` | FM_ADMIN | `visitor.approve`, `masterdata.view`, `report.view` |
+| `receptionist` | FLOOR_RECEPTIONIST | `visitor.register`, `masterdata.view` |
+| `tenantuser` | TENANT | `visitor.request`, `masterdata.view` |
+
+Seeded master data: building **WGT** (Westgate Tower) → floor **L01** → central reception **RC01**,
+tenant **ACME** (Acme Corporation) with host *Alice Host*. `tenantuser` belongs to ACME.
+
+## Try it
+
+```bash
+# 1. log in
+curl -s -X POST http://localhost:8081/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"tenantuser","password":"Password123!local"}'
+
+# 2. use the accessToken from the response
+TOKEN=<paste>
+
+# 3. who am I?
+curl -s http://localhost:8081/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
+
+# 4. submit a visitor request (FR-VMS-01)
+curl -s -X POST http://localhost:8081/api/v1/visitor-requests \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"scheduledFrom":"2026-09-01T09:00:00Z","scheduledTo":"2026-09-01T11:00:00Z",
+       "purpose":"Quarterly review",
+       "visitors":[{"fullName":"Ada Lovelace","email":"ada@example.test"}]}'
+```
+
+### Seeing authorization work
+
+```bash
+# sysadmin can administer users; tenantuser cannot
+curl -o /dev/null -w '%{http_code}\n' http://localhost:8081/api/v1/admin/users -H "Authorization: Bearer $SYSADMIN_TOKEN"   # 200
+curl -o /dev/null -w '%{http_code}\n' http://localhost:8081/api/v1/admin/users -H "Authorization: Bearer $TENANT_TOKEN"     # 403
+curl -o /dev/null -w '%{http_code}\n' http://localhost:8081/api/v1/admin/users                                              # 401
+```
+
+Conversely `sysadmin` gets **403** on `POST /api/v1/visitor-requests` — it holds `user.manage` but
+not `visitor.request`. Roles genuinely differ.
+
+## Endpoints available today
+
+| Method | Path | Requires |
+|---|---|---|
+| POST | `/api/v1/auth/login` | — public |
+| POST | `/api/v1/auth/refresh` | — public |
+| POST | `/api/v1/auth/activate` | — public (activation token) |
+| GET | `/api/v1/auth/me` | authenticated |
+| POST | `/api/v1/auth/logout` | authenticated |
+| GET/POST | `/api/v1/admin/users` | `user.manage` |
+| PUT | `/api/v1/admin/users/{id}` | `user.manage` |
+| POST | `/api/v1/admin/users/{id}/deactivate`, `/reactivate` | `user.manage` |
+| POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
+| POST | `/api/v1/visitor-requests` | `visitor.request` |
+
+Anything else is denied by default (US-03.2.1).
+
+## Notes on safety
+
+- **Local profile only.** The datasource settings and the seeder are both scoped to the `local`
+  profile — the seeder is `@Profile("local")` — so neither can reach a staging or production
+  artifact. There is no default profile: `local` is opt-in, exactly like staging and prod.
+- **The dev password is worthless elsewhere.** It is fixed and published here so you can log in.
+  Staging and production take `VMS_SECURITY_JWT_SECRET` from the environment and provision their
+  first account through the bootstrap command (US-02.4.1).
+- **The seeded role→permission grants are a development convenience**, inferred from the role
+  descriptions so each role can do something observable. They are deliberately not a migration: the
+  production grant matrix is authorization policy still awaiting client sign-off (D-15). Migrations
+  V3/V5/V7 grant only what an SRS requirement names.
+
+## Deviation from US-01.3.1 as written
+
+The story specified `docker compose` with PostgreSQL, Redis and Kafka. Docker is unavailable in this
+environment, so the local profile connects to a PostgreSQL installed directly on the machine
+(verified against 18.4). That is arguably better for development: the data is inspectable with the
+developer's own tools and survives independently of the application.
+
+Redis and Kafka are not required — nothing in the system uses them yet: sessions live in PostgreSQL
+(US-02.1.2) and domain events in the outbox table (US-07.1.1). Integration tests continue to use
+embedded PostgreSQL so they stay self-contained and need no installed server. When Docker becomes
+available, compose supersedes this without touching application code.

@@ -7,8 +7,9 @@
 spring:
   application:
     name: vms-api
-  profiles:
-    default: local
+  # No default profile. 'local' is opt-in like staging and prod: it starts an embedded
+  # database and seeds demo data, which must never be inherited silently by a test or a
+  # deployment. `./gradlew bootRun` activates it explicitly (see vms-bootstrap/build.gradle).
   flyway:
     schemas: vms
     default-schema: vms
