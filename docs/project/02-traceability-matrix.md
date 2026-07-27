@@ -156,6 +156,7 @@ Every pull request must:
 | US-01.5.1 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.5.1.1/2/3 | `db/migration/V1__baseline.sql`, `V2__reference_seed.sql`, Flyway wiring in `vms-bootstrap` | 5/5 ITs on real PostgreSQL (Zonky): schema-diff, no-op rerun, idempotent seed, failure naming, checksum tamper abort | [#32](https://github.com/mamunulhasan/pantropi-vms/pull/32) | 2026-07-19 | 0.1.0 |
 | US-01.4.1 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.4.1.1/2/3 | `.github/workflows/{ci,codeql}.yml`, JaCoCo gate `gradle/coverage.gradle` | 9 required checks live; coverage gate green at 80/60; seeded-violation proofs on draft PR | #33 | pending | 0.1.0 |
 | **US-02.1.1** | **FR-ADM-02 (SRS B1)** · NFR-SEC-01 | login use case + PBKDF2/HMAC-JWT adapters + JDBC user directory + `/api/v1/auth/login`,`/me` | 7 crypto unit + 4 login ITs on real PostgreSQL (success, /me, tampered token, uniform failure) | #37 | pending | 0.2.0 |
+| **US-02.4.1** | **FR-ADM-01 (SRS B1)** | V3 MASTER_ADMIN grants + BootstrapAdministrator + MasterAdminPolicy + first-run runner | 6 unit + BootstrapAdminIT (migrate→bootstrap→login end-to-end) + MigrationIT V3 grants; 48/48 green | #38 | pending | 0.1.0 |
 
 ---
 
