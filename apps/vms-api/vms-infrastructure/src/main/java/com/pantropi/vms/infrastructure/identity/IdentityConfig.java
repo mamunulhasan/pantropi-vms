@@ -50,4 +50,23 @@ public class IdentityConfig {
                                       AccessTokenIssuer issuer) {
         return new AuthenticateUser(users, hasher, issuer);
     }
+
+    // ---- US-02.4.1 Master Admin authority & bootstrap ----
+
+    @Bean
+    com.pantropi.vms.application.identity.port.AdminDirectory adminDirectory(DataSource dataSource) {
+        return new JdbcAdminDirectory(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.BootstrapAdministrator bootstrapAdministrator(
+            com.pantropi.vms.application.identity.port.AdminDirectory admin, PasswordHasher hasher) {
+        return new com.pantropi.vms.application.identity.usecase.BootstrapAdministrator(admin, hasher);
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.MasterAdminPolicy masterAdminPolicy(
+            com.pantropi.vms.application.identity.port.AdminDirectory admin) {
+        return new com.pantropi.vms.application.identity.usecase.MasterAdminPolicy(admin);
+    }
 }
