@@ -92,25 +92,26 @@ identity in place. No visitor workflow.
 ### EPIC-03 — Authorization & RBAC
 | Feature | Title | Provenance |
 |---|---|---|
-| F-03.1 | Role & permission model | `TDD-DERIVED` FR-USR-02 |
+| F-03.1 | Role & permission model | `ENABLER` (ADR-0004) — schema-bounded |
 | F-03.2 | API-boundary authorization enforcement | `SRS-NFR` NFR-SEC-01 |
-| F-03.3 | Role & permission administration | `TDD-DERIVED` FR-USR-02 |
-| F-03.4 | Tenant & floor data scoping | `BLOCKED` TODO-14 |
+| F-03.3 | Role & permission administration | `ENABLER` (ADR-0004) — schema-bounded |
+| F-03.4 | Tenant & floor data scoping | `ENABLER` (ADR-0004) — seam built, strict default; TODO-14 open |
 
-### EPIC-04 — Configuration & Master Data `TDD-DERIVED`
-*Entire epic is TDD/schema-derived. Held pending TODO-01.*
+### EPIC-04 — Configuration & Master Data `ENABLER`
+*Authorised by [ADR-0004](../adr/0004-master-data-and-rbac-as-approved-enablers.md): SRS-backed
+features cannot function without reference data. Scope is bounded by the published schema.*
 
 | Feature | Title | Provenance |
 |---|---|---|
-| F-04.1 | Building master data | `TDD-DERIVED` FR-CFG-02 |
-| F-04.2 | Floor master data | `TDD-DERIVED` FR-CFG-03 |
-| F-04.3 | Tenant master data | `TDD-DERIVED` FR-CFG-04 |
-| F-04.4 | Reception point master data | `TDD-DERIVED` FR-CFG-05 |
-| F-04.5 | Visitor type master data | `TDD-DERIVED` FR-CFG-06 |
-| F-04.6 | Pass type master data | `TDD-DERIVED` FR-CFG-07 |
-| F-04.7 | Holiday calendar | `TDD-DERIVED` FR-CFG-08 |
-| F-04.8 | System settings | `TDD-DERIVED` FR-SET-01 |
-| F-04.9 | Master data caching & invalidation | `TDD-DERIVED` TDD §4.1 |
+| F-04.1 | Building master data | `ENABLER` FR-CFG-02 |
+| F-04.2 | Floor master data | `ENABLER` FR-CFG-03 |
+| F-04.3 | Tenant master data | `ENABLER` FR-CFG-04 |
+| F-04.4 | Reception point master data | `ENABLER` FR-CFG-05 |
+| F-04.5 | Visitor type master data | `ENABLER` FR-CFG-06 |
+| F-04.6 | Pass type master data | `ENABLER` FR-CFG-07 |
+| F-04.7 | Holiday calendar | `ENABLER` FR-CFG-08 |
+| F-04.8 | System settings | `ENABLER` FR-SET-01 |
+| F-04.9 | Master data caching & invalidation | `ENABLER` TDD §4.1 |
 
 > ⚠️ **`FR-CFG-01` is unallocated.** The requirements catalogue §5 lists `FR-CFG-01 … FR-CFG-08`,
 > but only FR-CFG-02..08 have an identifiable subject in the schema. FR-CFG-01's content is unknown
