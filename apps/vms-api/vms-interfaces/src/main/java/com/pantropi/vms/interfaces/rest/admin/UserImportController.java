@@ -1,7 +1,8 @@
 package com.pantropi.vms.interfaces.rest.admin;
 
 import com.pantropi.vms.application.identity.usecase.UserImport;
-import com.pantropi.vms.interfaces.rest.auth.AuthController.AuthenticatedPrincipal;
+import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
+import com.pantropi.vms.interfaces.rest.security.RequiresPermission;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,6 +25,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/admin/users/import")
+@RequiresPermission("user.manage")
 @ConditionalOnProperty(prefix = "vms.identity", name = "enabled", havingValue = "true")
 public class UserImportController {
 
@@ -40,7 +42,7 @@ public class UserImportController {
 
     @PostMapping(consumes = {MediaType.TEXT_PLAIN_VALUE, "text/csv"})
     public ResponseEntity<UserImport.Result> execute(
-            @RequestAttribute("vms.principal") AuthenticatedPrincipal actor,
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
             @RequestBody String csv,
             @RequestParam(defaultValue = "unnamed.csv") String fileName,
             @RequestParam(defaultValue = "false") boolean confirmSkipConflicts) {

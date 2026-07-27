@@ -7,8 +7,8 @@ import java.util.UUID;
 
 /**
  * JDBC adapter for {@link AuditTrail} over the append-only {@code vms.audit_logs} (US-02.1.2 /
- * US-02.2.1). Records identifiers, the action and before/after state only — never a token, a
- * password, or a password hash (the caller excludes those).
+ * US-02.2.1 / US-03.2.2). Records identifiers, the action and before/after state only — never a
+ * token, a password, a password hash, or request/response body content.
  */
 public final class JdbcAuditTrail implements AuditTrail {
 
@@ -24,7 +24,7 @@ public final class JdbcAuditTrail implements AuditTrail {
                 INSERT INTO vms.audit_logs (user_id, action, entity_type, entity_id, after_state)
                 VALUES (?, ?, ?, ?, ?::jsonb)
                 """, actorId, action, entityType, entityId,
-                detail == null ? null : "{\"detail\":\"" + detail.replace("\"", "'") + "\"}");
+                detail == null ? null : "{\"detail\":\"" + safe(detail) + "\"}");
     }
 
     @Override
@@ -34,5 +34,37 @@ public final class JdbcAuditTrail implements AuditTrail {
                 INSERT INTO vms.audit_logs (user_id, action, entity_type, entity_id, before_state, after_state)
                 VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb)
                 """, actorId, action, entityType, entityId, beforeJson, afterJson);
+    }
+
+    @Override
+    public void recordSecurityDenial(UUID actorId, String action, String attemptedPermission,
+                                     String route, String method, String outcome, String sourceIp) {
+        // after_state carries only non-personal request metadata: never a body or query string.
+        String state = "{"
+                + "\"permission\":\"" + safe(attemptedPermission) + "\","
+                + "\"route\":\"" + safe(route) + "\","
+                + "\"method\":\"" + safe(method) + "\","
+                + "\"outcome\":\"" + safe(outcome) + "\","
+                + "\"actor\":\"" + (actorId == null ? "anonymous" : actorId.toString()) + "\""
+                + "}";
+        jdbc.update("""
+                INSERT INTO vms.audit_logs (user_id, action, entity_type, entity_id, after_state, ip_address)
+                VALUES (?, ?, 'security', ?, ?::jsonb, ?::inet)
+                """, actorId, action, safe(route), state, sourceIp);
+    }
+
+    /**
+     * Defensive escaping: values derived from a request must never break out of the JSON literal.
+     * Quotes and control characters are neutralised rather than escaped, because nothing written
+     * here legitimately contains them.
+     */
+    private static String safe(String value) {
+        if (value == null) {
+            return "-";
+        }
+        return value.replace("\\", "")
+                .replace("\"", "'")
+                .replace("\n", " ")
+                .replace("\r", " ");
     }
 }

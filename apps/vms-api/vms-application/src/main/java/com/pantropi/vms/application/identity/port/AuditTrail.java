@@ -18,4 +18,11 @@ public interface AuditTrail {
     /** State change: before and after JSON, with password material excluded by the caller. */
     void recordChange(UUID actorId, String action, String entityType, String entityId,
                       String beforeJson, String afterJson);
+
+    /**
+     * Security denial (US-03.2.2, T-03.2.2.2). Records who (null = anonymous), what was attempted,
+     * where and from which address — and never any request or response body content.
+     */
+    void recordSecurityDenial(UUID actorId, String action, String attemptedPermission,
+                              String route, String method, String outcome, String sourceIp);
 }

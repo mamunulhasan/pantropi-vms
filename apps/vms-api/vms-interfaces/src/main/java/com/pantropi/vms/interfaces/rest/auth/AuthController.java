@@ -2,6 +2,8 @@ package com.pantropi.vms.interfaces.rest.auth;
 
 import com.pantropi.vms.application.identity.usecase.AuthenticateUser;
 import com.pantropi.vms.application.identity.usecase.SessionManager;
+import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
+import com.pantropi.vms.interfaces.rest.security.RequiresAuthentication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -55,15 +57,17 @@ public class AuthController {
         return ResponseEntity.ok(toResponse(sessions.refresh(req.refreshToken())));
     }
 
+    @RequiresAuthentication
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            @RequestAttribute("vms.principal") AuthenticatedPrincipal principal) {
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal) {
         sessions.logout(UUID.fromString(principal.sessionId()), UUID.fromString(principal.userId()));
         return ResponseEntity.noContent().build();
     }
 
+    @RequiresAuthentication
     @GetMapping("/me")
-    public MeResponse me(@RequestAttribute("vms.principal") AuthenticatedPrincipal principal) {
+    public MeResponse me(@RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal) {
         return new MeResponse(principal.userId(), principal.username(), principal.role());
     }
 
@@ -89,6 +93,4 @@ public class AuthController {
                                 String refreshToken) {}
     public record MeResponse(String userId, String username, String role) {}
     public record ErrorResponse(String error, String message) {}
-    public record AuthenticatedPrincipal(String userId, String username, String role,
-                                         String sessionId) {}
 }

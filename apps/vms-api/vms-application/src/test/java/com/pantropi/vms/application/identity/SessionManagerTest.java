@@ -116,5 +116,7 @@ class SessionManagerTest {
         public void recordChange(UUID u, String action, String et, String eid, String b, String af) {
             actions.add(action);
         }
+        public void recordSecurityDenial(UUID a, String action, String p, String r,
+                                         String m, String o, String ip) { actions.add(action); }
     }
 }

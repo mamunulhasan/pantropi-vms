@@ -4,7 +4,8 @@ import com.pantropi.vms.application.identity.port.UserAdministrationStore.NewUse
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.Page;
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.UserFilter;
 import com.pantropi.vms.application.identity.usecase.UserAdministration;
-import com.pantropi.vms.interfaces.rest.auth.AuthController.AuthenticatedPrincipal;
+import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
+import com.pantropi.vms.interfaces.rest.security.RequiresPermission;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/admin/users")
+@RequiresPermission("user.manage")
 @ConditionalOnProperty(prefix = "vms.identity", name = "enabled", havingValue = "true")
 public class UserAdminController {
 
@@ -30,7 +32,7 @@ public class UserAdminController {
 
     @PostMapping
     public ResponseEntity<CreatedResponse> create(
-            @RequestAttribute("vms.principal") AuthenticatedPrincipal actor,
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
             @RequestBody CreateRequest req) {
         UUID id = users.create(UUID.fromString(actor.userId()),
                 new NewUser(req.username(), req.email(), req.fullName(), req.roleCode(),
@@ -40,7 +42,7 @@ public class UserAdminController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Void> update(
-            @RequestAttribute("vms.principal") AuthenticatedPrincipal actor,
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
             @PathVariable UUID id, @RequestBody UpdateRequest req) {
         users.updateAssignment(UUID.fromString(actor.userId()), id, req.roleCode(),
                 req.receptionId(), req.tenantId());
@@ -49,14 +51,14 @@ public class UserAdminController {
 
     @PostMapping("/{id}/deactivate")
     public ResponseEntity<Void> deactivate(
-            @RequestAttribute("vms.principal") AuthenticatedPrincipal actor, @PathVariable UUID id) {
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor, @PathVariable UUID id) {
         users.deactivate(UUID.fromString(actor.userId()), id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/reactivate")
     public ResponseEntity<Void> reactivate(
-            @RequestAttribute("vms.principal") AuthenticatedPrincipal actor, @PathVariable UUID id) {
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor, @PathVariable UUID id) {
         users.reactivate(UUID.fromString(actor.userId()), id);
         return ResponseEntity.noContent().build();
     }
