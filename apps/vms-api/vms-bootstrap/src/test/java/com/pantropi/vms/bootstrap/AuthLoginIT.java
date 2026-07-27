@@ -154,6 +154,12 @@ class AuthLoginIT {
                         id uuid PRIMARY KEY, username text UNIQUE NOT NULL, password_hash text NOT NULL,
                         role_id uuid NOT NULL REFERENCES vms.roles(id), is_active boolean NOT NULL)""");
             s.execute("""
+                    CREATE TABLE vms.audit_logs (
+                        id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, user_id uuid,
+                        action text NOT NULL, entity_type text, entity_id text,
+                        before_state jsonb, after_state jsonb, ip_address inet,
+                        created_at timestamptz NOT NULL DEFAULT now())""");
+            s.execute("""
                     CREATE TABLE vms.sessions (
                         id uuid PRIMARY KEY, user_id uuid NOT NULL, username text NOT NULL,
                         role_code text NOT NULL, refresh_token_hash text NOT NULL,

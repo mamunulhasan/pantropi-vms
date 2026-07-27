@@ -123,5 +123,7 @@ class UserAdministrationTest {
         final List<String> actions = new ArrayList<>();
         public void record(UUID a, String action, String et, String eid, String d) { actions.add(action); }
         public void recordChange(UUID a, String action, String et, String eid, String b, String af) { actions.add(action); }
+        public void recordSecurityDenial(UUID a, String action, String p, String r,
+                                         String m, String o, String ip) { actions.add(action); }
     }
 }
