@@ -279,9 +279,9 @@ clearly marked as requiring confirmation.
 |---|---|---|---|---|---|
 | D-01 | 🔴 | 2026-07-19 | Client / Pantropi doc control | **Open** | — |
 | D-02 | 🔴 | 2026-07-19 | Pantropi doc control | **Open** | — |
-| D-03 | 🟠 | 2026-07-19 | Client / Pantropi doc control | **Open** | — |
+| D-03 | 🟠 | 2026-07-19 | Client / Pantropi doc control | **Partially resolved** | ADR-0004: master data + RBAC admin approved as enablers; analytics/export & TDD-only notifications stay blocked |
 | D-04 | 🟠 | 2026-07-19 | Pantropi doc control | **Open** | — |
-| D-05 | 🟠 | 2026-07-19 | Pantropi doc control | **Open** | — |
+| D-05 | 🟠 | 2026-07-19 | Pantropi doc control | **Resolved** | ADR-0004: the unbacked master-data tables are authorised as enablers, bounded by the published schema |
 | D-06 | 🟠 | 2026-07-19 | Client | **Open** | — |
 | D-07 | 🟡 | 2026-07-19 | Pantropi doc control | **Open** | — |
 | D-08 | 🔴 | 2026-07-19 | Client / UAL | **Open** | — |

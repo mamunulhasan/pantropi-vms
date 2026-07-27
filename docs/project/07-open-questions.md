@@ -13,15 +13,18 @@ implement without inventing something.
 
 ## Blocking
 
-### TODO-01 🔴 Supply SRS v2, or confirm the attached SRS is authoritative
+### TODO-01 ✅ DISPOSITIONED (2026-07-28) — attached SRS is the baseline
 **Refs:** D-01, D-03, D-05 · **Blocks:** EPIC-04 (all), EPIC-10, EPIC-19, F-05.1, F-03.1/F-03.3, F-07.5, F-08.4, F-09.7, F-17.3/4/5, F-18.4 — and full backlog completeness
 
 The TDD is written against a 96-requirement, four-phase SRS v2 that we do not have. ~50 referenced
 requirement IDs are undefined. Master data, RBAC, audit, user administration, and most of the
 reporting suite are designed and schema-supported but unrequirmented.
 
-**We need:** SRS v2 + phased implementation plan Revision 2 — *or* written confirmation that the
-attached 28-requirement SRS is the delivery baseline and the TDD/schema will be reduced to match.
+**Dispositioned by the repository owner on 2026-07-28** ([ADR-0004](../adr/0004-master-data-and-rbac-as-approved-enablers.md)):
+the attached SRS is the delivery baseline; SRS v2 is not awaited. Master data (EPIC-04) and RBAC
+administration (EPIC-03) are **approved enablers**, bounded by the entities the published schema
+already defines. Analytics/export (EPIC-19) and the TDD-only notification scenarios remain blocked —
+they add user-facing capability rather than enabling an existing requirement.
 
 **Until resolved:** the backlog covers 28 requirements. It is not the whole system.
 
@@ -121,10 +124,15 @@ The schema has `visitors.id_document_ref` with the comment *"avoid storing raw I
 No SRS requirement mentions ID capture. **We need:** confirm in or out of scope. If in, it needs a
 requirement and a privacy assessment.
 
-### TODO-14 🟠 Tenant data isolation rules
+### TODO-14 🟠 Tenant data isolation rules — *interim strict default in force*
 No document states whether Tenant A may see Tenant B's visitor data, or whether a floor receptionist
 sees only their floor. NFR-SEC-01 requires role-based access control but not tenant scoping.
 **We need:** the isolation model. This is a design-time decision — retrofitting it is expensive.
+
+**Interim (ADR-0004):** the scoping seam is built with a **strict default** — a tenant sees only its
+own data, a floor receptionist only their own floor. Fails safe: relaxing is configuration, whereas
+a permissive default would have leaked tenant data while we waited. The policy is swappable; this
+question stays open.
 
 ### TODO-15 🟠 VMS user authentication mechanism
 **Feature:** F-02.1 (EPIC-02)
