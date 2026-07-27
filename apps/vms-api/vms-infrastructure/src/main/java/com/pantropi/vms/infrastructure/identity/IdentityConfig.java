@@ -62,6 +62,38 @@ public class IdentityConfig {
         return new JdbcAuditTrail(new JdbcTemplate(dataSource));
     }
 
+    // ---- US-02.2.2 bulk import & activation ----
+
+    @Bean
+    com.pantropi.vms.application.shared.port.TransactionRunner transactionRunner(
+            org.springframework.transaction.PlatformTransactionManager tm) {
+        return new com.pantropi.vms.infrastructure.shared.SpringTransactionRunner(
+                new org.springframework.transaction.support.TransactionTemplate(tm));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.port.ActivationStore activationStore(DataSource dataSource) {
+        return new JdbcActivationStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.AccountActivation accountActivation(
+            com.pantropi.vms.application.identity.port.ActivationStore store, PasswordHasher hasher,
+            Clock clock,
+            @Value("${vms.identity.activation-ttl-hours:72}") long activationTtlHours) {
+        return new com.pantropi.vms.application.identity.usecase.AccountActivation(
+                store, hasher, clock, Duration.ofHours(activationTtlHours));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.UserImport userImport(
+            com.pantropi.vms.application.identity.port.UserAdministrationStore store,
+            com.pantropi.vms.application.identity.port.AuditTrail audit,
+            com.pantropi.vms.application.shared.port.TransactionRunner tx,
+            com.pantropi.vms.application.identity.usecase.AccountActivation activation) {
+        return new com.pantropi.vms.application.identity.usecase.UserImport(store, audit, tx, activation);
+    }
+
     // ---- US-02.2.1 user administration ----
 
     @Bean

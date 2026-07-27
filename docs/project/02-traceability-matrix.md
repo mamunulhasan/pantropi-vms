@@ -159,6 +159,7 @@ Every pull request must:
 | **US-02.4.1** | **FR-ADM-01 (SRS B1)** | V3 MASTER_ADMIN grants + BootstrapAdministrator + MasterAdminPolicy + first-run runner | 6 unit + BootstrapAdminIT (migrate→bootstrap→login end-to-end) + MigrationIT V3 grants; 48/48 green | #38 | pending | 0.1.0 |
 | **US-02.1.2** | **FR-ADM-02 (SRS B1)** · NFR-SEC-01 | V4 sessions + SessionManager (rotate/replay/logout) + SessionStore/AuditTrail JDBC adapters + `/auth/refresh`,`/logout` + revocation in interceptor | 5 unit + SessionIT (rotate, replay→family-revoke+audit, logout→401); 55/55 green | #39 | pending | 0.1.0 |
 | **US-02.2.1** | **FR-ADM-02 (SRS B1)** · NFR-SEC-01 | V5 SYSTEM_ADMIN grant + UserAdministration use case + JDBC user/permission adapters + `/api/v1/admin/users` CRUD + AdminAuthorizationInterceptor (user.manage) | 6 unit + UserAdminIT (create/list, dup 409, deactivate→session revoke, non-admin 403+audit); 65/65 green | #40 | pending | 0.1.0 |
+| **US-02.2.2** | **FR-ADM-02 (SRS B1)** | V6 activation_tokens + UserImport (preview/execute) + AccountActivation + TransactionRunner + `/admin/users/import`,`/auth/activate` | 7 unit + UserImportIT (preview→confirm→activate→login, password-column 422, conflict 409); 74/74 green | *(local, unpushed)* | pending | 0.1.0 |
 
 ---
 
