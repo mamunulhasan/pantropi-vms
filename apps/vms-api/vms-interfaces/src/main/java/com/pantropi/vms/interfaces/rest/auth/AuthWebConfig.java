@@ -41,7 +41,8 @@ public class AuthWebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new BearerTokenInterceptor(tokens, sessions))
                 .addPathPatterns("/api/v1/auth/**")
-                .excludePathPatterns("/api/v1/auth/login", "/api/v1/auth/refresh");
+                .excludePathPatterns("/api/v1/auth/login", "/api/v1/auth/refresh",
+                        "/api/v1/auth/activate");
 
         registry.addInterceptor(new AdminAuthorizationInterceptor(
                         tokens, sessions, permissions, audit, "user.manage"))

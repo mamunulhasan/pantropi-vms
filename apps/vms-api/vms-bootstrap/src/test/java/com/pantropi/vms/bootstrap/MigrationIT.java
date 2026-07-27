@@ -46,7 +46,7 @@ class MigrationIT {
             "holiday_calendar", "roles", "permissions", "role_permissions", "users", "hosts",
             "visitor_requests", "visitors", "credentials", "card_issuances", "access_events",
             "acs_requests", "acs_api_log", "notification_logs", "system_settings", "audit_logs",
-            "sessions");
+            "sessions", "activation_tokens");
 
     private static final Set<String> EXPECTED_ENUMS = Set.of(
             "request_status", "visitor_status", "visit_kind", "credential_type",
@@ -77,7 +77,7 @@ class MigrationIT {
     @DisplayName("AC-1: baseline creates every table, enum, trigger and comment; history records V1+V2")
     void baselineCreatesFullSchema() throws Exception {
         MigrateResult result = flyway().migrate();
-        assertThat(result.migrationsExecuted).isEqualTo(5);
+        assertThat(result.migrationsExecuted).isEqualTo(6);
 
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             assertThat(query(s, """
@@ -114,7 +114,7 @@ class MigrationIT {
 
             assertThat(query(s, """
                     SELECT version FROM vms.flyway_schema_history WHERE success AND version IS NOT NULL"""))
-                    .containsExactly("1", "2", "3", "4", "5");
+                    .containsExactly("1", "2", "3", "4", "5", "6");
         }
     }
 
