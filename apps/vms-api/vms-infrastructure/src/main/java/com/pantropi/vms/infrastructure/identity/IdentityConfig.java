@@ -46,8 +46,56 @@ public class IdentityConfig {
     }
 
     @Bean
-    AuthenticateUser authenticateUser(UserDirectory users, PasswordHasher hasher) {
-        return new AuthenticateUser(users, hasher);
+    AuthenticateUser authenticateUser(
+            UserDirectory users, PasswordHasher hasher,
+            com.pantropi.vms.application.identity.port.LoginAttemptStore attempts,
+            com.pantropi.vms.application.identity.port.AuditTrail audit, Clock clock,
+            @Value("${vms.security.lockout.threshold:5}") int threshold,
+            @Value("${vms.security.lockout.window-minutes:15}") long windowMinutes) {
+        return new AuthenticateUser(users, hasher, attempts, audit, clock, threshold,
+                Duration.ofMinutes(windowMinutes));
+    }
+
+    // ---- US-02.3.1 account security policy ----
+
+    @Bean
+    com.pantropi.vms.application.identity.port.LoginAttemptStore loginAttemptStore(DataSource dataSource) {
+        return new JdbcLoginAttemptStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.port.CredentialStore credentialStore(DataSource dataSource) {
+        return new JdbcCredentialStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.PasswordPolicy passwordPolicy(
+            @Value("${vms.security.password.min-length:12}") int minLength,
+            @Value("${vms.security.password.max-length:200}") int maxLength) {
+        return new com.pantropi.vms.application.identity.usecase.PasswordPolicy(minLength, maxLength);
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.ChangePassword changePassword(
+            com.pantropi.vms.application.identity.port.CredentialStore credentials,
+            PasswordHasher hasher,
+            com.pantropi.vms.application.identity.usecase.PasswordPolicy policy,
+            com.pantropi.vms.application.identity.port.SessionStore sessions,
+            com.pantropi.vms.application.identity.port.LoginAttemptStore attempts,
+            com.pantropi.vms.application.identity.port.AuditTrail audit, Clock clock) {
+        return new com.pantropi.vms.application.identity.usecase.ChangePassword(
+                credentials, hasher, policy, sessions, attempts, audit, clock);
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.AccountRecovery accountRecovery(
+            com.pantropi.vms.application.identity.port.CredentialStore credentials,
+            com.pantropi.vms.application.identity.port.LoginAttemptStore attempts,
+            com.pantropi.vms.application.identity.port.SessionStore sessions,
+            com.pantropi.vms.application.identity.usecase.AccountActivation activation,
+            com.pantropi.vms.application.identity.port.AuditTrail audit) {
+        return new com.pantropi.vms.application.identity.usecase.AccountRecovery(
+                credentials, attempts, sessions, activation, audit);
     }
 
     // ---- US-02.1.2 sessions: store, audit, manager ----

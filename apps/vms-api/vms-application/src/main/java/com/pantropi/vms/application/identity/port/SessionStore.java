@@ -17,7 +17,7 @@ import java.util.UUID;
 public interface SessionStore {
 
     void create(UUID sessionId, UUID userId, String username, String roleCode,
-                String refreshTokenHash, Instant expiresAt);
+                String refreshTokenHash, Instant expiresAt, boolean mustChangePassword);
 
     /** Present (unrevoked, unexpired) session, else empty. Consulted on every protected request. */
     Optional<ActiveSession> findActive(UUID sessionId);
@@ -34,8 +34,12 @@ public interface SessionStore {
     /** Revoke every active session of a user — used when the user is deactivated (AC-3). */
     int revokeAllForUser(UUID userId, String reason);
 
+    /**
+     * @param mustChangePassword stamped at login; the authorization gate confines such a session
+     *                           to the password-change endpoints (US-02.3.1)
+     */
     record ActiveSession(UUID sessionId, UUID userId, String username, String roleCode,
-                         Instant expiresAt) {}
+                         Instant expiresAt, boolean mustChangePassword) {}
 
     enum RotationOutcome { ROTATED, REPLAY_DETECTED, INVALID }
 }

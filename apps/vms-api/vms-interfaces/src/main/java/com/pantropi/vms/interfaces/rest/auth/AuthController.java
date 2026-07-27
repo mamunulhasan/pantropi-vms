@@ -1,6 +1,8 @@
 package com.pantropi.vms.interfaces.rest.auth;
 
 import com.pantropi.vms.application.identity.usecase.AuthenticateUser;
+import com.pantropi.vms.application.identity.usecase.ChangePassword;
+import com.pantropi.vms.application.identity.usecase.PasswordPolicy;
 import com.pantropi.vms.application.identity.usecase.SessionManager;
 import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
 import com.pantropi.vms.interfaces.rest.security.RequiresAuthentication;
@@ -21,6 +23,7 @@ import java.util.UUID;
  *   <li>{@code POST /api/v1/auth/refresh} — single-use refresh rotation (AC-1).</li>
  *   <li>{@code POST /api/v1/auth/logout} — revoke the current session (AC-2). Protected.</li>
  *   <li>{@code GET  /api/v1/auth/me} — echo the authenticated principal. Protected.</li>
+ *   <li>{@code POST /api/v1/auth/password} — change your own password (US-02.3.1). Protected.</li>
  * </ul>
  *
  * <p>The controller holds no logic beyond HTTP mapping — it delegates to the use cases.
@@ -32,10 +35,13 @@ public class AuthController {
 
     private final AuthenticateUser authenticateUser;
     private final SessionManager sessions;
+    private final ChangePassword changePassword;
 
-    public AuthController(AuthenticateUser authenticateUser, SessionManager sessions) {
+    public AuthController(AuthenticateUser authenticateUser, SessionManager sessions,
+                          ChangePassword changePassword) {
         this.authenticateUser = authenticateUser;
         this.sessions = sessions;
+        this.changePassword = changePassword;
     }
 
     @PostMapping("/login")
@@ -45,8 +51,32 @@ public class AuthController {
         }
         AuthenticateUser.AuthenticatedUser user =
                 authenticateUser.login(req.username(), req.password().toCharArray());
-        SessionManager.Tokens t = sessions.openSession(user.id(), user.username(), user.roleCode());
+        SessionManager.Tokens t = sessions.openSession(user.id(), user.username(), user.roleCode(),
+                user.mustChangePassword());
         return ResponseEntity.ok(toResponse(t));
+    }
+
+    /**
+     * Change your own password (US-02.3.1). Requires the current password, so a stolen access token
+     * alone cannot take over the account.
+     *
+     * <p>Succeeding revokes every session of the user — including this one — and immediately opens
+     * a fresh one, so the response carries a new token pair that the client should adopt. Any other
+     * device the account was signed in on is signed out.
+     */
+    @RequiresAuthentication
+    @PostMapping("/password")
+    public ResponseEntity<TokenResponse> changePassword(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal,
+            @RequestBody ChangePasswordRequest req) {
+        if (req == null || req.currentPassword() == null || req.newPassword() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        UUID userId = UUID.fromString(principal.userId());
+        changePassword.change(userId, req.currentPassword().toCharArray(),
+                req.newPassword().toCharArray());
+        return ResponseEntity.ok(toResponse(
+                sessions.openSession(userId, principal.username(), principal.role(), false)));
     }
 
     @PostMapping("/refresh")
@@ -83,14 +113,38 @@ public class AuthController {
                 .body(new ErrorResponse("invalid_refresh_token", "Invalid or expired refresh token"));
     }
 
+    /**
+     * Policy rejections are 422, not 400: the request was well formed and understood, it just asked
+     * for something the policy forbids. The message is the guidance the policy composed — it never
+     * names the rule that matched a denylist entry, and never echoes the candidate password.
+     */
+    @ExceptionHandler(PasswordPolicy.WeakPassword.class)
+    public ResponseEntity<ErrorResponse> onWeakPassword(PasswordPolicy.WeakPassword e) {
+        return ResponseEntity.unprocessableEntity()
+                .body(new ErrorResponse("weak_password", e.getMessage()));
+    }
+
+    @ExceptionHandler(ChangePassword.PasswordUnchanged.class)
+    public ResponseEntity<ErrorResponse> onPasswordUnchanged(ChangePassword.PasswordUnchanged e) {
+        return ResponseEntity.unprocessableEntity()
+                .body(new ErrorResponse("password_unchanged", e.getMessage()));
+    }
+
     private static TokenResponse toResponse(SessionManager.Tokens t) {
-        return new TokenResponse(t.accessToken(), "Bearer", t.accessExpiresAt(), t.refreshToken());
+        return new TokenResponse(t.accessToken(), "Bearer", t.accessExpiresAt(), t.refreshToken(),
+                t.mustChangePassword());
     }
 
     public record LoginRequest(String username, String password) {}
     public record RefreshRequest(String refreshToken) {}
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {}
+
+    /**
+     * @param mustChangePassword when true the session may reach only the password-change endpoints
+     *                           until the change is made (US-02.3.1)
+     */
     public record TokenResponse(String accessToken, String tokenType, Instant expiresAt,
-                                String refreshToken) {}
+                                String refreshToken, boolean mustChangePassword) {}
     public record MeResponse(String userId, String username, String role) {}
     public record ErrorResponse(String error, String message) {}
 }

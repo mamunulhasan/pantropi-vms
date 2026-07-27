@@ -42,12 +42,23 @@ public final class SessionManager {
 
     /** Open a fresh session and return the access + refresh pair. */
     public Tokens openSession(UUID userId, String username, String roleCode) {
+        return openSession(userId, username, roleCode, false);
+    }
+
+    /**
+     * Open a session, stamping whether the account must change its password before it can reach
+     * anything else (US-02.3.1). The flag lives on the session rather than in the access token so
+     * that completing the change takes effect immediately, instead of at token expiry.
+     */
+    public Tokens openSession(UUID userId, String username, String roleCode,
+                              boolean mustChangePassword) {
         UUID sessionId = UUID.randomUUID();
         String refreshToken = sessionId + "." + randomSecret();
         Instant expiry = clock.instant().plus(refreshTtl);
-        sessions.create(sessionId, userId, username, roleCode, sha256(refreshToken), expiry);
+        sessions.create(sessionId, userId, username, roleCode, sha256(refreshToken), expiry,
+                mustChangePassword);
         AccessTokenIssuer.IssuedToken access = tokens.issue(userId, username, roleCode, sessionId);
-        return new Tokens(access.token(), access.expiresAt(), refreshToken);
+        return new Tokens(access.token(), access.expiresAt(), refreshToken, mustChangePassword);
     }
 
     /**
@@ -73,7 +84,10 @@ public final class SessionManager {
             case ROTATED -> {
                 AccessTokenIssuer.IssuedToken access =
                         tokens.issue(s.userId(), s.username(), s.roleCode(), sessionId);
-                return new Tokens(access.token(), access.expiresAt(), newRefresh);
+                // Refreshing does not shed the obligation: the flag lives on the session row and
+                // is carried forward, so a client cannot escape the gate by rotating its token.
+                return new Tokens(access.token(), access.expiresAt(), newRefresh,
+                        s.mustChangePassword());
             }
             case REPLAY_DETECTED -> {
                 sessions.revoke(sessionId, "refresh_token_replay");
@@ -117,7 +131,8 @@ public final class SessionManager {
         }
     }
 
-    public record Tokens(String accessToken, Instant accessExpiresAt, String refreshToken) {}
+    public record Tokens(String accessToken, Instant accessExpiresAt, String refreshToken,
+                         boolean mustChangePassword) {}
 
     public static final class InvalidRefreshToken extends RuntimeException {
         public InvalidRefreshToken() {

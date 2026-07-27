@@ -12,6 +12,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -41,6 +42,14 @@ import java.util.UUID;
  * decision points are isolated here, so adopting Spring Security later replaces this class alone.
  */
 public final class AuthorizationInterceptor implements HandlerInterceptor {
+
+    /**
+     * The only routes a session owing a password change may reach (US-02.3.1): make the change,
+     * see who you are, or give up and log out. Deliberately tiny and literal — a prefix match here
+     * would silently widen as sibling routes are added.
+     */
+    private static final Set<String> PASSWORD_CHANGE_ROUTES = Set.of(
+            "/api/v1/auth/password", "/api/v1/auth/logout", "/api/v1/auth/me");
 
     private final AccessTokenIssuer tokens;
     private final SessionStore sessions;
@@ -77,8 +86,18 @@ public final class AuthorizationInterceptor implements HandlerInterceptor {
         AccessTokenIssuer.VerifiedToken token = verified.get();
 
         // AC-6: a signature-valid token whose session was revoked or has expired is 401, not 403.
-        if (sessions.findActive(token.sessionId()).isEmpty()) {
+        Optional<SessionStore.ActiveSession> session = sessions.findActive(token.sessionId());
+        if (session.isEmpty()) {
             return deny(request, response, HttpServletResponse.SC_UNAUTHORIZED, null, token.userId());
+        }
+
+        // US-02.3.1: an account owing a password change reaches nothing but the endpoints that let
+        // it complete or abandon the change. Read from the session row already fetched above, so
+        // this costs no extra query — and, unlike a token claim, it stops applying the moment the
+        // change is made rather than at token expiry.
+        if (session.get().mustChangePassword() && !PASSWORD_CHANGE_ROUTES.contains(path)) {
+            return deny(request, response, HttpServletResponse.SC_FORBIDDEN,
+                    "<password-change-required>", token.userId());
         }
 
         // ---- authorize (403 when authenticated but not permitted) ----

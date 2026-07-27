@@ -91,15 +91,17 @@ class SessionManagerTest {
         boolean active = true;
         RotationOutcome rotationOutcome = RotationOutcome.ROTATED;
         UUID lastSessionId;
+        boolean createdWithMustChangePassword;
+        boolean sessionOwesPasswordChange;
         final java.util.Map<UUID, String> revoked = new java.util.HashMap<>();
 
-        public void create(UUID sid, UUID u, String un, String r, String h, Instant e) {
-            created++; lastSessionId = sid;
+        public void create(UUID sid, UUID u, String un, String r, String h, Instant e, boolean mcp) {
+            created++; lastSessionId = sid; createdWithMustChangePassword = mcp;
         }
         public Optional<ActiveSession> findActive(UUID sid) {
             lastSessionId = sid;
             return active ? Optional.of(new ActiveSession(sid, UUID.randomUUID(), "alice", "TENANT",
-                    Instant.now().plusSeconds(3600))) : Optional.empty();
+                    Instant.now().plusSeconds(3600), sessionOwesPasswordChange)) : Optional.empty();
         }
         public RotationOutcome rotate(UUID sid, String p, String n, Instant e) {
             rotateCalls++; return rotationOutcome;
