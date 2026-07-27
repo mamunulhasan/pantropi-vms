@@ -1,3 +1,5 @@
 # Profile: prod (US-01.2.1 · T-01.2.1.3)
 # Production. Health details hidden; all secrets from the environment (FR-API-03, SRS B1).
 server.port: 8080
+
+vms.identity.enabled: true
