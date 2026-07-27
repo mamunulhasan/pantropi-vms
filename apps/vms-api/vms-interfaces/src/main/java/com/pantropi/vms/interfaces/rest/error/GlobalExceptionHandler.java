@@ -5,6 +5,10 @@ import com.pantropi.vms.application.identity.usecase.AuthenticateUser;
 import com.pantropi.vms.application.identity.usecase.SessionManager;
 import com.pantropi.vms.application.identity.usecase.UserAdministration;
 import com.pantropi.vms.application.identity.usecase.UserImport;
+import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
+import com.pantropi.vms.domain.visitor.TimeWindow;
+import com.pantropi.vms.domain.visitor.Visitor;
+import com.pantropi.vms.domain.visitor.VisitorRequest;
 import com.pantropi.vms.interfaces.rest.security.CorrelationIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -52,6 +56,14 @@ public class GlobalExceptionHandler {
             UserAdministration.InvalidReference.class,
             AccountActivation.WeakPassword.class,
             UserImport.MalformedFile.class,
+            // US-07.1.1 domain validation: invalid window, missing or over-long visitor detail,
+            // no visitors named, host outside the tenant. Covered by IllegalArgumentException
+            // via inheritance; listed explicitly so the intent is visible.
+            TimeWindow.InvalidTimeWindow.class,
+            Visitor.InvalidVisitorDetail.class,
+            VisitorRequest.NoVisitorsNamed.class,
+            VisitorRequest.TooManyVisitors.class,
+            SubmitVisitorRequest.HostNotInTenant.class,
             HttpMessageNotReadableException.class,
             IllegalArgumentException.class})
     public ProblemDetail onBadRequest(HttpServletRequest request) {
