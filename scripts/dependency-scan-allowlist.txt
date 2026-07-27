@@ -1,0 +1,11 @@
+# Dependency-scan allowlist — US-01.4.1 (AC-3)
+#
+# Advisory ids suppressed from the HIGH/CRITICAL gate, each with a written
+# justification and a recheck date. An entry here is a REVIEWED decision, never a
+# convenience. Format:  <GHSA-or-CVE-id>  # reason (recheck YYYY-MM-DD)
+#
+# EMPTY BY DESIGN. The current build has 28 real HIGH/CRITICAL advisories (stale
+# Spring Boot 3.3.4 transitive chain: tomcat-embed-core, jackson, spring-framework,
+# postgresql). These are NOT suppressed — they are tracked as remediation work
+# (dependency upgrade), currently blocked by a Maven Central 403 in this environment.
+# Suppressing real criticals would defeat the gate. See docs/project/14-dependency-scan.md
