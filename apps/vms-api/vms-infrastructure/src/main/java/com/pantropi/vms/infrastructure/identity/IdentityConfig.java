@@ -62,6 +62,27 @@ public class IdentityConfig {
         return new JdbcAuditTrail(new JdbcTemplate(dataSource));
     }
 
+    // ---- US-02.2.1 user administration ----
+
+    @Bean
+    com.pantropi.vms.application.identity.port.UserAdministrationStore userAdministrationStore(
+            DataSource dataSource) {
+        return new JdbcUserAdministrationStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.port.PermissionChecker permissionChecker(DataSource dataSource) {
+        return new JdbcPermissionChecker(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.UserAdministration userAdministration(
+            com.pantropi.vms.application.identity.port.UserAdministrationStore store,
+            com.pantropi.vms.application.identity.port.SessionStore sessions,
+            com.pantropi.vms.application.identity.port.AuditTrail audit) {
+        return new com.pantropi.vms.application.identity.usecase.UserAdministration(store, sessions, audit);
+    }
+
     @Bean
     com.pantropi.vms.application.identity.usecase.SessionManager sessionManager(
             com.pantropi.vms.application.identity.port.SessionStore store, AccessTokenIssuer issuer,

@@ -3,13 +3,19 @@ package com.pantropi.vms.application.identity.port;
 import java.util.UUID;
 
 /**
- * Outbound port for security audit events (US-02.1.2, T-02.1.2.3).
+ * Outbound port for security audit events (US-02.1.2 / US-02.2.1).
  *
- * <p>Writes to the append-only {@code vms.audit_logs}. This is targeted security-event logging
- * justified by NFR-SEC-01 (SRS B1); the full audit framework (F-05.1) is a later, broader story.
- * Never record a token value or password — only identifiers and the action.
+ * <p>Writes to the append-only {@code vms.audit_logs}. Targeted security-event logging justified
+ * by NFR-SEC-01 (SRS B1); the full audit framework (F-05.1) is a later, broader story. Never
+ * record a token value, a password, or a password hash — only identifiers, the action, and
+ * before/after state with sensitive fields excluded.
  */
 public interface AuditTrail {
 
-    void record(UUID userId, String action, String entityType, String entityId, String detail);
+    /** Simple event: actor, action, target, optional free-text detail. */
+    void record(UUID actorId, String action, String entityType, String entityId, String detail);
+
+    /** State change: before and after JSON, with password material excluded by the caller. */
+    void recordChange(UUID actorId, String action, String entityType, String entityId,
+                      String beforeJson, String afterJson);
 }

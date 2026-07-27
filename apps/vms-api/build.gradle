@@ -101,6 +101,12 @@ subprojects {
         }
     }
 
+    // Emit method parameter names so Spring MVC can bind @RequestParam/@PathVariable
+    // without explicit names (the spring-boot plugin adds this; our plain modules need it).
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs << '-parameters'
+    }
+
     repositories {
         mavenCentral()
     }
