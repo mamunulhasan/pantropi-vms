@@ -50,13 +50,15 @@ class CryptoAdaptersTest {
         var issuer = new HmacJwtIssuer("this-secret-is-certainly-32-bytes-long!!", Duration.ofMinutes(10),
                 Clock.systemUTC());
         UUID id = UUID.randomUUID();
-        AccessTokenIssuer.IssuedToken t = issuer.issue(id, "alice", "MASTER_ADMIN");
+        UUID sid = UUID.randomUUID();
+        AccessTokenIssuer.IssuedToken t = issuer.issue(id, "alice", "MASTER_ADMIN", sid);
 
         Optional<AccessTokenIssuer.VerifiedToken> v = issuer.verify(t.token());
         assertThat(v).isPresent();
         assertThat(v.get().userId()).isEqualTo(id);
         assertThat(v.get().username()).isEqualTo("alice");
         assertThat(v.get().roleCode()).isEqualTo("MASTER_ADMIN");
+        assertThat(v.get().sessionId()).isEqualTo(sid);
     }
 
     @Test
@@ -66,7 +68,7 @@ class CryptoAdaptersTest {
                 Clock.systemUTC());
         var issuerB = new HmacJwtIssuer("secret-B-secret-B-secret-B-secret-B!", Duration.ofMinutes(10),
                 Clock.systemUTC());
-        String tokenFromA = issuerA.issue(UUID.randomUUID(), "alice", "TENANT").token();
+        String tokenFromA = issuerA.issue(UUID.randomUUID(), "alice", "TENANT", UUID.randomUUID()).token();
         assertThat(issuerB.verify(tokenFromA)).isEmpty();
     }
 
@@ -75,7 +77,7 @@ class CryptoAdaptersTest {
     void jwtRejectsExpired() {
         Clock past = Clock.fixed(Instant.now().minus(Duration.ofHours(1)), ZoneOffset.UTC);
         var issuer = new HmacJwtIssuer("secret-secret-secret-secret-secret!!", Duration.ofMinutes(5), past);
-        String expired = issuer.issue(UUID.randomUUID(), "alice", "TENANT").token();
+        String expired = issuer.issue(UUID.randomUUID(), "alice", "TENANT", UUID.randomUUID()).token();
         // verify with a now-clock: the token expired 55 minutes ago
         var nowIssuer = new HmacJwtIssuer("secret-secret-secret-secret-secret!!", Duration.ofMinutes(5),
                 Clock.systemUTC());

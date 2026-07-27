@@ -157,6 +157,7 @@ Every pull request must:
 | US-01.4.1 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.4.1.1/2/3 | `.github/workflows/{ci,codeql}.yml`, JaCoCo gate `gradle/coverage.gradle` | 9 required checks live; coverage gate green at 80/60; seeded-violation proofs on draft PR | #33 | pending | 0.1.0 |
 | **US-02.1.1** | **FR-ADM-02 (SRS B1)** · NFR-SEC-01 | login use case + PBKDF2/HMAC-JWT adapters + JDBC user directory + `/api/v1/auth/login`,`/me` | 7 crypto unit + 4 login ITs on real PostgreSQL (success, /me, tampered token, uniform failure) | #37 | pending | 0.2.0 |
 | **US-02.4.1** | **FR-ADM-01 (SRS B1)** | V3 MASTER_ADMIN grants + BootstrapAdministrator + MasterAdminPolicy + first-run runner | 6 unit + BootstrapAdminIT (migrate→bootstrap→login end-to-end) + MigrationIT V3 grants; 48/48 green | #38 | pending | 0.1.0 |
+| **US-02.1.2** | **FR-ADM-02 (SRS B1)** · NFR-SEC-01 | V4 sessions + SessionManager (rotate/replay/logout) + SessionStore/AuditTrail JDBC adapters + `/auth/refresh`,`/logout` + revocation in interceptor | 5 unit + SessionIT (rotate, replay→family-revoke+audit, logout→401); 55/55 green | #39 | pending | 0.1.0 |
 
 ---
 

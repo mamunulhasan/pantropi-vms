@@ -46,9 +46,29 @@ public class IdentityConfig {
     }
 
     @Bean
-    AuthenticateUser authenticateUser(UserDirectory users, PasswordHasher hasher,
-                                      AccessTokenIssuer issuer) {
-        return new AuthenticateUser(users, hasher, issuer);
+    AuthenticateUser authenticateUser(UserDirectory users, PasswordHasher hasher) {
+        return new AuthenticateUser(users, hasher);
+    }
+
+    // ---- US-02.1.2 sessions: store, audit, manager ----
+
+    @Bean
+    com.pantropi.vms.application.identity.port.SessionStore sessionStore(DataSource dataSource) {
+        return new JdbcSessionStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.port.AuditTrail auditTrail(DataSource dataSource) {
+        return new JdbcAuditTrail(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.SessionManager sessionManager(
+            com.pantropi.vms.application.identity.port.SessionStore store, AccessTokenIssuer issuer,
+            com.pantropi.vms.application.identity.port.AuditTrail audit, Clock clock,
+            @Value("${vms.security.jwt.refresh-ttl-minutes:1440}") long refreshTtlMinutes) {
+        return new com.pantropi.vms.application.identity.usecase.SessionManager(
+                store, issuer, audit, clock, Duration.ofMinutes(refreshTtlMinutes));
     }
 
     // ---- US-02.4.1 Master Admin authority & bootstrap ----
