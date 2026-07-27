@@ -153,6 +153,12 @@ class AuthLoginIT {
                     CREATE TABLE vms.users (
                         id uuid PRIMARY KEY, username text UNIQUE NOT NULL, password_hash text NOT NULL,
                         role_id uuid NOT NULL REFERENCES vms.roles(id), is_active boolean NOT NULL)""");
+            s.execute("""
+                    CREATE TABLE vms.sessions (
+                        id uuid PRIMARY KEY, user_id uuid NOT NULL, username text NOT NULL,
+                        role_code text NOT NULL, refresh_token_hash text NOT NULL,
+                        issued_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL,
+                        revoked boolean NOT NULL DEFAULT false, revoked_reason text, revoked_at timestamptz)""");
             UUID roleId = UUID.randomUUID();
             s.execute("INSERT INTO vms.roles (id, code, name) VALUES ('" + roleId
                     + "', 'MASTER_ADMIN', 'Master Admin')");

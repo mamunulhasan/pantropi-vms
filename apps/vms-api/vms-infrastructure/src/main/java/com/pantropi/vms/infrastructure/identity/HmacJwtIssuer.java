@@ -13,16 +13,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Minimal HS256 JWT issuer/verifier (US-02.1.1) built on the JDK's HMAC — no JWT library.
+ * Minimal HS256 JWT issuer/verifier (US-02.1.1/US-02.1.2) built on the JDK's HMAC — no JWT library.
  *
  * <p>Deliberately fixes the algorithm to HS256 and never reads {@code alg} from an incoming
- * token: verification recomputes the HS256 signature with the server secret and compares it
- * in constant time. This closes the "alg" confusion / {@code alg:none} class of JWT attacks
- * by construction. Claims carried: {@code sub}, {@code preferred_username}, {@code role},
- * {@code iat}, {@code exp}.
+ * token: verification recomputes the HS256 signature with the server secret and compares it in
+ * constant time. This closes the "alg" confusion / {@code alg:none} class of JWT attacks by
+ * construction. Claims carried: {@code sub}, {@code preferred_username}, {@code role},
+ * {@code sid} (session id), {@code iat}, {@code exp}.
  *
- * <p>Replace with a vetted JWT library (e.g. jjwt) behind this same port once dependencies
- * are available. The secret comes from configuration/environment, never source (FR-API-03).
+ * <p>Replace with a vetted JWT library behind this same port once dependencies are available. The
+ * secret comes from configuration/environment, never source (FR-API-03).
  */
 public final class HmacJwtIssuer implements AccessTokenIssuer {
 
@@ -45,13 +45,14 @@ public final class HmacJwtIssuer implements AccessTokenIssuer {
     }
 
     @Override
-    public IssuedToken issue(UUID userId, String username, String roleCode) {
+    public IssuedToken issue(UUID userId, String username, String roleCode, UUID sessionId) {
         Instant now = clock.instant();
         Instant exp = now.plus(ttl);
         String payload = "{"
                 + "\"sub\":\"" + userId + "\","
                 + "\"preferred_username\":\"" + esc(username) + "\","
                 + "\"role\":\"" + esc(roleCode) + "\","
+                + "\"sid\":\"" + sessionId + "\","
                 + "\"iat\":" + now.getEpochSecond() + ","
                 + "\"exp\":" + exp.getEpochSecond()
                 + "}";
@@ -84,6 +85,7 @@ public final class HmacJwtIssuer implements AccessTokenIssuer {
                 UUID.fromString(strClaim(payload, "sub")),
                 strClaim(payload, "preferred_username"),
                 strClaim(payload, "role"),
+                UUID.fromString(strClaim(payload, "sid")),
                 Instant.ofEpochSecond(exp)));
     }
 
@@ -105,7 +107,6 @@ public final class HmacJwtIssuer implements AccessTokenIssuer {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    // Minimal claim readers — the payload is our own compact JSON, no nesting.
     private static String strClaim(String json, String key) {
         int i = json.indexOf("\"" + key + "\":\"");
         if (i < 0) return null;
@@ -118,7 +119,7 @@ public final class HmacJwtIssuer implements AccessTokenIssuer {
         int i = json.indexOf("\"" + key + "\":");
         int start = i + key.length() + 3;
         int end = start;
-        while (end < json.length() && (Character.isDigit(json.charAt(end)))) end++;
+        while (end < json.length() && Character.isDigit(json.charAt(end))) end++;
         return Long.parseLong(json.substring(start, end));
     }
 }
