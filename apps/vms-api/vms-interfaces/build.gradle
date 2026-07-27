@@ -18,4 +18,8 @@ dependencies {
     api project(':vms-application')
     implementation 'org.springframework:spring-context'
     implementation 'org.springframework:spring-web'
+    implementation 'org.springframework:spring-webmvc'       // US-02.1.1 controller + interceptor
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'
+    // servlet API for the interceptor — sourced from cached tomcat-embed-core (offline; Maven 403)
+    compileOnly('org.apache.tomcat.embed:tomcat-embed-core') { transitive = false }
 }

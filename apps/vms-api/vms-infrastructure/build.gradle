@@ -21,4 +21,6 @@ dependencyManagement {
 dependencies {
     api project(':vms-application')
     implementation 'org.springframework:spring-context'
+    implementation 'org.springframework:spring-jdbc'          // US-02.1.1 JdbcTemplate
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'  // @ConditionalOnProperty
 }

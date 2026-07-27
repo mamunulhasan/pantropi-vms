@@ -155,6 +155,7 @@ Every pull request must:
 | US-01.2.2 | ENABLER — NFR-MNT-01, CON-01, CON-02 (SRS B1) | T-01.2.2.1/2/3 | `vms-architecture-tests` (13 ArchUnit rules), `.github/workflows/architecture-fitness.yml` | 13/13 rules pass; AC-4 violation injected → build failed naming class → removed → green; check required on both branches | [#31](https://github.com/mamunulhasan/pantropi-vms/pull/31) | 2026-07-19 | 0.1.0 |
 | US-01.5.1 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.5.1.1/2/3 | `db/migration/V1__baseline.sql`, `V2__reference_seed.sql`, Flyway wiring in `vms-bootstrap` | 5/5 ITs on real PostgreSQL (Zonky): schema-diff, no-op rerun, idempotent seed, failure naming, checksum tamper abort | [#32](https://github.com/mamunulhasan/pantropi-vms/pull/32) | 2026-07-19 | 0.1.0 |
 | US-01.4.1 | ENABLER — NFR-MNT-01 (SRS B1) | T-01.4.1.1/2/3 | `.github/workflows/{ci,codeql}.yml`, JaCoCo gate `gradle/coverage.gradle` | 9 required checks live; coverage gate green at 80/60; seeded-violation proofs on draft PR | #33 | pending | 0.1.0 |
+| **US-02.1.1** | **FR-ADM-02 (SRS B1)** · NFR-SEC-01 | login use case + PBKDF2/HMAC-JWT adapters + JDBC user directory + `/api/v1/auth/login`,`/me` | 7 crypto unit + 4 login ITs on real PostgreSQL (success, /me, tampered token, uniform failure) | #37 | pending | 0.2.0 |
 
 ---
 
