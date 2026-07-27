@@ -77,7 +77,7 @@ class MigrationIT {
     @DisplayName("AC-1: baseline creates every table, enum, trigger and comment; history records V1+V2")
     void baselineCreatesFullSchema() throws Exception {
         MigrateResult result = flyway().migrate();
-        assertThat(result.migrationsExecuted).isEqualTo(4);
+        assertThat(result.migrationsExecuted).isEqualTo(5);
 
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             assertThat(query(s, """
@@ -114,7 +114,7 @@ class MigrationIT {
 
             assertThat(query(s, """
                     SELECT version FROM vms.flyway_schema_history WHERE success AND version IS NOT NULL"""))
-                    .containsExactly("1", "2", "3", "4");
+                    .containsExactly("1", "2", "3", "4", "5");
         }
     }
 
@@ -148,7 +148,7 @@ class MigrationIT {
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.system_settings")).isEqualTo("4");
         // V3 grants MASTER_ADMIN its two FR-ADM-01 authorities (US-02.4.1); the rest of the
         // grant matrix still awaits client sign-off (D-15 partially lifted).
-        assertThat(scalar(s, "SELECT count(*)::text FROM vms.role_permissions")).isEqualTo("2");
+        assertThat(scalar(s, "SELECT count(*)::text FROM vms.role_permissions")).isEqualTo("3");
         assertThat(query(s, """
                 SELECT p.code FROM vms.role_permissions rp
                 JOIN vms.roles r ON r.id = rp.role_id AND r.code = 'MASTER_ADMIN'

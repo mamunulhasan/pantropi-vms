@@ -113,5 +113,8 @@ class SessionManagerTest {
         public void record(UUID u, String action, String et, String eid, String detail) {
             actions.add(action);
         }
+        public void recordChange(UUID u, String action, String et, String eid, String b, String af) {
+            actions.add(action);
+        }
     }
 }
