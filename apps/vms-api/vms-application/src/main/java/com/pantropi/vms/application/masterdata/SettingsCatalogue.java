@@ -19,10 +19,6 @@ import java.util.Optional;
  * catalogued would be unreadable through the API, and a key catalogued but not seeded would read as
  * its default while appearing to be stored.
  *
- * <p>US-04.8.2 adds a secret-valued marker here, along with redaction on read. It is deliberately
- * absent for now rather than declared and ignored — no catalogued key is secret today, and a field
- * that nothing honours is worse than no field at all.
- *
  * <p>Pure Java: no framework, no I/O.
  */
 public final class SettingsCatalogue {
@@ -33,19 +29,41 @@ public final class SettingsCatalogue {
     /**
      * @param defaultValue what the setting reads as when the row is absent — documented, never
      *                     silently null
+     * @param secret       when true the value is never disclosed through the API or written to the
+     *                     audit trail (US-04.8.2 AC-2). <strong>No catalogued key is secret today,
+     *                     and a test asserts it</strong> — a real credential belongs in the F-05.2
+     *                     secrets mechanism, not in a table an administrator can read over HTTP.
+     *                     The marker exists so that if a setting ever legitimately holds something
+     *                     sensitive, the redaction path is already built and tested rather than
+     *                     retrofitted under pressure.
      */
-    public record Entry(String key, Type type, String defaultValue, String description) {}
+    public record Entry(String key, Type type, String defaultValue, String description,
+                        boolean secret) {}
 
     /** The settings this application understands. Ordered for a stable listing. */
     private static final List<Entry> ENTRIES = List.of(
             new Entry("default_pass_valid_hours", Type.INTEGER, "12",
-                    "Fallback validity window when a pass type is not specified"),
+                    "Fallback validity window when a pass type is not specified", false),
             new Entry("notification.email.enabled", Type.BOOLEAN, "true",
-                    "Master switch for email notifications"),
+                    "Master switch for email notifications", false),
             new Entry("notification.whatsapp.enabled", Type.BOOLEAN, "false",
-                    "WhatsApp disabled until Business API approval (TODO-05)"),
+                    "WhatsApp disabled until Business API approval (TODO-05)", false),
             new Entry("acs.retry.max_attempts", Type.INTEGER, "5",
-                    "Max outbound ACS retry attempts before dead-letter"));
+                    "Max outbound ACS retry attempts before dead-letter", false));
+
+    /** What a redacted value reads as. Fixed, so it can never be mistaken for a real value. */
+    public static final String REDACTED = "********";
+
+    /**
+     * The value as it may be disclosed — through the API, or into the audit trail (US-04.8.2 AC-2).
+     *
+     * <p>Every path that renders a value goes through here rather than each deciding for itself.
+     * Redaction that has to be remembered at each call site is redaction that will eventually be
+     * forgotten at one of them, and the one that forgets is the leak.
+     */
+    public static String disclose(Entry entry, String value) {
+        return entry.secret() ? REDACTED : value;
+    }
 
     private static final Map<String, Entry> BY_KEY = index();
 

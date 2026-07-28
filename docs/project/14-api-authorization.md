@@ -133,9 +133,25 @@ authenticate a cross-site request ambiently.
 | Deviation | Reason | Resolution |
 |---|---|---|
 | Interceptor instead of the Spring Security filter chain (T-03.2.1.1) | Spring Security is not available in this build — only its BOM is cached and Maven Central is blocked. Same documented deviation as US-02.1.1. | Decision points are isolated in `AuthorizationInterceptor`; adopting Spring Security replaces that one class. |
-| No cached effective-permission set (T-03.2.1.2) | Redis is unavailable; the permission check is a direct query. | `PermissionChecker` is a port — a caching decorator drops in without touching callers. |
-| Lockout counters in PostgreSQL, not Redis (T-03.2.1.2 / US-02.3.1 T-02.3.1.2) | Redis is unavailable. Same substitution already accepted for sessions in US-02.1.2. | `LoginAttemptStore` is a port; a Redis adapter replaces it without touching the use case. |
+| No cached effective-permission set (T-03.2.1.2) | No Redis **client** is obtainable — see the note below; the permission check is a direct query. | `PermissionChecker` is a port — a caching decorator drops in without touching callers. |
+| Lockout counters in PostgreSQL, not Redis (T-03.2.1.2 / US-02.3.1 T-02.3.1.2) | No Redis **client** is obtainable — see the note below. Same substitution already accepted for sessions in US-02.1.2. | `LoginAttemptStore` is a port; a Redis adapter replaces it without touching the use case. |
 | PBKDF2-HMAC-SHA256 (210k) instead of Argon2id (US-02.3.1 AC-2) | No Argon2 or bcrypt library is obtainable — Maven Central returns 403. | Hashes carry a versioned prefix (`pbkdf2_sha256$…`), so rehash-on-login can migrate them silently once a library is available. |
+
+### Note on Redis (corrected 2026-07-28)
+
+Earlier revisions of this table said "Redis is unavailable". **That is no longer the accurate
+reason, and the distinction matters for whoever picks these up.**
+
+A Redis server *is* running locally and answers `PING`. What is missing is a usable Java client:
+
+- `spring-data-redis` — not in the Gradle cache, and Maven Central returns 403 from this network.
+- `lettuce-core` — present in `~/.m2` (5.2.0, 5.3.4), but its transitive `netty` there is
+  **4.0.37** (2016) while Lettuce 5.3.x requires netty 4.1.x. The stack will not assemble offline.
+
+So the blocker is a **jar, not a server**. Anyone revisiting `US-04.9.1`, the permission cache or the
+lockout counters should check dependency resolution first — on a network where Maven Central is
+reachable (GitHub Actions runners, for instance) these become straightforwardly buildable, and each
+already sits behind a port precisely so the adapter is the only thing that changes.
 
 ## Adding an endpoint
 

@@ -2,6 +2,7 @@ package com.pantropi.vms.infrastructure.masterdata;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.masterdata.port.SettingsStore;
+import com.pantropi.vms.application.masterdata.usecase.SettingValues;
 import com.pantropi.vms.application.masterdata.usecase.SystemSettings;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -25,13 +26,24 @@ import java.time.Clock;
 @ConditionalOnProperty(prefix = "vms.masterdata", name = "enabled", havingValue = "true")
 public class MasterDataConfig {
 
+    /**
+     * The store every reader sees is the cached one; the JDBC store is wrapped, not exposed
+     * separately, so nothing can accidentally bypass invalidation by injecting the inner store
+     * (US-04.8.2 AC-3).
+     */
     @Bean
     SettingsStore settingsStore(DataSource dataSource) {
-        return new JdbcSettingsStore(new JdbcTemplate(dataSource));
+        return new CachingSettingsStore(new JdbcSettingsStore(new JdbcTemplate(dataSource)));
     }
 
     @Bean
     SystemSettings systemSettings(SettingsStore store, AuditTrail audit, Clock clock) {
         return new SystemSettings(store, audit, clock);
+    }
+
+    /** The typed accessor other use cases read settings through (US-04.8.2 AC-1). */
+    @Bean
+    SettingValues settingValues(SettingsStore store) {
+        return new SettingValues(store);
     }
 }
