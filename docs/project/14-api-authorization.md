@@ -31,6 +31,7 @@ path in PublicRoutes             → allow
 no / malformed Bearer token      → 401
 token fails signature or expiry  → 401
 session revoked or expired       → 401   ← the session store, not the token, is the authority
+session owes a password change   → 403   ← unless the path is a password-change route
 handler declares nothing         → 403   ← deny-by-default
 declared permission not held     → 403
 otherwise                        → allow, principal published from the token
@@ -42,6 +43,27 @@ problem (US-03.2.1 AC-6).
 
 The decision happens in `preHandle` — **before the handler and before any read of the target
 resource** — so a denial performs no work and cannot reveal whether the resource exists.
+
+## Forced password change (US-02.3.1)
+
+An account marked `must_change_password` — set by an administrator reset, or by rotation — gets a
+session that can reach only three routes:
+
+| Path | Why |
+|---|---|
+| `POST /api/v1/auth/password` | The way out |
+| `GET /api/v1/auth/me` | So a client can render who is being asked |
+| `POST /api/v1/auth/logout` | Abandoning is always allowed |
+
+Everything else is **403**, including routes the user's role would otherwise permit.
+
+Two design points worth keeping:
+
+- The flag is read from the **session row**, which `preHandle` already fetches — so the gate costs
+  no extra query.
+- It is **not** a token claim. A claim could not be withdrawn before the token expired, so a user
+  who completed the change would stay confined until then. Refreshing carries the flag forward from
+  the session, so rotation is not an escape either. Both are tested.
 
 ## The principal
 
@@ -112,6 +134,8 @@ authenticate a cross-site request ambiently.
 |---|---|---|
 | Interceptor instead of the Spring Security filter chain (T-03.2.1.1) | Spring Security is not available in this build — only its BOM is cached and Maven Central is blocked. Same documented deviation as US-02.1.1. | Decision points are isolated in `AuthorizationInterceptor`; adopting Spring Security replaces that one class. |
 | No cached effective-permission set (T-03.2.1.2) | Redis is unavailable; the permission check is a direct query. | `PermissionChecker` is a port — a caching decorator drops in without touching callers. |
+| Lockout counters in PostgreSQL, not Redis (T-03.2.1.2 / US-02.3.1 T-02.3.1.2) | Redis is unavailable. Same substitution already accepted for sessions in US-02.1.2. | `LoginAttemptStore` is a port; a Redis adapter replaces it without touching the use case. |
+| PBKDF2-HMAC-SHA256 (210k) instead of Argon2id (US-02.3.1 AC-2) | No Argon2 or bcrypt library is obtainable — Maven Central returns 403. | Hashes carry a versioned prefix (`pbkdf2_sha256$…`), so rehash-on-login can migrate them silently once a library is available. |
 
 ## Adding an endpoint
 

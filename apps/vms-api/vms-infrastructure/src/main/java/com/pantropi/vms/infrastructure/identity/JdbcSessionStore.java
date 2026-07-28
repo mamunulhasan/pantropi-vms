@@ -26,24 +26,28 @@ public final class JdbcSessionStore implements SessionStore {
 
     @Override
     public void create(UUID sessionId, UUID userId, String username, String roleCode,
-                       String refreshTokenHash, Instant expiresAt) {
+                       String refreshTokenHash, Instant expiresAt, boolean mustChangePassword) {
         jdbc.update("""
-                INSERT INTO vms.sessions (id, user_id, username, role_code, refresh_token_hash, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, sessionId, userId, username, roleCode, refreshTokenHash, Timestamp.from(expiresAt));
+                INSERT INTO vms.sessions (id, user_id, username, role_code, refresh_token_hash,
+                                          expires_at, must_change_password)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, sessionId, userId, username, roleCode, refreshTokenHash,
+                Timestamp.from(expiresAt), mustChangePassword);
     }
 
     @Override
     public Optional<ActiveSession> findActive(UUID sessionId) {
         return jdbc.query("""
-                SELECT id, user_id, username, role_code, expires_at FROM vms.sessions
+                SELECT id, user_id, username, role_code, expires_at, must_change_password
+                FROM vms.sessions
                 WHERE id = ? AND revoked = false AND expires_at > now()
                 """, (rs, i) -> new ActiveSession(
                 rs.getObject("id", UUID.class),
                 rs.getObject("user_id", UUID.class),
                 rs.getString("username"),
                 rs.getString("role_code"),
-                rs.getTimestamp("expires_at").toInstant()), sessionId).stream().findFirst();
+                rs.getTimestamp("expires_at").toInstant(),
+                rs.getBoolean("must_change_password")), sessionId).stream().findFirst();
     }
 
     @Override

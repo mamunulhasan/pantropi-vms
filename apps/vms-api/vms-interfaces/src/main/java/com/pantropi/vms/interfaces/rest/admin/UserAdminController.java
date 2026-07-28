@@ -3,6 +3,7 @@ package com.pantropi.vms.interfaces.rest.admin;
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.NewUser;
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.Page;
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.UserFilter;
+import com.pantropi.vms.application.identity.usecase.AccountRecovery;
 import com.pantropi.vms.application.identity.usecase.UserAdministration;
 import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
 import com.pantropi.vms.interfaces.rest.security.RequiresPermission;
@@ -25,9 +26,11 @@ import java.util.UUID;
 public class UserAdminController {
 
     private final UserAdministration users;
+    private final AccountRecovery recovery;
 
-    public UserAdminController(UserAdministration users) {
+    public UserAdminController(UserAdministration users, AccountRecovery recovery) {
         this.users = users;
+        this.recovery = recovery;
     }
 
     @PostMapping
@@ -63,6 +66,32 @@ public class UserAdminController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Clear a lockout so the user can attempt to log in again (US-02.3.1). */
+    @PostMapping("/{id}/unlock")
+    public ResponseEntity<Void> unlock(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
+            @PathVariable UUID id) {
+        recovery.unlock(UUID.fromString(actor.userId()), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Start a password reset (US-02.3.1). Issues a single-use activation token and forces a change;
+     * the administrator never chooses a password value.
+     *
+     * <p>The token is returned here only because out-of-band delivery is still a stub (Phase 4,
+     * F-16.2) — the same interim already accepted for provisioning in US-02.2.2. When the email
+     * channel arrives this response drops the token and returns 202: a reset should not be readable
+     * by whoever triggered it.
+     */
+    @PostMapping("/{id}/reset-password")
+    public ResponseEntity<ResetResponse> resetPassword(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(
+                new ResetResponse(recovery.reset(UUID.fromString(actor.userId()), id)));
+    }
+
     @GetMapping
     public Page list(@RequestParam(required = false) String role,
                      @RequestParam(required = false) UUID receptionId,
@@ -87,7 +116,7 @@ public class UserAdminController {
         return ResponseEntity.badRequest().body(new ErrorResponse("invalid", field));
     }
 
-    @ExceptionHandler(UserAdministration.UserNotFound.class)
+    @ExceptionHandler({UserAdministration.UserNotFound.class, AccountRecovery.UnknownAccount.class})
     public ResponseEntity<Void> onNotFound() {
         return ResponseEntity.notFound().build();
     }
@@ -96,5 +125,6 @@ public class UserAdminController {
                                 UUID receptionId, UUID tenantId) {}
     public record UpdateRequest(String roleCode, UUID receptionId, UUID tenantId) {}
     public record CreatedResponse(String id) {}
+    public record ResetResponse(String activationToken) {}
     public record ErrorResponse(String error, String field) {}
 }

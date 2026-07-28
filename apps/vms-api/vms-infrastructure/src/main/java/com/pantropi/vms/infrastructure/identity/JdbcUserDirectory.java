@@ -16,7 +16,8 @@ import java.util.UUID;
 public final class JdbcUserDirectory implements UserDirectory {
 
     private static final String SQL = """
-            SELECT u.id, u.username, u.password_hash, r.code AS role_code, u.is_active
+            SELECT u.id, u.username, u.password_hash, r.code AS role_code, u.is_active,
+                   u.must_change_password
             FROM vms.users u
             JOIN vms.roles r ON r.id = u.role_id
             WHERE u.username = ? AND u.is_active = true
@@ -35,7 +36,8 @@ public final class JdbcUserDirectory implements UserDirectory {
                 rs.getString("username"),
                 rs.getString("password_hash"),
                 rs.getString("role_code"),
-                rs.getBoolean("is_active")), username);
+                rs.getBoolean("is_active"),
+                rs.getBoolean("must_change_password")), username);
         return rows.stream().findFirst();
     }
 }

@@ -112,7 +112,8 @@ class UserAdministrationTest {
 
     private static final class FakeSessions implements SessionStore {
         UUID revokedUser;
-        public void create(UUID s, UUID u, String un, String r, String h, java.time.Instant e) {}
+        public void create(UUID s, UUID u, String un, String r, String h, java.time.Instant e,
+                           boolean mustChangePassword) {}
         public Optional<ActiveSession> findActive(UUID s) { return Optional.empty(); }
         public RotationOutcome rotate(UUID s, String p, String n, java.time.Instant e) { return RotationOutcome.INVALID; }
         public void revoke(UUID s, String reason) {}

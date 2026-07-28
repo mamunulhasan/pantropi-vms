@@ -91,6 +91,49 @@ curl -o /dev/null -w '%{http_code}\n' http://localhost:8081/api/v1/admin/users  
 Conversely `sysadmin` gets **403** on `POST /api/v1/visitor-requests` — it holds `user.manage` but
 not `visitor.request`. Roles genuinely differ.
 
+### Seeing lockout and password policy work (US-02.3.1)
+
+```bash
+# five wrong passwords lock the account — then the RIGHT password fails too, identically
+for i in 1 2 3 4 5; do
+  curl -s -X POST http://localhost:8081/api/v1/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"tenantuser","password":"nope"}' -o /dev/null -w '%{http_code} '
+done; echo
+curl -s -X POST http://localhost:8081/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"tenantuser","password":"Password123!local"}'      # still 401 — locked
+```
+
+The body is byte-identical whether the account is locked, the password is wrong, or the username
+does not exist. That is the point: none of the three can be told apart.
+
+An administrator clears it — and can never set a password, only issue an activation token:
+
+```bash
+USER_ID=$(psql -h localhost -U postgres -d vms -tAc "SELECT id FROM vms.users WHERE username='tenantuser'")
+curl -s -X POST http://localhost:8081/api/v1/admin/users/$USER_ID/unlock \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" -o /dev/null -w '%{http_code}\n'   # 204
+```
+
+Changing your own password requires the current one, and signs out every other device:
+
+```bash
+curl -s -X POST http://localhost:8081/api/v1/auth/password -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"currentPassword":"Password123!local","newPassword":"a much longer passphrase"}'
+```
+
+A weak choice comes back **422** with guidance that never repeats what you typed:
+
+```bash
+curl -s -X POST http://localhost:8081/api/v1/auth/password -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"currentPassword":"Password123!local","newPassword":"password1234"}'
+```
+
+Lockout is tunable — `vms.security.lockout.threshold` (default 5) and
+`vms.security.lockout.window-minutes` (default 15).
+
 ## Endpoints available today
 
 | Method | Path | Requires |
@@ -100,9 +143,11 @@ not `visitor.request`. Roles genuinely differ.
 | POST | `/api/v1/auth/activate` | — public (activation token) |
 | GET | `/api/v1/auth/me` | authenticated |
 | POST | `/api/v1/auth/logout` | authenticated |
+| POST | `/api/v1/auth/password` | authenticated (+ current password) |
 | GET/POST | `/api/v1/admin/users` | `user.manage` |
 | PUT | `/api/v1/admin/users/{id}` | `user.manage` |
 | POST | `/api/v1/admin/users/{id}/deactivate`, `/reactivate` | `user.manage` |
+| POST | `/api/v1/admin/users/{id}/unlock`, `/reset-password` | `user.manage` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 

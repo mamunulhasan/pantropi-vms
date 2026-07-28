@@ -42,6 +42,9 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "vms.identity.enabled=true",
                 "vms.security.jwt.secret=integration-test-secret-least-32-bytes-long-xx",
                 "vms.security.jwt.access-ttl-minutes=15",
+                // Lockout is exercised in AccountSecurityIT; a low threshold here would make these
+                // tests order-dependent, since several of them deliberately fail a login.
+                "vms.security.lockout.threshold=50",
                 "spring.flyway.enabled=false"
         })
 class AuthLoginIT {
@@ -152,7 +155,15 @@ class AuthLoginIT {
             s.execute("""
                     CREATE TABLE vms.users (
                         id uuid PRIMARY KEY, username text UNIQUE NOT NULL, password_hash text NOT NULL,
-                        role_id uuid NOT NULL REFERENCES vms.roles(id), is_active boolean NOT NULL)""");
+                        role_id uuid NOT NULL REFERENCES vms.roles(id), is_active boolean NOT NULL,
+                        password_changed_at timestamptz NOT NULL DEFAULT now(),
+                        must_change_password boolean NOT NULL DEFAULT false)""");
+            s.execute("""
+                    CREATE TABLE vms.login_attempts (
+                        username text PRIMARY KEY, failed_count integer NOT NULL DEFAULT 0,
+                        locked_until timestamptz,
+                        last_attempt_at timestamptz NOT NULL DEFAULT now(),
+                        updated_at timestamptz NOT NULL DEFAULT now())""");
             s.execute("""
                     CREATE TABLE vms.audit_logs (
                         id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, user_id uuid,
@@ -164,7 +175,8 @@ class AuthLoginIT {
                         id uuid PRIMARY KEY, user_id uuid NOT NULL, username text NOT NULL,
                         role_code text NOT NULL, refresh_token_hash text NOT NULL,
                         issued_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL,
-                        revoked boolean NOT NULL DEFAULT false, revoked_reason text, revoked_at timestamptz)""");
+                        revoked boolean NOT NULL DEFAULT false, revoked_reason text, revoked_at timestamptz,
+                        must_change_password boolean NOT NULL DEFAULT false)""");
             UUID roleId = UUID.randomUUID();
             s.execute("INSERT INTO vms.roles (id, code, name) VALUES ('" + roleId
                     + "', 'MASTER_ADMIN', 'Master Admin')");

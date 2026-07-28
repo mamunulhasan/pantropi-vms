@@ -14,5 +14,6 @@ public interface UserDirectory {
     Optional<AuthUser> findActiveByUsername(String username);
 
     /** Authentication view of a user — never carries anything the login flow does not need. */
-    record AuthUser(UUID id, String username, String passwordHash, String roleCode, boolean active) {}
+    record AuthUser(UUID id, String username, String passwordHash, String roleCode, boolean active,
+                    boolean mustChangePassword) {}
 }
