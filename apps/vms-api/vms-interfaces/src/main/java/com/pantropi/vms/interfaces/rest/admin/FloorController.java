@@ -70,6 +70,10 @@ public class FloorController {
     public ResponseEntity<Void> reactivate(
             @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
             @PathVariable UUID buildingId, @PathVariable UUID id) {
+        Floor floor = floors.get(id);
+        if (!floor.buildingId().equals(buildingId)) {
+            throw new MasterDataStore.NotFound();
+        }
         floors.reactivate(UUID.fromString(actor.userId()), id);
         return ResponseEntity.noContent().build();
     }
