@@ -60,7 +60,7 @@ public class FloorController {
     @PostMapping("/{id}/deactivate")
     public ResponseEntity<Void> deactivate(
             @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
-            @PathVariable UUID buildingId, @PathVariable UUID id) {
+            @PathVariable UUID id) {
         floors.deactivate(UUID.fromString(actor.userId()), id);
         return ResponseEntity.noContent().build();
     }
