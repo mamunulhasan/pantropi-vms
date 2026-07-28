@@ -109,42 +109,20 @@ public final class JdbcFloorStore implements MasterDataStore<Floor> {
 
     @Override
     public Page<Floor> list(Query query) {
-        StringBuilder where = new StringBuilder(" WHERE 1=1");
-        List<Object> args = new ArrayList<>();
-
-        if (query.parentId() != null) {
-            // Uses idx_floors_building (T-04.2.1.2).
-            where.append(" AND building_id = ?");
-            args.add(query.parentId());
-        }
-        if (query.active() != null) {
-            where.append(" AND is_active = ?");
-            args.add(query.active());
-        }
-        if (query.search() != null && !query.search().isBlank()) {
-            where.append(" AND (code ILIKE ? OR name ILIKE ?)");
-            String pattern = "%" + query.search().trim() + "%";
-            args.add(pattern);
-            args.add(pattern);
-        }
+        // building_id filter uses idx_floors_building (T-04.2.1.2).
+        MasterDataQuery q = MasterDataQuery.of(query, "building_id");
 
         Long total = jdbc.queryForObject(
-                "SELECT count(*) FROM vms.floors" + where, Long.class, args.toArray());
-
-        int size = Math.max(1, Math.min(query.size(), 200));
-        int page = Math.max(0, query.page());
-        List<Object> pageArgs = new ArrayList<>(args);
-        pageArgs.add(size);
-        pageArgs.add(page * size);
+                "SELECT count(*) FROM vms.floors" + q.where(), Long.class, q.countArgs());
 
         List<Floor> items = jdbc.query(
-                "SELECT " + COLUMNS + " FROM vms.floors" + where
+                "SELECT " + COLUMNS + " FROM vms.floors" + q.where()
                         // The id tiebreak keeps paging stable when level_no and code both tie
                         // across buildings — without it, two pages could repeat or skip a row.
                         + " ORDER BY " + sortColumn(query.sort()) + ", id LIMIT ? OFFSET ?",
-                JdbcFloorStore::map, pageArgs.toArray());
+                JdbcFloorStore::map, q.pageArgs());
 
-        return new Page<>(items, page, size, total == null ? 0 : total);
+        return new Page<>(items, q.page(), q.size(), total == null ? 0 : total);
     }
 
     /** Allow-listed; an unknown key becomes the default rather than reaching SQL. */
