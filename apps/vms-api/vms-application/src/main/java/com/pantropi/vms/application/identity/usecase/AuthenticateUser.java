@@ -104,9 +104,8 @@ public final class AuthenticateUser {
         }
 
         attempts.recordSuccess(key);
-        UserDirectory.AuthUser authenticatedUser = found.orElseThrow(InvalidCredentials::new);
-        return new AuthenticatedUser(authenticatedUser.id(), authenticatedUser.username(),
-                authenticatedUser.roleCode(), authenticatedUser.mustChangePassword());
+        return new AuthenticatedUser(user.id(), user.username(), user.roleCode(),
+                user.mustChangePassword());
     }
 
     public record AuthenticatedUser(UUID id, String username, String roleCode,
