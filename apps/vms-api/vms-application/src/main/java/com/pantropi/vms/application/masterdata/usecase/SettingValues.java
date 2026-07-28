@@ -39,7 +39,11 @@ public final class SettingValues {
      */
     public long getLong(String key) {
         SettingsCatalogue.Entry entry = requireType(key, SettingsCatalogue.Type.INTEGER);
-        return Long.parseLong(readNormalised(entry));
+        try {
+            return Long.parseLong(readNormalised(entry));
+        } catch (NumberFormatException e) {
+            throw new SettingsCatalogue.InvalidSettingValue(key, "is not a valid long");
+        }
     }
 
     /** Convenience for the common case; the stored value must fit in an {@code int}. */
