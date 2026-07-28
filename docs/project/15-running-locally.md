@@ -170,6 +170,32 @@ psql -h localhost -U postgres -d vms -c "SELECT action, entity_id, before_state,
 These endpoints sit behind `vms.masterdata.enabled`, which the `local` profile sets. With the flag
 off the routes are unmapped rather than present-and-refusing.
 
+### Seeing the master data pattern work (US-04.1.1)
+
+```bash
+# create a building — the code is upper-cased on the way in
+curl -s -X POST http://localhost:8081/api/v1/admin/buildings \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"code":"wgt","name":"Westgate Tower","address":"Westgate, Dhaka"}'
+
+# list: paginated, filterable, searchable by code OR name
+curl -s "http://localhost:8081/api/v1/admin/buildings?search=west&active=true&size=10" \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN"
+```
+
+There is **no DELETE route** — retirement is deactivation, because `vms.floors.building_id` is
+`ON DELETE RESTRICT` and a visitor record from last year must still resolve the building it names:
+
+```bash
+curl -s -X POST http://localhost:8081/api/v1/admin/buildings/$ID/deactivate \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" -o /dev/null -w '%{http_code}\n'   # 204
+curl -s -X DELETE http://localhost:8081/api/v1/admin/buildings/$ID \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" -o /dev/null -w '%{http_code}\n'   # 405 — no such verb
+```
+
+Reading needs `masterdata.view`, every mutation needs `masterdata.edit`. `fmadmin` has the first but
+not the second, so it can list buildings and gets **403** on a create.
+
 Settings are cached in memory and the cache is dropped on every write, so a change is visible on the
 next read with no restart. **The cache is per-process**: if you ever run two instances against one
 database, a change made on one is not seen by the other until it reloads. Cross-instance
@@ -192,6 +218,9 @@ invalidation is US-04.9.2 — see the Redis note in
 | POST | `/api/v1/admin/users/{id}/unlock`, `/reset-password` | `user.manage` |
 | GET | `/api/v1/admin/settings`, `/settings/{key}` | `masterdata.view` |
 | PUT | `/api/v1/admin/settings/{key}` | `settings.manage` |
+| GET | `/api/v1/admin/buildings`, `/buildings/{id}` | `masterdata.view` |
+| POST/PUT | `/api/v1/admin/buildings`, `/buildings/{id}` | `masterdata.edit` |
+| POST | `/api/v1/admin/buildings/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 

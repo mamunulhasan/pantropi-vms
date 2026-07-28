@@ -1,7 +1,11 @@
 package com.pantropi.vms.infrastructure.masterdata;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
+import com.pantropi.vms.application.masterdata.BuildingDefinition;
+import com.pantropi.vms.application.masterdata.port.MasterDataStore;
 import com.pantropi.vms.application.masterdata.port.SettingsStore;
+import com.pantropi.vms.application.masterdata.usecase.MasterDataAdministration;
+import com.pantropi.vms.domain.masterdata.Building;
 import com.pantropi.vms.application.masterdata.usecase.SettingValues;
 import com.pantropi.vms.application.masterdata.usecase.SystemSettings;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -45,5 +49,18 @@ public class MasterDataConfig {
     @Bean
     SettingValues settingValues(SettingsStore store) {
         return new SettingValues(store);
+    }
+
+    // ---- US-04.1.1 buildings: the first entity on the shared master data pattern ----
+
+    @Bean
+    MasterDataStore<Building> buildingStore(DataSource dataSource) {
+        return new JdbcBuildingStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    MasterDataAdministration<Building> buildingAdministration(MasterDataStore<Building> store,
+                                                              AuditTrail audit) {
+        return new MasterDataAdministration<>(new BuildingDefinition(), store, audit);
     }
 }
