@@ -15,9 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.ErrorResponse;
-import org.springframework.web.ErrorResponseException;
-import org.springframework.web.servlet.NoHandlerFoundException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -89,24 +86,26 @@ public class GlobalExceptionHandler {
         return ProblemDetails.of(HttpStatus.NOT_FOUND, CorrelationIdFilter.of(request));
     }
 
-    /**
-     * Framework exceptions that already carry a status — an unmapped path, an unsupported method —
-     * keep it. Without this the catch-all below would turn every 404 into a 500.
-     */
-    @ExceptionHandler({ErrorResponseException.class, NoResourceFoundException.class,
-            NoHandlerFoundException.class})
-    public ProblemDetail onFrameworkError(HttpServletRequest request, Exception e) {
-        HttpStatus status = e instanceof ErrorResponse er
-                ? HttpStatus.valueOf(er.getStatusCode().value())
-                : HttpStatus.NOT_FOUND;
-        return ProblemDetails.of(status, CorrelationIdFilter.of(request));
-    }
-
     // ---- anything else ----
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail onUnexpected(HttpServletRequest request, Exception e) {
         String correlationId = CorrelationIdFilter.of(request);
+
+        // Spring MVC reports routing and negotiation problems — unmapped path, unsupported method,
+        // unacceptable media type — with exceptions that implement ErrorResponse and already carry
+        // the correct status. Honour it rather than calling it a server error.
+        //
+        // This used to be an enumerated list of exception classes, and it went stale exactly the way
+        // such lists do: the comment claimed "an unsupported method keeps its status" while
+        // HttpRequestMethodNotSupportedException was absent from the list, because it implements
+        // ErrorResponse without extending ErrorResponseException. DELETE on a mapped path returned
+        // 500. Asking the exception whether it knows its own status cannot drift that way.
+        if (e instanceof ErrorResponse known) {
+            return ProblemDetails.of(HttpStatus.valueOf(known.getStatusCode().value()),
+                    correlationId);
+        }
+
         // Detail stays server-side. The message may embed caller input, so it is logged at the
         // exception level only and never returned.
         log.log(Level.SEVERE, "Unhandled exception [correlationId=" + correlationId
