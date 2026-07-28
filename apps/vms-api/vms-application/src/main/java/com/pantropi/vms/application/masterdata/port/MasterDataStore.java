@@ -41,12 +41,16 @@ public interface MasterDataStore<T> {
     Page<T> list(Query query);
 
     /**
-     * @param search  matches code or name, case-insensitively; null means no text filter
-     * @param active  null means both; true or false filters (AC-2)
-     * @param sort    a caller-supplied key the adapter maps through its own allow-list — never
-     *                interpolated into SQL
+     * @param parentId restricts to children of one parent — a building's floors, a floor's
+     *                 receptions. Null for entities that have no parent, and for those that do it
+     *                 is the path segment rather than a query parameter, so it is never optional in
+     *                 practice.
+     * @param search   matches code or name, case-insensitively; null means no text filter
+     * @param active   null means both; true or false filters (AC-2)
+     * @param sort     a caller-supplied key the adapter maps through its own allow-list — never
+     *                 interpolated into SQL
      */
-    record Query(String search, Boolean active, int page, int size, String sort) {}
+    record Query(UUID parentId, String search, Boolean active, int page, int size, String sort) {}
 
     record Page<T>(List<T> items, int page, int size, long total) {}
 
@@ -63,6 +67,23 @@ public interface MasterDataStore<T> {
     class NotFound extends RuntimeException {
         public NotFound() {
             super("No such record");
+        }
+    }
+
+    /**
+     * The parent named by a child record does not exist, or is not active (US-04.2.1 AC-5).
+     *
+     * <p>A foreign key cannot express this: it enforces that the parent row <em>exists</em>, not
+     * that it is still in use. Adapters therefore make the write conditional on the parent being
+     * active in the same statement, rather than checking first — a separate check could pass and
+     * then be invalidated by a concurrent deactivation before the insert lands.
+     */
+    class InvalidParent extends RuntimeException {
+        public final String field;
+
+        public InvalidParent(String field) {
+            super(field + " must reference an active record");
+            this.field = field;
         }
     }
 }

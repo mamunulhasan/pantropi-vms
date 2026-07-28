@@ -221,6 +221,9 @@ invalidation is US-04.9.2 — see the Redis note in
 | GET | `/api/v1/admin/buildings`, `/buildings/{id}` | `masterdata.view` |
 | POST/PUT | `/api/v1/admin/buildings`, `/buildings/{id}` | `masterdata.edit` |
 | POST | `/api/v1/admin/buildings/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
+| GET | `/api/v1/admin/buildings/{bid}/floors`, `/floors/{id}` | `masterdata.view` |
+| POST/PUT | `/api/v1/admin/buildings/{bid}/floors`, `/floors/{id}` | `masterdata.edit` |
+| POST | `…/floors/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 
