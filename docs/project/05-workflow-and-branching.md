@@ -122,7 +122,11 @@ Refs TODO-02
 **Rules**
 - Subject: imperative mood, lowercase, no trailing period, ≤72 chars
 - Every `feat` and `fix` commit names its user story id
-- Every commit body naming a requirement uses the qualified form: `FR-VMS-01 (SRS B1)` — see D-02
+- Every commit body naming a requirement uses the qualified form — see D-02:
+  - `FR-VMS-01 (SRS B1)` when the SRS appendix defines it
+  - `FR-SET-01 (TDD-derived)` when it appears only in the TDD or the published schema. Do **not**
+    write `(SRS B1)` for these: the id has no SRS definition, and claiming one is exactly the
+    ambiguity this rule exists to prevent (TODO-01, ADR-0004)
 - Breaking changes use `!` and a `BREAKING CHANGE:` footer
 
 Release notes and the changelog are generated from this history. A sloppy commit message is a hole

@@ -78,6 +78,12 @@ SRS. Security-sensitive. **We need:** an SRS requirement, or explicit descope.
 Schema already defaults `notification.whatsapp.enabled` to `false`. **We need:** approval timeline,
 or a decision to descope WhatsApp for release 1.0. Email proceeds regardless.
 
+**Enforced in code since US-04.8.1 (2026-07-28).** `SystemSettings` refuses any request setting
+`notification.whatsapp.enabled` to true, returning 409 with this TODO named in the message, and
+audits the attempt as `settings.change_refused`. Disabling is unaffected. **When this question
+closes, delete that guard** — it is the only thing standing between the setting and an operator who
+wants it on.
+
 ### TODO-06 🟠 Deployment target + hosting region + data residency
 **Refs:** SRS App. B item 3, NFR-CMP-01, TDD §11 dep. 5 · **Feature:** F-01.6 (EPIC-01)
 Hybrid cloud-and-edge vs fully on-premise. **We need:** target model, hosting region, and the

@@ -134,6 +134,42 @@ curl -s -X POST http://localhost:8081/api/v1/auth/password -H "Authorization: Be
 Lockout is tunable — `vms.security.lockout.threshold` (default 5) and
 `vms.security.lockout.window-minutes` (default 15).
 
+### Seeing system settings work (US-04.8.1)
+
+```bash
+curl -s http://localhost:8081/api/v1/admin/settings -H "Authorization: Bearer $SYSADMIN_TOKEN"
+```
+
+Reading needs only `masterdata.view`; **changing** needs `settings.manage`, which is deliberately a
+different permission — altering `acs.retry.max_attempts` changes how the whole installation behaves,
+which is a different kind of act from renaming a floor.
+
+```bash
+# change one
+curl -s -X PUT http://localhost:8081/api/v1/admin/settings/acs.retry.max_attempts \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value":"8"}'
+
+# a key that is not in the catalogue is 404, not silently created
+curl -s -X PUT http://localhost:8081/api/v1/admin/settings/notification.sms.enabled \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value":"true"}'
+
+# enabling WhatsApp is refused 409 while TODO-05 is open — and the attempt is audited
+curl -s -X PUT http://localhost:8081/api/v1/admin/settings/notification.whatsapp.enabled \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value":"true"}'
+```
+
+Every change and every refusal leaves a row with both states:
+
+```bash
+psql -h localhost -U postgres -d vms -c "SELECT action, entity_id, before_state, after_state FROM vms.audit_logs WHERE action LIKE 'settings.%' ORDER BY created_at DESC"
+```
+
+These endpoints sit behind `vms.masterdata.enabled`, which the `local` profile sets. With the flag
+off the routes are unmapped rather than present-and-refusing.
+
 ## Endpoints available today
 
 | Method | Path | Requires |
@@ -148,6 +184,8 @@ Lockout is tunable — `vms.security.lockout.threshold` (default 5) and
 | PUT | `/api/v1/admin/users/{id}` | `user.manage` |
 | POST | `/api/v1/admin/users/{id}/deactivate`, `/reactivate` | `user.manage` |
 | POST | `/api/v1/admin/users/{id}/unlock`, `/reset-password` | `user.manage` |
+| GET | `/api/v1/admin/settings`, `/settings/{key}` | `masterdata.view` |
+| PUT | `/api/v1/admin/settings/{key}` | `settings.manage` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 

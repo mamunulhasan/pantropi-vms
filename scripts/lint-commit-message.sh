@@ -75,12 +75,22 @@ else:
 
 # ---- R5: qualified requirement references — discrepancy D-02 (AC-4) ---------
 # FR ids were renumbered between SRS versions; a bare id is ambiguous. Any line
-# that cites an FR id must also carry an '(SRS Bn)' qualifier on that line
+# that cites an FR id must also say WHERE that id comes from, on the same line
 # (a line-level rule so ranges like 'FR-VMS-01..15 (SRS B1)' pass naturally).
+#
+# Two qualifiers are accepted, because the backlog contains two kinds of id:
+#   (SRS Bn)       the id is defined in that appendix of the attached SRS
+#   (TDD-derived)  the id appears only in the TDD or the published schema and
+#                  has NO SRS definition — FR-SET-01, FR-EXP-01 and friends
+# The second is not a loophole. Requiring '(SRS B1)' on an id the SRS never
+# defined would force every commit touching that work to either omit the id or
+# assert a provenance that does not exist — and provenance is the one thing
+# this rule exists to protect (TODO-01, ADR-0004).
+QUALIFIER = r'\((?:SRS B\d+|TDD-derived)\)'
 for i, line in enumerate(lines):
-    if re.search(r'\bFR-[A-Z]{3}-\d{2}\b', line) and not re.search(r'\(SRS B\d+\)', line):
+    if re.search(r'\bFR-[A-Z]{3}-\d{2}\b', line) and not re.search(QUALIFIER, line):
         fails.append(f"R5 (AC-4, D-02): line {i+1} cites a requirement id without an "
-                     f"'(SRS Bn)' qualifier: {line.strip()[:60]}")
+                     f"'(SRS Bn)' or '(TDD-derived)' qualifier: {line.strip()[:60]}")
 
 if fails:
     print("COMMIT MESSAGE REJECTED:")
