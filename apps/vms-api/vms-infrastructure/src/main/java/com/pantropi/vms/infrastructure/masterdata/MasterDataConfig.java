@@ -3,7 +3,9 @@ package com.pantropi.vms.infrastructure.masterdata;
 import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.masterdata.BuildingDefinition;
 import com.pantropi.vms.application.masterdata.FloorDefinition;
+import com.pantropi.vms.application.masterdata.PassTypeDefinition;
 import com.pantropi.vms.application.masterdata.VisitorTypeDefinition;
+import com.pantropi.vms.domain.masterdata.PassType;
 import com.pantropi.vms.domain.masterdata.Floor;
 import com.pantropi.vms.domain.masterdata.VisitorType;
 import com.pantropi.vms.application.masterdata.port.MasterDataStore;
@@ -92,5 +94,18 @@ public class MasterDataConfig {
     MasterDataAdministration<VisitorType> visitorTypeAdministration(
             MasterDataStore<VisitorType> store, AuditTrail audit) {
         return new MasterDataAdministration<>(new VisitorTypeDefinition(), store, audit);
+    }
+
+    // ---- US-04.6.1 pass types ----
+
+    @Bean
+    MasterDataStore<PassType> passTypeStore(DataSource dataSource) {
+        return new JdbcPassTypeStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    MasterDataAdministration<PassType> passTypeAdministration(MasterDataStore<PassType> store,
+                                                              AuditTrail audit) {
+        return new MasterDataAdministration<>(new PassTypeDefinition(), store, audit);
     }
 }
