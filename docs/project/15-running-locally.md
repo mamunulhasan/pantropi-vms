@@ -227,6 +227,9 @@ invalidation is US-04.9.2 — see the Redis note in
 | GET | `/api/v1/admin/visitor-types`, `/visitor-types/{id}` | `masterdata.view` |
 | POST/PUT | `/api/v1/admin/visitor-types`, `/visitor-types/{id}` | `masterdata.edit` |
 | POST | `…/visitor-types/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
+| GET | `/api/v1/admin/pass-types`, `/pass-types/{id}` | `masterdata.view` |
+| POST/PUT | `/api/v1/admin/pass-types`, `/pass-types/{id}` | `masterdata.edit` |
+| POST | `…/pass-types/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 
