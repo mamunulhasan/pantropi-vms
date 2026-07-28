@@ -96,8 +96,9 @@ public final class AuthenticateUser {
         }
 
         attempts.recordSuccess(key);
-        return new AuthenticatedUser(user.id(), user.username(), user.roleCode(),
-                user.mustChangePassword());
+        UserDirectory.AuthUser authenticatedUser = found.orElseThrow(InvalidCredentials::new);
+        return new AuthenticatedUser(authenticatedUser.id(), authenticatedUser.username(),
+                authenticatedUser.roleCode(), authenticatedUser.mustChangePassword());
     }
 
     /** Consumes the decoy result so the compiler cannot elide the comparison. */
