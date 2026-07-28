@@ -78,11 +78,19 @@ public final class AuthenticateUser {
             throw new InvalidCredentials();
         }
 
-        boolean ok = user == null
-                ? falseAfter(passwordHasher.matches(password, DUMMY_HASH))   // constant-time decoy
-                : passwordHasher.matches(password, user.passwordHash());
+        boolean ok;
+        if (user == null) {
+            passwordHasher.matches(password, DUMMY_HASH);   // constant-time decoy
+            ok = false;
+        } else {
+            ok = passwordHasher.matches(password, user.passwordHash());
+        }
 
-        if (!ok) {
+        // The null check is stated again rather than left implied by `ok`. It is redundant at
+        // runtime, but the reader — and the static analyser — should not have to prove that a
+        // failed comparison is the only way `user` can be null to know the dereference below is
+        // safe. CodeQL flagged exactly that gap.
+        if (user == null || !ok) {
             // Counted by username, so an unknown account behaves exactly like a real one.
             boolean nowLocked = attempts.recordFailure(key, clock.instant(), lockThreshold, lockWindow);
             if (nowLocked) {
@@ -99,11 +107,6 @@ public final class AuthenticateUser {
         UserDirectory.AuthUser authenticatedUser = found.orElseThrow(InvalidCredentials::new);
         return new AuthenticatedUser(authenticatedUser.id(), authenticatedUser.username(),
                 authenticatedUser.roleCode(), authenticatedUser.mustChangePassword());
-    }
-
-    /** Consumes the decoy result so the compiler cannot elide the comparison. */
-    private static boolean falseAfter(boolean decoyResult) {
-        return decoyResult && false;
     }
 
     public record AuthenticatedUser(UUID id, String username, String roleCode,
