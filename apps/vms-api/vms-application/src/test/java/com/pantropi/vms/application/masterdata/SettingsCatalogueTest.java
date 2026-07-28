@@ -37,6 +37,30 @@ class SettingsCatalogueTest {
     }
 
     @Test
+    @DisplayName("AC-2: no catalogued key is secret-valued — a real secret belongs in F-05.2")
+    void noKeyIsSecretToday() {
+        // The redaction path exists and is tested, but nothing in this table should need it.
+        // If this test ever fails, the new entry needs a hard look: is that value really a setting,
+        // or is it a credential that belongs in the secrets mechanism instead?
+        assertThat(SettingsCatalogue.all()).noneMatch(SettingsCatalogue.Entry::secret);
+    }
+
+    @Test
+    @DisplayName("AC-2: a secret-valued entry never discloses its value, only that it is set")
+    void secretEntryIsRedacted() {
+        // Hand-built, because nothing in the real catalogue is secret. This exercises the path that
+        // would run the day one is added — the point of building it now rather than retrofitting it.
+        SettingsCatalogue.Entry secret = new SettingsCatalogue.Entry(
+                "integration.api.key", SettingsCatalogue.Type.STRING, "", "A secret one", true);
+        SettingsCatalogue.Entry ordinary = SettingsCatalogue.require("acs.retry.max_attempts");
+
+        assertThat(SettingsCatalogue.disclose(secret, "s3cr3t-value"))
+                .isEqualTo(SettingsCatalogue.REDACTED)
+                .doesNotContain("s3cr3t");
+        assertThat(SettingsCatalogue.disclose(ordinary, "5")).isEqualTo("5");
+    }
+
+    @Test
     @DisplayName("keys are unique and every entry is fully described")
     void catalogueIsWellFormed() {
         assertThat(SettingsCatalogue.all()).extracting(SettingsCatalogue.Entry::key)

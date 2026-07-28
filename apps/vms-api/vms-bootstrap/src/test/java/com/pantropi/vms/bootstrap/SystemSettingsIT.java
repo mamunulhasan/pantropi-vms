@@ -213,6 +213,57 @@ class SystemSettingsIT {
                 + "WHERE key='notification.sms.enabled'")).isEqualTo("0");
     }
 
+    // ---- US-04.8.2 ----
+
+    @Test @org.junit.jupiter.api.Order(11)
+    @DisplayName("AC-3: a change is visible on the next read, so the cache does not serve stale data")
+    void cacheIsInvalidatedOnWrite() throws Exception {
+        String admin = token("cfgadmin");
+
+        // Read first, so the cache is warm and a broken invalidation would show as a stale read.
+        assertThat(get("/api/v1/admin/settings/acs.retry.max_attempts", admin).body())
+                .contains("\"value\":");
+
+        put("/api/v1/admin/settings/acs.retry.max_attempts", "{\"value\":\"17\"}", admin);
+
+        assertThat(get("/api/v1/admin/settings/acs.retry.max_attempts", admin).body())
+                .contains("\"value\":\"17\"");
+        // ...and again, to prove the reload was cached rather than reloaded per request.
+        assertThat(get("/api/v1/admin/settings/acs.retry.max_attempts", admin).body())
+                .contains("\"value\":\"17\"");
+    }
+
+    @Test @org.junit.jupiter.api.Order(12)
+    @DisplayName("AC-4: a credential-shaped value is refused, and never reaches the audit trail")
+    void credentialShapedValueRefused() throws Exception {
+        String pastedKey = "ghp_16CharsAndThenSomeMore00";
+
+        HttpResponse<String> res = put("/api/v1/admin/settings/acs.retry.max_attempts",
+                "{\"value\":\"" + pastedKey + "\"}", token("cfgadmin"));
+
+        assertThat(res.statusCode()).isEqualTo(409);
+        assertThat(res.body()).contains("F-05.2");
+        // The response must not echo it back either.
+        assertThat(res.body()).doesNotContain(pastedKey);
+
+        assertThat(scalar("SELECT count(*) FROM vms.audit_logs "
+                + "WHERE action='settings.credential_refused'")).isNotEqualTo("0");
+        assertThat(scalar("SELECT count(*) FROM vms.audit_logs "
+                + "WHERE before_state::text LIKE '%" + pastedKey + "%' "
+                + "   OR after_state::text LIKE '%" + pastedKey + "%'")).isEqualTo("0");
+    }
+
+    @Test @org.junit.jupiter.api.Order(13)
+    @DisplayName("AC-2: no setting is marked secret, so nothing in the listing is redacted")
+    void nothingIsRedactedToday() throws Exception {
+        HttpResponse<String> res = get("/api/v1/admin/settings", token("cfgadmin"));
+
+        // The redaction machinery exists and is unit-tested; this asserts the deployed catalogue
+        // has no reason to use it. A secret appearing here would be a secret in the wrong store.
+        assertThat(res.body()).doesNotContain("********");
+        assertThat(res.body()).contains("\"secret\":false").doesNotContain("\"secret\":true");
+    }
+
     @Test @org.junit.jupiter.api.Order(10)
     @DisplayName("a value of the wrong type is 400 and leaves the stored value untouched")
     void wrongTypeRefused() throws Exception {

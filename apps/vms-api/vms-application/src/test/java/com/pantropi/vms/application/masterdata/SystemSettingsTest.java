@@ -133,6 +133,46 @@ class SystemSettingsTest {
     }
 
     @Test
+    @DisplayName("AC-4: a credential-shaped value is refused, naming the secrets mechanism")
+    void credentialShapedValueRefused() {
+        assertThatThrownBy(() -> settings.update(ADMIN, "acs.retry.max_attempts",
+                "ghp_16CharsAndThenSomeMore00"))
+                .isInstanceOf(SystemSettings.ChangeRefused.class)
+                .hasMessageContaining("F-05.2");
+
+        assertThat(store.writes).isZero();
+    }
+
+    @Test
+    @DisplayName("AC-4: the refusal is audited, but the value itself never reaches the audit trail")
+    void credentialRefusalDoesNotRecordTheValue() {
+        // An opaque blob rather than a recognisable vendor prefix: this test only needs *a* value
+        // the guard refuses, so it should not also be a literal the repository secret scanner has
+        // to be told to ignore. The vendor shapes live in CredentialShapeTest, where they earn it.
+        String pastedKey = "aVeryLongOpaqueToken1234567890abcdef";
+
+        assertThatThrownBy(() -> settings.update(ADMIN, "acs.retry.max_attempts", pastedKey))
+                .isInstanceOf(SystemSettings.ChangeRefused.class);
+
+        assertThat(audit.entries).hasSize(1);
+        assertThat(audit.entries.get(0)[1]).isEqualTo("settings.credential_refused");
+        for (Object field : audit.entries.get(0)) {
+            assertThat(String.valueOf(field)).doesNotContain(pastedKey);
+        }
+    }
+
+    @Test
+    @DisplayName("AC-4: the credential check runs before the type check, so it is not shadowed")
+    void credentialCheckPrecedesTypeCheck() {
+        // Every catalogued key is an integer or a boolean today. If the type check ran first, a
+        // pasted key would come back as "expected a whole number" and this guard would be dead.
+        assertThatThrownBy(() -> settings.update(ADMIN, "notification.email.enabled",
+                "Bearer abcdefghijklmnop"))
+                .isInstanceOf(SystemSettings.ChangeRefused.class)
+                .hasMessageContaining("credential");
+    }
+
+    @Test
     @DisplayName("the declared type reaches the store, so jsonb is written in the right shape")
     void typeIsPassedToTheStore() {
         settings.update(ADMIN, "acs.retry.max_attempts", "8");

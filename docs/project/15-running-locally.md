@@ -170,6 +170,12 @@ psql -h localhost -U postgres -d vms -c "SELECT action, entity_id, before_state,
 These endpoints sit behind `vms.masterdata.enabled`, which the `local` profile sets. With the flag
 off the routes are unmapped rather than present-and-refusing.
 
+Settings are cached in memory and the cache is dropped on every write, so a change is visible on the
+next read with no restart. **The cache is per-process**: if you ever run two instances against one
+database, a change made on one is not seen by the other until it reloads. Cross-instance
+invalidation is US-04.9.2 — see the Redis note in
+[14-api-authorization.md](14-api-authorization.md#deviations) for why that story is still open.
+
 ## Endpoints available today
 
 | Method | Path | Requires |
