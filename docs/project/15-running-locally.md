@@ -230,6 +230,10 @@ invalidation is US-04.9.2 — see the Redis note in
 | GET | `/api/v1/admin/pass-types`, `/pass-types/{id}` | `masterdata.view` |
 | POST/PUT | `/api/v1/admin/pass-types`, `/pass-types/{id}` | `masterdata.edit` |
 | POST | `…/pass-types/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
+| GET | `/api/v1/admin/holidays?year=` or `?from=&to=` | `masterdata.view` |
+| POST/PUT | `/api/v1/admin/holidays`, `/holidays/{id}` | `masterdata.edit` |
+| POST | `/api/v1/admin/holidays/import` | `masterdata.edit` |
+| DELETE | `/api/v1/admin/holidays/{id}` — *the only delete in master data* | `masterdata.edit` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 
