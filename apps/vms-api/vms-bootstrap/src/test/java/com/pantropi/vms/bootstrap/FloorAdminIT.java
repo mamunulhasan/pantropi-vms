@@ -188,6 +188,31 @@ class FloorAdminIT {
     }
 
     @Test
+    @DisplayName("every /{id} route rejects a floor reached through the wrong building")
+    void everyIdRouteChecksTheParent() throws Exception {
+        String admin = token();
+        String a = createBuilding("wra", admin);
+        String b = createBuilding("wrb", admin);
+        String id = extract(post(floors(a), floorBody("l01", "Level 1", 1), admin).body(), "id");
+
+        // Asserted route by route rather than once, because this is precisely where the check was
+        // inconsistent: it was written on some routes and omitted on deactivate, which let a floor
+        // be retired through a building it has nothing to do with.
+        assertThat(get(floors(b) + "/" + id, admin).statusCode()).isEqualTo(404);
+        assertThat(put(floors(b) + "/" + id, floorBody("l01", "X", 1), admin).statusCode())
+                .isEqualTo(404);
+        assertThat(post(floors(b) + "/" + id + "/deactivate", "", admin).statusCode())
+                .isEqualTo(404);
+        assertThat(post(floors(b) + "/" + id + "/reactivate", "", admin).statusCode())
+                .isEqualTo(404);
+
+        // ...and the floor is untouched by any of them.
+        assertThat(scalar("SELECT is_active FROM vms.floors WHERE id='" + id + "'"))
+                .isEqualTo("t");
+        assertThat(scalar("SELECT building_id FROM vms.floors WHERE id='" + id + "'")).isEqualTo(a);
+    }
+
+    @Test
     @DisplayName("updating through the wrong building does not move the floor between buildings")
     void updateCannotRelocateAFloor() throws Exception {
         String admin = token();

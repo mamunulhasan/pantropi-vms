@@ -60,7 +60,8 @@ public class FloorController {
     @PostMapping("/{id}/deactivate")
     public ResponseEntity<Void> deactivate(
             @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
-            @PathVariable UUID id) {
+            @PathVariable UUID buildingId, @PathVariable UUID id) {
+        requireInBuilding(buildingId, id);
         floors.deactivate(UUID.fromString(actor.userId()), id);
         return ResponseEntity.noContent().build();
     }
@@ -70,16 +71,29 @@ public class FloorController {
     public ResponseEntity<Void> reactivate(
             @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
             @PathVariable UUID buildingId, @PathVariable UUID id) {
-        Floor floor = floors.get(id);
-        if (!floor.buildingId().equals(buildingId)) {
-            throw new MasterDataStore.NotFound();
-        }
+        requireInBuilding(buildingId, id);
         floors.reactivate(UUID.fromString(actor.userId()), id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
     public Floor get(@PathVariable UUID buildingId, @PathVariable UUID id) {
+        return requireInBuilding(buildingId, id);
+    }
+
+    /**
+     * Every {@code /{id}} route must confirm the floor really belongs to the building in its path.
+     *
+     * <p>Extracted so there is one place to get it right rather than one per route. It was written
+     * inline on some routes and omitted on others, and the one that was omitted — deactivate —
+     * accepted any building id in its path, which made the nested route decorative for that
+     * operation and let a floor be retired through a path that has nothing to do with it.
+     *
+     * <p>The scoping for {@code update} lives in the store instead ({@code WHERE building_id = ?}),
+     * which is stronger still because it is one statement. That is not available for
+     * activate/deactivate, whose port method takes only an id — so the check happens here.
+     */
+    private Floor requireInBuilding(UUID buildingId, UUID id) {
         Floor floor = floors.get(id);
         if (!floor.buildingId().equals(buildingId)) {
             // Reached through the wrong building, so as far as this route is concerned it is not
