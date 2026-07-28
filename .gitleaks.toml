@@ -1,0 +1,28 @@
+# gitleaks configuration — secret scanning (US-01.4.1, T-01.4.1.3)
+#
+# The default ruleset is kept in full and extended, never replaced: this file
+# only narrows false positives, it must never widen what the scanner ignores.
+#
+# Rule for changing this file: an entry allowlists ONE known-fake literal in a
+# bounded set of paths. Do not add a path-only entry — allowlisting a whole
+# directory would blind the scanner to a real credential committed there, which
+# is precisely the failure this check exists to prevent.
+
+[extend]
+useDefault = true
+
+# The JWT signing key used by the integration tests. It is a fixed, published,
+# deliberately worthless string that exists so a test can sign and verify a
+# token against an ephemeral database; it authenticates nothing that exists.
+# Real deployments read vms.security.jwt.secret from the environment and the
+# application ships no default for it outside the local profile.
+#
+# condition = "AND" so BOTH the literal and the test path must match. A real
+# secret in these same files still fails the build, and this literal appearing
+# anywhere outside the test sources still fails the build.
+[[allowlists]]
+description = "Fixed non-secret JWT signing key used by the integration tests"
+condition = "AND"
+regexTarget = "line"
+regexes = ['''integration-test-secret-least-32-bytes-long-xx''']
+paths = ['''apps/vms-api/[^/]+/src/test/java/.*\.java''']
