@@ -2,6 +2,8 @@ package com.pantropi.vms.infrastructure.masterdata;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.masterdata.BuildingDefinition;
+import com.pantropi.vms.application.masterdata.FloorDefinition;
+import com.pantropi.vms.domain.masterdata.Floor;
 import com.pantropi.vms.application.masterdata.port.MasterDataStore;
 import com.pantropi.vms.application.masterdata.port.SettingsStore;
 import com.pantropi.vms.application.masterdata.usecase.MasterDataAdministration;
@@ -62,5 +64,18 @@ public class MasterDataConfig {
     MasterDataAdministration<Building> buildingAdministration(MasterDataStore<Building> store,
                                                               AuditTrail audit) {
         return new MasterDataAdministration<>(new BuildingDefinition(), store, audit);
+    }
+
+    // ---- US-04.2.1 floors: the same pattern, first entity with a parent ----
+
+    @Bean
+    MasterDataStore<Floor> floorStore(DataSource dataSource) {
+        return new JdbcFloorStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    MasterDataAdministration<Floor> floorAdministration(MasterDataStore<Floor> store,
+                                                        AuditTrail audit) {
+        return new MasterDataAdministration<>(new FloorDefinition(), store, audit);
     }
 }

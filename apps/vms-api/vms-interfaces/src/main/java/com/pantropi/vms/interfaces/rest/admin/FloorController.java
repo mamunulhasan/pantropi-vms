@@ -2,7 +2,7 @@ package com.pantropi.vms.interfaces.rest.admin;
 
 import com.pantropi.vms.application.masterdata.port.MasterDataStore;
 import com.pantropi.vms.application.masterdata.usecase.MasterDataAdministration;
-import com.pantropi.vms.domain.masterdata.Building;
+import com.pantropi.vms.domain.masterdata.Floor;
 import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
 import com.pantropi.vms.interfaces.rest.security.RequiresPermission;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,37 +13,36 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 /**
- * Building register API (US-04.1.1) — FR-CFG-02 (TDD-derived).
+ * Floor API, nested under its building (US-04.2.1) — FR-CFG-03 (TDD-derived).
  *
- * <p>Reading needs {@code masterdata.view}; every mutation needs {@code masterdata.edit},
- * declared per method so the read default cannot accidentally cover a write (AC-6).
+ * <p>Every route carries the building id, because a floor code only means something inside one:
+ * "L01" identifies a floor when you already know the tower and nothing at all when you do not
+ * (AC-4). Taking the parent from the path rather than the body also means the two can never
+ * disagree — there is no body field for a client to contradict it with.
  *
- * <p><strong>There is no DELETE mapping</strong>, and that is the design rather than an omission:
- * {@code vms.floors.building_id} is {@code ON DELETE RESTRICT} and historical records must stay
- * resolvable, so retirement is deactivation (AC-5). The verb is absent all the way down — controller,
- * use case and port — so it cannot be reached by any route.
- *
- * <p>The controller holds no logic beyond HTTP mapping.
+ * <p>Reading needs {@code masterdata.view}; every mutation needs {@code masterdata.edit}.
+ * <strong>No DELETE mapping</strong>: {@code vms.receptions.floor_id} is {@code ON DELETE RESTRICT}
+ * and retirement is deactivation (AC-6).
  */
 @RestController
-@RequestMapping("/api/v1/admin/buildings")
+@RequestMapping("/api/v1/admin/buildings/{buildingId}/floors")
 @RequiresPermission("masterdata.view")
 @ConditionalOnProperty(prefix = "vms.masterdata", name = "enabled", havingValue = "true")
-public class BuildingController {
+public class FloorController {
 
-    private final MasterDataAdministration<Building> buildings;
+    private final MasterDataAdministration<Floor> floors;
 
-    public BuildingController(MasterDataAdministration<Building> buildings) {
-        this.buildings = buildings;
+    public FloorController(MasterDataAdministration<Floor> floors) {
+        this.floors = floors;
     }
 
     @RequiresPermission("masterdata.edit")
     @PostMapping
     public ResponseEntity<CreatedResponse> create(
             @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
-            @RequestBody BuildingRequest req) {
-        UUID id = buildings.create(UUID.fromString(actor.userId()),
-                Building.draft(req.code(), req.name(), req.address()));
+            @PathVariable UUID buildingId, @RequestBody FloorRequest req) {
+        UUID id = floors.create(UUID.fromString(actor.userId()),
+                Floor.draft(buildingId, req.code(), req.name(), req.levelNo()));
         return ResponseEntity.status(HttpStatus.CREATED).body(new CreatedResponse(id.toString()));
     }
 
@@ -51,9 +50,9 @@ public class BuildingController {
     @PutMapping("/{id}")
     public ResponseEntity<Void> update(
             @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
-            @PathVariable UUID id, @RequestBody BuildingRequest req) {
-        buildings.update(UUID.fromString(actor.userId()), id,
-                Building.draft(req.code(), req.name(), req.address()));
+            @PathVariable UUID buildingId, @PathVariable UUID id, @RequestBody FloorRequest req) {
+        floors.update(UUID.fromString(actor.userId()), id,
+                Floor.draft(buildingId, req.code(), req.name(), req.levelNo()));
         return ResponseEntity.noContent().build();
     }
 
@@ -62,7 +61,7 @@ public class BuildingController {
     public ResponseEntity<Void> deactivate(
             @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
             @PathVariable UUID id) {
-        buildings.deactivate(UUID.fromString(actor.userId()), id);
+        floors.deactivate(UUID.fromString(actor.userId()), id);
         return ResponseEntity.noContent().build();
     }
 
@@ -70,25 +69,35 @@ public class BuildingController {
     @PostMapping("/{id}/reactivate")
     public ResponseEntity<Void> reactivate(
             @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal actor,
-            @PathVariable UUID id) {
-        buildings.reactivate(UUID.fromString(actor.userId()), id);
+            @PathVariable UUID buildingId, @PathVariable UUID id) {
+        Floor floor = floors.get(id);
+        if (!floor.buildingId().equals(buildingId)) {
+            throw new MasterDataStore.NotFound();
+        }
+        floors.reactivate(UUID.fromString(actor.userId()), id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
-    public Building get(@PathVariable UUID id) {
-        return buildings.get(id);
+    public Floor get(@PathVariable UUID buildingId, @PathVariable UUID id) {
+        Floor floor = floors.get(id);
+        if (!floor.buildingId().equals(buildingId)) {
+            // Reached through the wrong building, so as far as this route is concerned it is not
+            // there. Reporting it as found would let the path be used to enumerate floors.
+            throw new MasterDataStore.NotFound();
+        }
+        return floor;
     }
 
     @GetMapping
-    public MasterDataStore.Page<Building> list(
+    public MasterDataStore.Page<Floor> list(
+            @PathVariable UUID buildingId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Boolean active,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "code") String sort) {
-        // Null parent: buildings sit at the top of the hierarchy and have none.
-        return buildings.list(new MasterDataStore.Query(null, search, active, page, size, sort));
+            @RequestParam(defaultValue = "levelNo") String sort) {
+        return floors.list(new MasterDataStore.Query(buildingId, search, active, page, size, sort));
     }
 
     @ExceptionHandler(MasterDataStore.DuplicateCode.class)
@@ -97,12 +106,18 @@ public class BuildingController {
                 .body(new ErrorResponse("duplicate", "code", e.getMessage()));
     }
 
+    /** AC-5: an absent or deactivated building is a validation failure naming the field. */
+    @ExceptionHandler(MasterDataStore.InvalidParent.class)
+    public ResponseEntity<ErrorResponse> onInvalidParent(MasterDataStore.InvalidParent e) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("invalid", e.field, e.getMessage()));
+    }
+
     @ExceptionHandler(MasterDataStore.NotFound.class)
     public ResponseEntity<Void> onNotFound() {
         return ResponseEntity.notFound().build();
     }
 
-    /** The domain record rejects its own bad input; this turns that into a 400 naming the field. */
     @ExceptionHandler(com.pantropi.vms.domain.masterdata.MasterDataText.InvalidField.class)
     public ResponseEntity<ErrorResponse> onInvalidField(
             com.pantropi.vms.domain.masterdata.MasterDataText.InvalidField e) {
@@ -110,7 +125,7 @@ public class BuildingController {
                 .body(new ErrorResponse("invalid", e.field, e.getMessage()));
     }
 
-    public record BuildingRequest(String code, String name, String address) {}
+    public record FloorRequest(String code, String name, Integer levelNo) {}
     public record CreatedResponse(String id) {}
     public record ErrorResponse(String error, String field, String message) {}
 }
