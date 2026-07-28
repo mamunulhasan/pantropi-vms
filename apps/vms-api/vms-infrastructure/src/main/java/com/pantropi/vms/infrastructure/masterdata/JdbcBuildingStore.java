@@ -90,37 +90,18 @@ public final class JdbcBuildingStore implements MasterDataStore<Building> {
 
     @Override
     public Page<Building> list(Query query) {
-        StringBuilder where = new StringBuilder(" WHERE 1=1");
-        List<Object> args = new java.util.ArrayList<>();
-
-        if (query.active() != null) {
-            where.append(" AND is_active = ?");
-            args.add(query.active());
-        }
-        if (query.search() != null && !query.search().isBlank()) {
-            // ILIKE over both fields: an operator searching "west" should find it whether it is the
-            // code or the name that matches, without having to know which.
-            where.append(" AND (code ILIKE ? OR name ILIKE ?)");
-            String pattern = "%" + query.search().trim() + "%";
-            args.add(pattern);
-            args.add(pattern);
-        }
+        // Buildings are top-level, so there is no parent column to filter by.
+        MasterDataQuery q = MasterDataQuery.of(query, null);
 
         Long total = jdbc.queryForObject(
-                "SELECT count(*) FROM vms.buildings" + where, Long.class, args.toArray());
-
-        int size = Math.max(1, Math.min(query.size(), 200));   // bounded: a page is not a dump
-        int page = Math.max(0, query.page());
-        List<Object> pageArgs = new java.util.ArrayList<>(args);
-        pageArgs.add(size);
-        pageArgs.add(page * size);
+                "SELECT count(*) FROM vms.buildings" + q.where(), Long.class, q.countArgs());
 
         List<Building> items = jdbc.query(
-                "SELECT " + COLUMNS + " FROM vms.buildings" + where
+                "SELECT " + COLUMNS + " FROM vms.buildings" + q.where()
                         + " ORDER BY " + sortColumn(query.sort()) + ", id LIMIT ? OFFSET ?",
-                JdbcBuildingStore::map, pageArgs.toArray());
+                JdbcBuildingStore::map, q.pageArgs());
 
-        return new Page<>(items, page, size, total == null ? 0 : total);
+        return new Page<>(items, q.page(), q.size(), total == null ? 0 : total);
     }
 
     /** Allow-listed; an unknown key silently becomes the default rather than reaching SQL. */

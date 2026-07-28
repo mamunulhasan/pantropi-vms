@@ -3,7 +3,9 @@ package com.pantropi.vms.infrastructure.masterdata;
 import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.masterdata.BuildingDefinition;
 import com.pantropi.vms.application.masterdata.FloorDefinition;
+import com.pantropi.vms.application.masterdata.VisitorTypeDefinition;
 import com.pantropi.vms.domain.masterdata.Floor;
+import com.pantropi.vms.domain.masterdata.VisitorType;
 import com.pantropi.vms.application.masterdata.port.MasterDataStore;
 import com.pantropi.vms.application.masterdata.port.SettingsStore;
 import com.pantropi.vms.application.masterdata.usecase.MasterDataAdministration;
@@ -77,5 +79,18 @@ public class MasterDataConfig {
     MasterDataAdministration<Floor> floorAdministration(MasterDataStore<Floor> store,
                                                         AuditTrail audit) {
         return new MasterDataAdministration<>(new FloorDefinition(), store, audit);
+    }
+
+    // ---- US-04.5.1 visitor types ----
+
+    @Bean
+    MasterDataStore<VisitorType> visitorTypeStore(DataSource dataSource) {
+        return new JdbcVisitorTypeStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    MasterDataAdministration<VisitorType> visitorTypeAdministration(
+            MasterDataStore<VisitorType> store, AuditTrail audit) {
+        return new MasterDataAdministration<>(new VisitorTypeDefinition(), store, audit);
     }
 }
