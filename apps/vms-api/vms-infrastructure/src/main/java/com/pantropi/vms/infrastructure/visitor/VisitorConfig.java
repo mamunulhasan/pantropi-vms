@@ -24,8 +24,9 @@ import javax.sql.DataSource;
 public class VisitorConfig {
 
     @Bean
-    VisitorRequestRepository visitorRequestRepository(DataSource dataSource) {
-        return new JdbcVisitorRequestRepository(new JdbcTemplate(dataSource));
+    VisitorRequestRepository visitorRequestRepository(DataSource dataSource,
+            com.pantropi.vms.application.identity.usecase.ScopePolicy scope) {
+        return new JdbcVisitorRequestRepository(new JdbcTemplate(dataSource), scope);
     }
 
     @Bean

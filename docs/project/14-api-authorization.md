@@ -65,6 +65,24 @@ Two design points worth keeping:
   who completed the change would stay confined until then. Refreshing carries the flag forward from
   the session, so rotation is not an escape either. Both are tested.
 
+## Tenant and floor scoping (US-03.4.1)
+
+Authorization answers *may you call this route*. Scoping answers *which rows may you see* — a
+separate question, decided in `ScopePolicy` and nowhere else.
+
+The interceptor opens a request's scope only **after** the authorization decision passes, and clears
+it in `afterCompletion` — which runs even when the handler threw. Servlet threads are pooled, so a
+scope left behind would be inherited by the next request on that thread: one user's tenant isolation
+silently applied to another user's query, with every query still looking correct.
+
+The shipped policy is strict own-scope per ADR-0004; everything undeterminable resolves to seeing
+nothing. [ADR-0005](../adr/0005-tenant-and-floor-scoping-seam.md) records the mechanism, the
+divergence from the backlog's deny-all, and what changes when TODO-14 is answered.
+
+`ScopingRulesTest` fails the build naming any adapter that reads scope-sensitive data without
+consulting the policy, and forbids anything outside the policy from constructing an unrestricted
+filter.
+
 ## The principal
 
 `AuthenticatedPrincipal` is derived **solely** from the validated token. No request body, query

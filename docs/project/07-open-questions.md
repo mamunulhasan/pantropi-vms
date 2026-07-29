@@ -148,6 +148,17 @@ own data, a floor receptionist only their own floor. Fails safe: relaxing is con
 a permissive default would have leaked tenant data while we waited. The policy is swappable; this
 question stays open.
 
+**Built in US-03.4.1 (2026-07-29), recorded in [ADR-0005](../adr/0005-tenant-and-floor-scoping-seam.md).**
+Answering this question is now a change to `ScopePolicy` and nothing else. Two things are worth
+knowing before answering it:
+
+- **`ScopeFilter` is sealed.** An answer that needs a new shape — a tenant group, a delegation —
+  makes every place that handles a filter a compile error until updated. That is intended: a new
+  isolation shape must not be quietly ignorable by an adapter written before it existed.
+- **The bypass is guarded, not just the policy.** `ScopingRulesTest` fails the build naming any
+  adapter that reads scope-sensitive data without consulting the policy. So whatever is decided here
+  cannot be silently sidestepped by the next query someone writes.
+
 ### TODO-15 🟠 VMS user authentication mechanism
 **Feature:** F-02.1 (EPIC-02)
 The schema stores `password_hash`, implying local accounts. TDD §7 specifies JWT. Neither states
