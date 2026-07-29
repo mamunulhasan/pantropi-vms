@@ -8,6 +8,8 @@ import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
 import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
+import com.pantropi.vms.application.visitor.port.VisitorRequestQueries;
+import com.pantropi.vms.application.visitor.usecase.MyVisitorRequests;
 import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
 import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
@@ -44,6 +46,18 @@ public class VisitorConfig {
     @Bean
     PendingApprovals pendingApprovals(ApprovalQueueStore queue) {
         return new PendingApprovals(queue);
+    }
+
+    /** US-07.6.1 — the tenant's own list and detail, scoped by the same policy. */
+    @Bean
+    VisitorRequestQueries visitorRequestQueries(DataSource dataSource,
+            com.pantropi.vms.application.identity.usecase.ScopePolicy scope) {
+        return new JdbcVisitorRequestQueries(new JdbcTemplate(dataSource), scope);
+    }
+
+    @Bean
+    MyVisitorRequests myVisitorRequests(VisitorRequestQueries queries) {
+        return new MyVisitorRequests(queries);
     }
 
     @Bean

@@ -1,6 +1,8 @@
 package com.pantropi.vms.interfaces.rest.visitor;
 
 import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
+import com.pantropi.vms.application.visitor.port.VisitorRequestQueries;
+import com.pantropi.vms.application.visitor.usecase.MyVisitorRequests;
 import com.pantropi.vms.application.shared.PageRequest;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
@@ -12,6 +14,7 @@ import com.pantropi.vms.domain.visitor.VisitorRequest;
 import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
 import com.pantropi.vms.interfaces.rest.security.RequiresPermission;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,8 +25,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Visitor request submission and decisions (US-07.1.1, US-07.4.1, US-07.4.2) — FR-VMS-01/02
- * (SRS B1).
+ * Visitor requests: submission, decisions, the approval queue and the tenant's own list
+ * (US-07.1.1, US-07.3.1, US-07.4.1, US-07.4.2, US-07.6.1) — FR-VMS-01/02 (SRS B1).
  *
  * <p>{@code POST /api/v1/visitor-requests} is guarded by {@code visitor.request} at the class level
  * (US-03.2.1); {@code POST /{id}/approve} and {@code POST /{id}/reject} override that with
@@ -44,15 +47,80 @@ public class VisitorRequestController {
     private final ApproveVisitorRequest approveVisitorRequest;
     private final RejectVisitorRequest rejectVisitorRequest;
     private final PendingApprovals pendingApprovals;
+    private final MyVisitorRequests myVisitorRequests;
 
     public VisitorRequestController(SubmitVisitorRequest submitVisitorRequest,
                                     ApproveVisitorRequest approveVisitorRequest,
                                     RejectVisitorRequest rejectVisitorRequest,
-                                    PendingApprovals pendingApprovals) {
+                                    PendingApprovals pendingApprovals,
+                                    MyVisitorRequests myVisitorRequests) {
         this.submitVisitorRequest = submitVisitorRequest;
         this.approveVisitorRequest = approveVisitorRequest;
         this.rejectVisitorRequest = rejectVisitorRequest;
         this.pendingApprovals = pendingApprovals;
+        this.myVisitorRequests = myVisitorRequests;
+    }
+
+    /**
+     * The tenant's own requests and their status (US-07.6.1, T-07.6.1.2) — FR-VMS-01 (SRS B1).
+     *
+     * <p>Guarded by the class-level {@code visitor.request}: raising requests and seeing what became
+     * of them are the same tenant-facing capability.
+     *
+     * <p>Which rows come back is <strong>not</strong> decided here. This method has no tenant
+     * parameter and builds no condition; the adapter takes the predicate from {@code ScopePolicy},
+     * so the filters below narrow the tenant's own set and cannot widen it (AC-2).
+     *
+     * @param status optional; an unrecognised value is a 400 rather than an ignored filter
+     * @param from   optional lower bound on the visit window, inclusive
+     * @param to     optional upper bound on the visit window, exclusive
+     */
+    @GetMapping
+    public MyRequestsPage myRequests(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        VisitorRequestQueries.Page result = myVisitorRequests.list(status, from, to, page, size);
+
+        return new MyRequestsPage(
+                result.content().stream()
+                        .map(r -> new MyRequestRow(r.id().toString(), r.status(), r.host(),
+                                r.scheduledFrom(), r.scheduledTo(), r.visitorCount(),
+                                r.submittedAt(), r.decidedAt(), r.decisionReason()))
+                        .toList(),
+                result.totalElements(), result.page(), result.size(), PageRequest.MAX_SIZE);
+    }
+
+    /**
+     * One request in full, including the decision and why (US-07.6.1 AC-3).
+     *
+     * <p>A request belonging to another tenant answers <strong>404</strong>, identical to one that
+     * never existed (AC-4). It is one scoped query, so there is no ownership branch that could take
+     * measurably longer than a miss, and nothing for this method to phrase differently.
+     *
+     * <p>The rejection reason is returned as a JSON string. It is stored exactly as the approver
+     * typed it (US-07.4.2 AC-6); encoding it for display is the renderer's job, and the JSON
+     * serialiser escapes it for this transport.
+     */
+    @GetMapping("/{id}")
+    public MyRequestDetail myRequest(@PathVariable UUID id) {
+        VisitorRequestQueries.Detail d = myVisitorRequests.detail(id);
+        return new MyRequestDetail(d.id().toString(), d.status(), d.host(), d.purpose(),
+                d.scheduledFrom(), d.scheduledTo(), d.submittedAt(), d.decidedBy(), d.decidedAt(),
+                d.decisionReason(),
+                d.visitors().stream()
+                        .map(v -> new VisitorLine(v.fullName(), v.status())).toList());
+    }
+
+    /** AC-2: a filter we do not understand is refused, never quietly dropped. */
+    @ExceptionHandler(MyVisitorRequests.UnknownStatus.class)
+    public ResponseEntity<DecisionError> onUnknownStatus(MyVisitorRequests.UnknownStatus e) {
+        return ResponseEntity.badRequest().body(new DecisionError("invalid", e.getMessage()));
     }
 
     /**
@@ -199,6 +267,22 @@ public class VisitorRequestController {
     public ResponseEntity<DecisionError> onNoteTooLong(VisitorRequest.DecisionReasonTooLong e) {
         return ResponseEntity.badRequest().body(new DecisionError("invalid", e.getMessage()));
     }
+
+    /** A row of the tenant's own list — status, window, host, count, and the decision (AC-1). */
+    public record MyRequestRow(String id, String status, String host, Instant scheduledFrom,
+                               Instant scheduledTo, int visitorCount, Instant submittedAt,
+                               Instant decidedAt, String decisionReason) {}
+
+    public record MyRequestsPage(List<MyRequestRow> content, long totalElements, int page, int size,
+                                 int maxSize) {}
+
+    /** @param decidedBy the approver's display name only — no username, email or id */
+    public record MyRequestDetail(String id, String status, String host, String purpose,
+                                  Instant scheduledFrom, Instant scheduledTo, Instant submittedAt,
+                                  String decidedBy, Instant decidedAt, String decisionReason,
+                                  List<VisitorLine> visitors) {}
+
+    public record VisitorLine(String fullName, String status) {}
 
     /**
      * One queue row. Counts and names an approver needs to recognise the request — deliberately no

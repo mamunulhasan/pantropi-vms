@@ -87,6 +87,22 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/approve \
   -d '{"note":"Cleared with building security"}'
 ```
 
+A tenant sees its own requests at `GET /api/v1/visitor-requests`, filterable by `status` and by
+visit-date range (`from`/`to`, ISO-8601). The filters narrow within the tenant's own set and
+cannot widen it — the scope predicate is applied first, in the repository, never in the
+controller. `GET /api/v1/visitor-requests/{id}` adds the purpose, the guests by name, and — for a
+rejected request — the reason and when it was decided, with the approver identified by display
+name only.
+
+Another tenant's request is **404**, byte-identical to an id that never existed, so the endpoint
+cannot be used to find out what else is in the building. A tenant user with no tenant assigned
+sees nothing at all rather than everything.
+
+```bash
+curl -s "http://localhost:8081/api/v1/visitor-requests?status=rejected" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 The queue an approver works from is `GET /api/v1/visitor-requests/pending`. It lists only
 `submitted` requests, newest first, with tenant, host, window and **visitor count** — never a
 visitor's email or phone, which are not selected at all. Page size is capped at **100**; asking for
@@ -334,6 +350,8 @@ invalidation is US-04.9.2 — see the Redis note in
 | POST | `/api/v1/visitor-requests/{id}/approve` — optional `{"note":"…"}` | `visitor.approve` |
 | POST | `/api/v1/visitor-requests/{id}/reject` — **required** `{"reason":"…"}`, ≤1000 chars | `visitor.approve` |
 | GET | `/api/v1/visitor-requests/pending?page=&size=` — **max size 100**, clamped not refused | `visitor.approve` |
+| GET | `/api/v1/visitor-requests?status=&from=&to=&page=&size=` — own tenant only | `visitor.request` |
+| GET | `/api/v1/visitor-requests/{id}` — own tenant only; 404 for anyone else's | `visitor.request` |
 
 Anything else is denied by default (US-03.2.1).
 
