@@ -31,8 +31,8 @@ final class VisitorScopeSql {
      */
     static Clause on(ScopeFilter filter, String tenantColumn, String receptionColumn) {
         return switch (filter) {
-            case ScopeFilter.Unrestricted u when u != null -> new Clause("TRUE", List.of());
-            case ScopeFilter.DenyAll d when d != null -> new Clause("FALSE", List.of());
+            case ScopeFilter.Unrestricted ignored -> new Clause("TRUE", List.of());
+            case ScopeFilter.DenyAll ignored -> new Clause("FALSE", List.of());
             case ScopeFilter.OwnTenant own ->
                     tenantColumn == null
                             ? new Clause("FALSE", List.of())
