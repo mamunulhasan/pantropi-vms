@@ -73,6 +73,14 @@ unconditionally and the edge component is display/status only.
 Designed (TDD §6.1) and schema-supported (`acs_op.manual_override`), but absent from the attached
 SRS. Security-sensitive. **We need:** an SRS requirement, or explicit descope.
 
+**Enforced in the grant matrix since US-03.1.1 (2026-07-29).** `V9__role_permission_grants.sql`
+grants `credential.override` to **no role**, and `RoleGrantMatrixIT` asserts zero grants of it.
+Worth knowing: `MASTER_ADMIN`'s own seeded description says *"approves access, issues credentials,
+overrides"* — this is the one place the matrix contradicts a role description on purpose, because
+nobody has written the rules for when an override is legitimate. `report.view` and `report.export`
+are ungranted on the same basis, pending TODO-16. **When this question closes, the grant is one line
+in a new migration** — the constant already exists in `Permissions.UNBACKED`.
+
 ### TODO-05 🟠 WhatsApp Business API approval status
 **Refs:** SRS App. B item 2, TDD §11 dep. 4 · **Feature:** F-16.3 (EPIC-16)
 Schema already defaults `notification.whatsapp.enabled` to `false`. **We need:** approval timeline,

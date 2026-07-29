@@ -287,23 +287,13 @@ class BuildingAdminIT {
         try (Connection c = pg.getPostgresDatabase().getConnection();
              Statement s = c.createStatement()) {
             String sysRole = single(s, "SELECT id FROM vms.roles WHERE code='SYSTEM_ADMIN'");
-            String fmRole = single(s, "SELECT id FROM vms.roles WHERE code='FM_ADMIN'");
+            String viewerRole = single(s, "SELECT id FROM vms.roles WHERE code='FLOOR_RECEPTIONIST'");
             insertUser(s, "mdadmin", hash, sysRole);
-            insertUser(s, "viewer", hash, fmRole);
-
-            grant(s, "SYSTEM_ADMIN", "masterdata.view");
-            grant(s, "SYSTEM_ADMIN", "masterdata.edit");
-            grant(s, "FM_ADMIN", "masterdata.view");   // deliberately not masterdata.edit
+            insertUser(s, "viewer", hash, viewerRole);
+   // deliberately not masterdata.edit
         }
     }
 
-    private static void grant(Statement s, String role, String permission) throws Exception {
-        s.execute("""
-                INSERT INTO vms.role_permissions (role_id, permission_id)
-                SELECT r.id, p.id FROM vms.roles r JOIN vms.permissions p ON p.code = '%s'
-                WHERE r.code = '%s' ON CONFLICT DO NOTHING"""
-                .formatted(permission, role));
-    }
 
     private static void insertUser(Statement s, String u, String hash, String roleId)
             throws Exception {

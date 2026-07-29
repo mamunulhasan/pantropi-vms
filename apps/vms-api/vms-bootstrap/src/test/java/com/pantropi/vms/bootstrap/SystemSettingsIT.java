@@ -308,8 +308,15 @@ class SystemSettingsIT {
     private String base() { return "http://localhost:" + port; }
 
     /**
-     * Grants are inserted here rather than relied upon from a migration: the production
-     * role-to-permission matrix lands in V9 (US-03.1.1) and is not this story's to assert.
+     * The one integration test that still seeds its own grants, and deliberately.
+     *
+     * <p>Since V9 the other suites rely entirely on the real matrix. This one cannot: AC-4 needs a
+     * principal holding {@code masterdata.edit} but <strong>not</strong> {@code settings.manage},
+     * and no seeded role is that shape — {@code SYSTEM_ADMIN} holds both, and every other role holds
+     * neither. The principal is hypothetical by design, because the point of the AC is that the two
+     * permissions are independent of each other, not that some particular role lacks one.
+     *
+     * <p>{@code cfgadmin} still comes from the real matrix; only {@code dataadmin} is constructed.
      */
     private static void seed() throws Exception {
         String hash = new Pbkdf2PasswordHasher().hash(PASSWORD.toCharArray());
