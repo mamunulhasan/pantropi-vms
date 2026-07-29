@@ -1,5 +1,6 @@
 package com.pantropi.vms.domain.visitor;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +39,7 @@ public final class VisitorRequest {
     private RequestStatus status;
     private UUID approvedBy;
     private String decisionReason;
+    private Instant decidedAt;
 
     private VisitorRequest(UUID id, UUID tenantId, UUID hostId, UUID requestedBy,
                            VisitKind visitKind, TimeWindow window, String purpose,
@@ -86,9 +88,13 @@ public final class VisitorRequest {
     public static VisitorRequest rehydrate(UUID id, UUID tenantId, UUID hostId, UUID requestedBy,
                                            VisitKind visitKind, TimeWindow window, String purpose,
                                            List<Visitor> visitors, RequestStatus status,
-                                           UUID approvedBy) {
-        return new VisitorRequest(id, tenantId, hostId, requestedBy, visitKind, window, purpose,
-                new ArrayList<>(visitors), status, approvedBy);
+                                           UUID approvedBy, String decisionReason,
+                                           Instant decidedAt) {
+        VisitorRequest request = new VisitorRequest(id, tenantId, hostId, requestedBy, visitKind,
+                window, purpose, new ArrayList<>(visitors), status, approvedBy);
+        request.decisionReason = decisionReason;
+        request.decidedAt = decidedAt;
+        return request;
     }
 
     /**
@@ -105,14 +111,33 @@ public final class VisitorRequest {
     }
 
     /**
-     * FM Admin approval (FR-VMS-02, SRS B1); approves every named visitor with the request.
+     * FM Admin approval (US-07.4.1, T-07.4.1.1) — FR-VMS-02 (SRS B1); approves every named visitor
+     * with the request.
      *
-     * @throws RequestTransitions.IllegalTransition from any state but {@code SUBMITTED}
+     * <p>Time is a parameter, not {@code Instant.now()}: this class has no clock, and the elapsed-
+     * window rule is only testable if "now" is supplied.
+     *
+     * @param note optional; why the approval was given (AC-4). Blank is the same as absent.
+     * @param now  the deciding instant — recorded, and used to refuse an elapsed window
+     * @throws RequestTransitions.IllegalTransition from any state but {@code SUBMITTED} (AC-5)
+     * @throws WindowAlreadyElapsed                 if the visit window is entirely in the past
+     *                                              (AC-7)
+     * @throws DecisionReasonTooLong                if the note exceeds the bound
      */
-    public void approve(UUID approver) {
+    public void approve(UUID approver, String note, Instant now) {
         Objects.requireNonNull(approver, "approver is required");
-        transitionTo(RequestStatus.APPROVED);
+        Objects.requireNonNull(now, "the deciding instant is required");
+        String cleanNote = cleanReason(note);
+
+        // AC-7: approving a visit that has already finished would mint a credential that is expired
+        // the moment it exists. Checked before the transition, so a refusal changes nothing.
+        if (window != null && window.to() != null && !window.to().isAfter(now)) {
+            throw new WindowAlreadyElapsed(window.to(), now);
+        }
+
+        transitionTo(RequestStatus.APPROVED, now);
         this.approvedBy = approver;
+        this.decisionReason = cleanNote;
     }
 
     /**
@@ -125,16 +150,14 @@ public final class VisitorRequest {
      *                                              an approval is a cancellation, not a rejection.
      * @throws RejectionReasonRequired              if the reason is null, empty or whitespace
      */
-    public void reject(UUID approver, String reason) {
+    public void reject(UUID approver, String reason, Instant now) {
         Objects.requireNonNull(approver, "approver is required");
-        String trimmed = reason == null ? "" : reason.trim();
-        if (trimmed.isEmpty()) {
+        Objects.requireNonNull(now, "the deciding instant is required");
+        String trimmed = cleanReason(reason);
+        if (trimmed == null) {
             throw new RejectionReasonRequired();
         }
-        if (trimmed.length() > MAX_DECISION_REASON) {
-            throw new DecisionReasonTooLong(MAX_DECISION_REASON);
-        }
-        transitionTo(RequestStatus.REJECTED);
+        transitionTo(RequestStatus.REJECTED, now);
         this.approvedBy = approver;
         this.decisionReason = trimmed;
     }
@@ -145,8 +168,26 @@ public final class VisitorRequest {
      *
      * @throws RequestTransitions.IllegalTransition from a terminal state
      */
-    public void cancel() {
-        transitionTo(RequestStatus.CANCELLED);
+    public void cancel(Instant now) {
+        Objects.requireNonNull(now, "the deciding instant is required");
+        transitionTo(RequestStatus.CANCELLED, now);
+    }
+
+    /**
+     * Trims a decision reason, mapping blank to absent.
+     *
+     * @return null when nothing was said — so a caller that requires one can simply test for null
+     * @throws DecisionReasonTooLong if it exceeds the bound
+     */
+    private static String cleanReason(String reason) {
+        String trimmed = reason == null ? "" : reason.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > MAX_DECISION_REASON) {
+            throw new DecisionReasonTooLong(MAX_DECISION_REASON);
+        }
+        return trimmed;
     }
 
     /** Visitors may only be added while the request is still open — not a status change. */
@@ -162,9 +203,10 @@ public final class VisitorRequest {
      * <p>Guard first, then mutate, then cascade — so an illegal move leaves the request and every
      * visitor exactly as they were.
      */
-    private void transitionTo(RequestStatus target) {
+    private void transitionTo(RequestStatus target, Instant now) {
         RequestTransitions.require(this.status, target);
         this.status = target;
+        this.decidedAt = now;
         cascadeToVisitors(target);
     }
 
@@ -237,9 +279,19 @@ public final class VisitorRequest {
         }
     }
 
-    /** Why the request was refused; null unless it was rejected. */
+    /** Why the request was decided the way it was; null when nobody said (US-07.4.1 AC-4). */
     public String decisionReason() {
         return decisionReason;
+    }
+
+    /** When the decision was taken; null while the request is still awaiting one. */
+    public Instant decidedAt() {
+        return decidedAt;
+    }
+
+    /** The visitors this decision applies to — ids only, so a caller cannot leak PII by accident. */
+    public List<UUID> visitorIds() {
+        return visitors.stream().map(Visitor::id).toList();
     }
 
     /** A rejection nobody has to justify is not an accountable decision (US-07.4.2 AC-2). */
@@ -252,6 +304,22 @@ public final class VisitorRequest {
     public static final class DecisionReasonTooLong extends IllegalArgumentException {
         public DecisionReasonTooLong(int max) {
             super("A decision reason must be at most " + max + " characters");
+        }
+    }
+
+    /**
+     * A visit that has already finished cannot be approved (US-07.4.1 AC-7).
+     *
+     * <p>Not an illegal transition — the source state was fine, the world moved on. The distinction
+     * is what lets the endpoint answer 422 rather than 409: retrying will never help.
+     */
+    public static final class WindowAlreadyElapsed extends IllegalStateException {
+        public final Instant windowEnd;
+
+        public WindowAlreadyElapsed(Instant windowEnd, Instant now) {
+            super("The visit window ended at " + windowEnd + ", before " + now
+                    + "; approving it would issue a credential that is already expired");
+            this.windowEnd = windowEnd;
         }
     }
 

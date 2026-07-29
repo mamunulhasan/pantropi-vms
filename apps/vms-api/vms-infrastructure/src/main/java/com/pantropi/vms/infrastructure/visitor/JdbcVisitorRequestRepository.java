@@ -65,6 +65,46 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
     }
 
     /**
+     * Applies a decision as a compare-and-set on the status (US-07.4.1, T-07.4.1.2, AC-6).
+     *
+     * <p>The expected previous status is part of the {@code WHERE} clause, so of two concurrent
+     * approvals the second updates no row and gets {@code false}. There is no {@code SELECT … FOR
+     * UPDATE} beforehand and none is needed: a single {@code UPDATE} takes its own row lock, and the
+     * loser's re-read after that lock is released sees the winner's status and fails the predicate.
+     *
+     * <p>The visitor rows are written only once the request row has been won, so a losing caller
+     * never touches them even before its transaction rolls back.
+     */
+    @Override
+    public boolean saveDecision(VisitorRequest r, RequestStatus expectedPrevious) {
+        int updated = jdbc.update("""
+                UPDATE vms.visitor_requests
+                   SET status          = ?::vms.request_status,
+                       approved_by     = ?,
+                       decision_reason = ?,
+                       decided_at      = ?,
+                       updated_at      = now()
+                 WHERE id = ? AND status = ?::vms.request_status
+                """,
+                r.status().dbValue(), r.approvedBy(), r.decisionReason(),
+                r.decidedAt() == null ? null : Timestamp.from(r.decidedAt()),
+                r.id(), expectedPrevious.dbValue());
+
+        if (updated == 0) {
+            return false;
+        }
+
+        // Each visitor is written with the status the aggregate holds, which for one already in a
+        // terminal state is the value it came in with — the cascade decided what moves, and this
+        // only records the outcome.
+        for (Visitor v : r.visitors()) {
+            jdbc.update("UPDATE vms.visitors SET status = ?::vms.visitor_status WHERE id = ?",
+                    v.status().dbValue(), v.id());
+        }
+        return true;
+    }
+
+    /**
      * Reads one request, <strong>subject to the caller's scope</strong> (US-03.4.1 AC-2).
      *
      * <p>The predicate comes from {@link ScopePolicy}, never from a condition written here. A
@@ -81,13 +121,19 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
 
         List<Object[]> rows = jdbc.query("""
                 SELECT tenant_id, host_id, requested_by, approved_by, visit_kind,
-                       scheduled_from, scheduled_to, status, purpose
-                FROM vms.visitor_requests WHERE id = ? AND """ + clause.sql(),
+                       scheduled_from, scheduled_to, status, purpose,
+                       decision_reason, decided_at
+                FROM vms.visitor_requests WHERE id = ?
+                """ + " AND " + clause.sql(),
+                // The separator sits outside the text block on purpose: a text block strips the
+                // trailing whitespace from every line, so "... AND """ + clause would concatenate
+                // to "ANDTRUE".
                 (rs, i) -> new Object[]{
                 rs.getObject("tenant_id", UUID.class), rs.getObject("host_id", UUID.class),
                 rs.getObject("requested_by", UUID.class), rs.getObject("approved_by", UUID.class),
                 rs.getString("visit_kind"), rs.getTimestamp("scheduled_from"),
-                rs.getTimestamp("scheduled_to"), rs.getString("status"), rs.getString("purpose")},
+                rs.getTimestamp("scheduled_to"), rs.getString("status"), rs.getString("purpose"),
+                rs.getString("decision_reason"), rs.getTimestamp("decided_at")},
                 args.toArray());
         if (rows.isEmpty()) {
             return Optional.empty();
@@ -102,10 +148,12 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
                 rs.getString("phone"), rs.getString("company"),
                 VisitorStatus.fromDb(rs.getString("status"))), id);
 
+        Timestamp decidedAt = (Timestamp) row[10];
         return Optional.of(VisitorRequest.rehydrate(id,
                 (UUID) row[0], (UUID) row[1], (UUID) row[2],
                 VisitKind.fromDb((String) row[4]),
                 new TimeWindow(((Timestamp) row[5]).toInstant(), ((Timestamp) row[6]).toInstant()),
-                (String) row[8], visitors, RequestStatus.fromDb((String) row[7]), (UUID) row[3]));
+                (String) row[8], visitors, RequestStatus.fromDb((String) row[7]), (UUID) row[3],
+                (String) row[9], decidedAt == null ? null : decidedAt.toInstant()));
     }
 }
