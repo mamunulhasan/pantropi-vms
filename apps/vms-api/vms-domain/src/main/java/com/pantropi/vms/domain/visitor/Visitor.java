@@ -77,12 +77,16 @@ public final class Visitor {
         return status;
     }
 
-    void markApproved() {
-        this.status = VisitorStatus.APPROVED;
-    }
-
-    void markCancelled() {
-        this.status = VisitorStatus.CANCELLED;
+    /**
+     * Move this visitor to the status the request-level cascade decided (US-07.5.1 AC-3).
+     *
+     * <p>Package-private, and deliberately the only mutator: a visitor's status is a consequence of
+     * a decision about the request, never something set independently from outside the aggregate.
+     * Whether the move is allowed at all is {@link VisitorCascade}'s judgement, made before this is
+     * called.
+     */
+    void moveTo(VisitorStatus target) {
+        this.status = target;
     }
 
     private static String required(String value, String field, int max) {
