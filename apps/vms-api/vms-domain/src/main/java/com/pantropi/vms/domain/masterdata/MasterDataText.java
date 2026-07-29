@@ -79,6 +79,57 @@ public final class MasterDataText {
         return value;
     }
 
+    /**
+     * An optional contact email. Null and blank both become null — a column holding {@code ""} is a
+     * value that looks like a value and is not one.
+     *
+     * <p>The check is deliberately shallow: one {@code @}, something either side, a dot in the
+     * domain, no spaces. Anything stricter starts rejecting addresses that genuinely work, and the
+     * only authority on whether an address is real is whether mail to it arrives. This catches the
+     * typo and the pasted sentence, which is what it is for.
+     *
+     * @throws InvalidField if present and clearly not an address
+     */
+    public static String email(String field, String raw) {
+        String value = optionalText(field, raw, 320);   // RFC 5321 maximum
+        if (value == null) {
+            return null;
+        }
+        int at = value.indexOf('@');
+        boolean shaped = at > 0                                   // something before the @
+                && at == value.lastIndexOf('@')                   // exactly one
+                && at < value.length() - 1                        // something after it
+                && value.indexOf('.', at) > at + 1                // a dot inside the domain
+                && !value.endsWith(".")
+                && value.chars().noneMatch(Character::isWhitespace);
+        if (!shaped) {
+            throw new InvalidField(field, "is not a valid email address");
+        }
+        return value;
+    }
+
+    /**
+     * An optional contact phone. Kept as typed apart from trimming — numbers arrive with country
+     * codes, spaces and brackets, and normalising them would mean deciding a canonical form this
+     * project has no requirement for.
+     *
+     * @throws InvalidField if present and containing characters no phone number has
+     */
+    public static String phone(String field, String raw) {
+        String value = optionalText(field, raw, 40);
+        if (value == null) {
+            return null;
+        }
+        long digits = value.chars().filter(Character::isDigit).count();
+        boolean shaped = digits >= 6 && digits <= 20
+                && value.chars().allMatch(c -> Character.isDigit(c)
+                        || c == '+' || c == '-' || c == ' ' || c == '(' || c == ')');
+        if (!shaped) {
+            throw new InvalidField(field, "is not a valid phone number");
+        }
+        return value;
+    }
+
     /** Names the offending field, so the API can say which one without the caller guessing. */
     public static final class InvalidField extends RuntimeException {
         public final String field;
