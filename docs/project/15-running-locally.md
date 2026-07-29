@@ -196,6 +196,18 @@ curl -s -X DELETE http://localhost:8081/api/v1/admin/buildings/$ID \
 Reading needs `masterdata.view`, every mutation needs `masterdata.edit`. `fmadmin` has the first but
 not the second, so it can list buildings and gets **403** on a create.
 
+### A deployment note about logging and personal data (US-04.3.1 AC-6)
+
+Tenant contact details are personal data. Nothing this application logs contains them — asserted by
+`TenantAdminIT.contactDetailsNeverReachTheLog`, which captures every line the `com.pantropi.vms`
+loggers emit at **all** levels during create, read, update, list and a rejected write.
+
+**That guarantee stops at the application boundary.** Tomcat's `Http11InputBuffer` logs the raw HTTP
+request — headers and body — at `FINER`. So enabling FINEST-level container logging in a real
+deployment puts tenant contact details, bearer tokens, and every other request body into the log
+file, regardless of what the application does. Container log levels are a deployment decision and
+should stay at `INFO` outside of a debugging session.
+
 Settings are cached in memory and the cache is dropped on every write, so a change is visible on the
 next read with no restart. **The cache is per-process**: if you ever run two instances against one
 database, a change made on one is not seen by the other until it reloads. Cross-instance
@@ -230,6 +242,9 @@ invalidation is US-04.9.2 — see the Redis note in
 | GET | `/api/v1/admin/pass-types`, `/pass-types/{id}` | `masterdata.view` |
 | POST/PUT | `/api/v1/admin/pass-types`, `/pass-types/{id}` | `masterdata.edit` |
 | POST | `…/pass-types/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
+| GET | `/api/v1/admin/tenants`, `/tenants/{id}`, `/tenants/{id}/dependents` | `masterdata.view` |
+| POST/PUT | `/api/v1/admin/tenants`, `/tenants/{id}` | `masterdata.edit` |
+| POST | `…/tenants/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
 | GET | `/api/v1/admin/holidays?year=` or `?from=&to=` | `masterdata.view` |
 | POST/PUT | `/api/v1/admin/holidays`, `/holidays/{id}` | `masterdata.edit` |
 | POST | `/api/v1/admin/holidays/import` | `masterdata.edit` |

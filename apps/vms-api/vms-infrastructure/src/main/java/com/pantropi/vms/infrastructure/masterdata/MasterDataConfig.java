@@ -8,7 +8,10 @@ import com.pantropi.vms.application.masterdata.VisitorTypeDefinition;
 import com.pantropi.vms.domain.masterdata.PassType;
 import com.pantropi.vms.domain.masterdata.Floor;
 import com.pantropi.vms.domain.masterdata.VisitorType;
+import com.pantropi.vms.application.masterdata.TenantDefinition;
 import com.pantropi.vms.application.masterdata.port.HolidayCalendarStore;
+import com.pantropi.vms.application.masterdata.port.TenantDependencies;
+import com.pantropi.vms.domain.masterdata.Tenant;
 import com.pantropi.vms.application.masterdata.port.MasterDataStore;
 import com.pantropi.vms.application.masterdata.usecase.HolidayCalendar;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
@@ -110,6 +113,29 @@ public class MasterDataConfig {
     MasterDataAdministration<PassType> passTypeAdministration(MasterDataStore<PassType> store,
                                                               AuditTrail audit) {
         return new MasterDataAdministration<>(new PassTypeDefinition(), store, audit);
+    }
+
+    // ---- US-04.3.1 tenants: optional parent, and the first entity carrying personal data ----
+
+    @Bean
+    MasterDataStore<Tenant> tenantStore(DataSource dataSource) {
+        return new JdbcTenantStore(new JdbcTemplate(dataSource));
+    }
+
+    /**
+     * Separate adapter, not another method on the store. It reads {@code vms.users}, a different
+     * table in a different context — and one class implementing both ports would make every bean of
+     * it a candidate for both, which Spring cannot disambiguate.
+     */
+    @Bean
+    TenantDependencies tenantDependencies(DataSource dataSource) {
+        return new JdbcTenantDependencies(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    MasterDataAdministration<Tenant> tenantAdministration(MasterDataStore<Tenant> store,
+                                                          AuditTrail audit) {
+        return new MasterDataAdministration<>(new TenantDefinition(), store, audit);
     }
 
     // ---- US-04.7.1 holiday calendar: its own port and use case, not the shared pattern ----
