@@ -20,7 +20,22 @@ import java.util.List;
 final class VisitorScopeSql {
 
     /** A predicate and its arguments, ready to append to a {@code WHERE}. */
-    record Clause(String sql, List<Object> args) {}
+    record Clause(String sql, List<Object> args) {
+
+        /**
+         * The predicate with its leading {@code AND}, for appending to a query written as a text
+         * block.
+         *
+         * <p>This exists because {@code """ … WHERE id = ? AND """ + clause.sql()} does not work: a
+         * Java text block strips the trailing whitespace from every line, so the result is
+         * {@code ANDTRUE}. That shipped once in {@code findById} and was written again in the
+         * approval queue within a fortnight, which is the signal that the separator should not be
+         * something each call site has to remember.
+         */
+        String and() {
+            return " AND " + sql;
+        }
+    }
 
     private VisitorScopeSql() {
     }

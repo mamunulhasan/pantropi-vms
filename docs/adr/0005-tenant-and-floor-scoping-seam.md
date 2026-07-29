@@ -85,7 +85,36 @@ token, so moving a user between tenants applies on their next request rather tha
 login — a stale scope is an isolation failure and a session lasts hours. The read is lazy: requests
 that never touch scoped data never pay for it.
 
+## Amendment (US-07.3.1): the posture is configuration, and there is still only one seam
+
+US-07.3.1 AC-6 asks that restricting an approver to a subset of tenants or floors later require **no
+change to query-building code**, and `T-07.3.1.2` phrases the mechanism as a separate
+`ApprovalScopeStrategy` port with a permissive default and a restrictive alternative.
+
+**We did not add a second port.** A dedicated strategy for approval visibility would give isolation
+two homes — the thing this ADR and `ScopingRulesTest` exist to prevent — and worse, the queue would
+then be scoped by different rules from the request-detail read sitting behind every row in it. Two
+scoping mechanisms that agree today are two that can disagree after one is edited.
+
+What was added instead is a **posture on `ScopePolicy`**, selected by `vms.scoping.posture`:
+
+| Value | Building-wide roles (`MASTER_ADMIN`, `FM_ADMIN`, `SYSTEM_ADMIN`) |
+|---|---|
+| `building-wide` *(default)* | `Unrestricted` — an approver cannot decide what they cannot see |
+| `own-scope` | confined to their own tenant, else their own reception, else nothing |
+
+This satisfies the AC as written: the queue's SQL contains no tenant condition, the swap is a
+property, and `ApprovalQueueIT` demonstrates it by running the same store against both postures on a
+real database and observing a filtered result. The active posture is logged at startup, so the
+isolation a deployment is enforcing is discoverable from its logs rather than only from its config.
+
+**`own-scope` denies an approver who has no assignment at all**, which today is every FM Admin —
+they are not tenant-scoped. That is the honest answer rather than an oversight: if approvers are to
+be restricted to a subset, someone has to say which subset, and until TODO-14 is answered there is no
+defensible set to show. It fails closed, which is the direction this ADR has chosen throughout.
+
 ## Status of TODO-14
 
 **Still open.** This ADR does not close it. It records that the mechanism is in place, that the
-policy shipped is provisional, and that changing it is a change to one class.
+policy shipped is provisional, and that changing it is a change to one class — or, since US-07.3.1,
+a change to one property.

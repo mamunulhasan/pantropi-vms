@@ -187,11 +187,40 @@ public class IdentityConfig {
         return new RequestScopeContext(new JdbcTemplate(dataSource));
     }
 
+    /**
+     * The scoping posture is configuration (US-07.3.1, T-07.3.1.2).
+     *
+     * <p>{@code vms.scoping.posture: building-wide | own-scope}, defaulting to the shipped
+     * building-wide reading of TODO-14. Answering that question restrictively is then a property
+     * change rather than a code change, which is what AC-6 asks for.
+     *
+     * <p>The active posture is logged at startup so the isolation a deployment is actually running
+     * is discoverable from its logs, not only from its configuration files.
+     */
     @Bean
     com.pantropi.vms.application.identity.usecase.ScopePolicy scopePolicy(
-            com.pantropi.vms.application.identity.port.ScopeContext context) {
-        return new com.pantropi.vms.application.identity.usecase.ScopePolicy(context);
+            com.pantropi.vms.application.identity.port.ScopeContext context,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${vms.scoping.posture:building-wide}") String posture) {
+
+        var chosen = "own-scope".equalsIgnoreCase(posture)
+                ? com.pantropi.vms.application.identity.usecase.ScopePolicy.Posture.OWN_SCOPE
+                : com.pantropi.vms.application.identity.usecase.ScopePolicy.Posture.BUILDING_WIDE;
+
+        if (!"own-scope".equalsIgnoreCase(posture) && !"building-wide".equalsIgnoreCase(posture)) {
+            // Not a failure: an unrecognised value falls back to the shipped default rather than
+            // refusing to start, but it is said out loud so a typo is not silently a policy.
+            SCOPE_LOG.warning("Unknown vms.scoping.posture '" + posture + "'; using " + chosen);
+        }
+        SCOPE_LOG.info("Tenant scoping posture: " + chosen
+                + " (TODO-14 provisional; see ADR-0005)");
+        return new com.pantropi.vms.application.identity.usecase.ScopePolicy(context, chosen);
     }
+
+    // java.util.logging rather than SLF4J: it is what this module already uses
+    // (BootstrapAdminRunner), and the alternative is a new dependency for two lines.
+    private static final java.util.logging.Logger SCOPE_LOG =
+            java.util.logging.Logger.getLogger(IdentityConfig.class.getName());
 
     // ---- US-03.1.1 roles, permissions and effective resolution ----
 

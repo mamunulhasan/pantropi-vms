@@ -87,6 +87,22 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/approve \
   -d '{"note":"Cleared with building security"}'
 ```
 
+The queue an approver works from is `GET /api/v1/visitor-requests/pending`. It lists only
+`submitted` requests, newest first, with tenant, host, window and **visitor count** — never a
+visitor's email or phone, which are not selected at all. Page size is capped at **100**; asking for
+more is clamped rather than refused, and the response reports the `size` actually applied alongside
+`maxSize`.
+
+Which requests an approver sees is decided by `vms.scoping.posture`:
+
+| Value | Effect |
+|---|---|
+| `building-wide` *(default)* | MASTER_ADMIN, FM_ADMIN and SYSTEM_ADMIN see every tenant |
+| `own-scope` | every principal is confined to their own tenant or reception, approvers included — one with neither assigned sees nothing |
+
+The active posture is logged at startup, so what a deployment is actually enforcing is visible in its
+logs. This is provisional pending TODO-14; see [ADR-0005](../adr/0005-tenant-and-floor-scoping-seam.md).
+
 Rejecting instead takes a **required** reason — `POST …/{id}/reject` with `{"reason":"Host is on
 leave"}`. An empty, whitespace-only or absent reason is **400**, enforced server-side so a modified
 client cannot omit it. The reason is stored exactly as typed, markup included; encoding it belongs at
@@ -317,6 +333,7 @@ invalidation is US-04.9.2 — see the Redis note in
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 | POST | `/api/v1/visitor-requests/{id}/approve` — optional `{"note":"…"}` | `visitor.approve` |
 | POST | `/api/v1/visitor-requests/{id}/reject` — **required** `{"reason":"…"}`, ≤1000 chars | `visitor.approve` |
+| GET | `/api/v1/visitor-requests/pending?page=&size=` — **max size 100**, clamped not refused | `visitor.approve` |
 
 Anything else is denied by default (US-03.2.1).
 
