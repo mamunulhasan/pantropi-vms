@@ -38,12 +38,21 @@ public final class Permissions {
     public static final String REPORT_EXPORT = "report.export";
     public static final String SETTINGS_MANAGE = "settings.manage";
 
+    /**
+     * Read the immutable audit trail (US-07.4.3 AC-6, FR-AUD-01).
+     *
+     * <p>Separate from {@link #REPORT_VIEW} on purpose. That one is ungranted pending
+     * TODO-16 because no role description mentions reporting, and borrowing it here would
+     * have answered that open question as a side effect of an unrelated story.
+     */
+    public static final String AUDIT_VIEW = "audit.view";
+
     /** The complete set, for the correspondence test and for validating a grant request. */
     public static final Set<String> ALL = Set.of(
             MASTERDATA_VIEW, MASTERDATA_EDIT, USER_MANAGE,
             VISITOR_REQUEST, VISITOR_APPROVE, VISITOR_REGISTER,
             CREDENTIAL_ISSUE, CREDENTIAL_OVERRIDE,
-            REPORT_VIEW, REPORT_EXPORT, SETTINGS_MANAGE);
+            REPORT_VIEW, REPORT_EXPORT, SETTINGS_MANAGE, AUDIT_VIEW);
 
     /**
      * Permissions that exist in the schema but are not authorised for use in this phase.

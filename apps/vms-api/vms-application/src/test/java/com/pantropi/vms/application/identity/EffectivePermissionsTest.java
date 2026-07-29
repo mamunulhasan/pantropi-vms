@@ -102,7 +102,7 @@ class EffectivePermissionsTest {
     @Test
     @DisplayName("the curated constant set names every permission exactly once")
     void constantsAreWellFormed() {
-        assertThat(Permissions.ALL).hasSize(11);
+        assertThat(Permissions.ALL).hasSize(12);
         assertThat(Permissions.isKnown(Permissions.CREDENTIAL_OVERRIDE)).isTrue();
         assertThat(Permissions.isKnown("masterdata.veiw")).isFalse();   // the typo this prevents
         assertThat(Permissions.isKnown(null)).isFalse();

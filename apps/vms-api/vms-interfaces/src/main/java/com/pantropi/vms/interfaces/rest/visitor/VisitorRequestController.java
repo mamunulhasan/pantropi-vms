@@ -1,6 +1,7 @@
 package com.pantropi.vms.interfaces.rest.visitor;
 
 import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
+import com.pantropi.vms.application.visitor.port.DecisionTrail;
 import com.pantropi.vms.application.visitor.port.VisitorRequestQueries;
 import com.pantropi.vms.application.visitor.usecase.MyVisitorRequests;
 import com.pantropi.vms.application.shared.PageRequest;
@@ -10,6 +11,7 @@ import com.pantropi.vms.application.visitor.usecase.CancelVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
 import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.RequestDecision;
+import com.pantropi.vms.application.visitor.usecase.RequestHistory;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
 import com.pantropi.vms.domain.visitor.RequestTransitions;
 import com.pantropi.vms.domain.visitor.Visitor;
@@ -56,6 +58,7 @@ public class VisitorRequestController {
     private final AmendVisitorRequest amendVisitorRequest;
     private final CancelVisitorRequest cancelVisitorRequest;
     private final AuthorizationDenialRecorder denials;
+    private final RequestHistory requestHistory;
 
     public VisitorRequestController(SubmitVisitorRequest submitVisitorRequest,
                                     ApproveVisitorRequest approveVisitorRequest,
@@ -64,7 +67,8 @@ public class VisitorRequestController {
                                     MyVisitorRequests myVisitorRequests,
                                     AmendVisitorRequest amendVisitorRequest,
                                     CancelVisitorRequest cancelVisitorRequest,
-                                    AuthorizationDenialRecorder denials) {
+                                    AuthorizationDenialRecorder denials,
+                                    RequestHistory requestHistory) {
         this.submitVisitorRequest = submitVisitorRequest;
         this.approveVisitorRequest = approveVisitorRequest;
         this.rejectVisitorRequest = rejectVisitorRequest;
@@ -73,6 +77,27 @@ public class VisitorRequestController {
         this.amendVisitorRequest = amendVisitorRequest;
         this.cancelVisitorRequest = cancelVisitorRequest;
         this.denials = denials;
+        this.requestHistory = requestHistory;
+    }
+
+    /**
+     * The decision trail for one request (US-07.4.3, T-07.4.3.3, AC-4) — FR-VMS-02 (SRS B1).
+     *
+     * <p>Guarded by {@code audit.view}, which only SYSTEM_ADMIN holds — including <em>not</em> the
+     * FM Admins who take the decisions. Reading back who decided what is an oversight function, not
+     * part of taking a decision (AC-6).
+     *
+     * <p>Chronological, because it is read to reconstruct a sequence months later and a sequence
+     * reads forwards. The entries carry no visitor personal data: what an audit row may contain is
+     * decided by {@code AuditProjection}, not here.
+     */
+    @GetMapping("/{id}/history")
+    @RequiresPermission("audit.view")
+    public List<HistoryEntry> history(@PathVariable UUID id) {
+        return requestHistory.of(id).stream()
+                .map(e -> new HistoryEntry(e.at(), e.action(), e.actor(),
+                        e.beforeState(), e.afterState()))
+                .toList();
     }
 
     /**
@@ -411,6 +436,17 @@ public class VisitorRequestController {
      */
     public record AmendRequest(UUID hostId, Instant scheduledFrom, Instant scheduledTo,
                                String purpose, List<VisitorPayload> visitors) {}
+
+    /**
+     * One entry of the trail.
+     *
+     * <p>{@code actor} is a display name, and null when the account has since been removed — the
+     * entry outlives the account, which is the point of an immutable trail. The state projections
+     * are returned as raw JSON strings because that is exactly what was recorded; re-shaping them
+     * here would make the endpoint show something other than what the trail says.
+     */
+    public record HistoryEntry(Instant at, String action, String actor, String beforeState,
+                               String afterState) {}
 
     /** Optional note only — everything else about a decision is server-determined. */
     public record DecisionRequest(String note) {}

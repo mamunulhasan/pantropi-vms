@@ -2,6 +2,7 @@ package com.pantropi.vms.infrastructure.visitor;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
+import com.pantropi.vms.application.visitor.port.DecisionTrail;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
 import com.pantropi.vms.application.visitor.port.TenantDirectory;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
@@ -14,6 +15,7 @@ import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
 import com.pantropi.vms.application.visitor.port.VisitorRequestQueries;
 import com.pantropi.vms.application.visitor.usecase.MyVisitorRequests;
 import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
+import com.pantropi.vms.application.visitor.usecase.RequestHistory;
 import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -87,6 +89,17 @@ public class VisitorConfig {
                                                 DomainEventPublisher events, AuditTrail audit,
                                                 TransactionRunner tx, ClockPort clock) {
         return new ApproveVisitorRequest(requests, events, audit, tx, clock);
+    }
+
+    /** US-07.4.3 — the decision trail, read under audit.view rather than a tenant predicate. */
+    @Bean
+    DecisionTrail decisionTrail(DataSource dataSource) {
+        return new JdbcDecisionTrail(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    RequestHistory requestHistory(DecisionTrail trail) {
+        return new RequestHistory(trail);
     }
 
     /** US-07.1.3 — the tenant's own control over a request it raised. */

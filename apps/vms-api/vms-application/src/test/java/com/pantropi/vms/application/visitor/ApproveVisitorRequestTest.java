@@ -111,10 +111,11 @@ class ApproveVisitorRequestTest {
         assertThat(entry.entityId()).isEqualTo(request.id().toString());
         assertThat(entry.before()).contains("submitted");
         assertThat(entry.after()).contains("approved").contains(approver.toString());
-        // The note is operator prose; the audit says one was given, not what it said. Repeating it
-        // here would make the audit a second store for free text nobody validates.
-        assertThat(entry.after()).contains("\"noteProvided\":true")
-                .doesNotContain("Escorted by the host");
+        // US-07.4.3 AC-1 asks the audit row to carry "the decision reason where applicable", which
+        // supersedes US-07.4.1's choice to record only that a note was given. An approval note is a
+        // decision reason, so the trail now holds it — the same field, for the same purpose, as a
+        // rejection reason.
+        assertThat(entry.after()).contains("Escorted by the host throughout");
         assertThat(entry.before()).doesNotContain("Ada Lovelace");
         assertThat(entry.after()).doesNotContain("Ada Lovelace");
     }

@@ -130,8 +130,12 @@ class VisitorApprovalIT {
                 .contains("submitted");
         assertThat(scalar("SELECT count(*) FROM vms.audit_logs WHERE entity_id='" + id
                 + "' AND after_state::text LIKE '%" + visitorEmail + "%'")).isEqualTo("0");
-        assertThat(scalar("SELECT count(*) FROM vms.audit_logs WHERE entity_id='" + id
-                + "' AND after_state::text LIKE '%building security%'")).isEqualTo("0");
+        // US-07.4.3 AC-1 asks the audit row to carry "the decision reason where applicable", which
+        // supersedes this story's choice to record only that a note was given. An approval note is
+        // a decision reason, so the trail now holds it — as it always did for a rejection.
+        assertThat(scalar("SELECT after_state->>'decisionReason' FROM vms.audit_logs"
+                + " WHERE action='visitor_request.approve' AND entity_id='" + id + "'"))
+                .isEqualTo("Cleared with building security");
     }
 
     @Test

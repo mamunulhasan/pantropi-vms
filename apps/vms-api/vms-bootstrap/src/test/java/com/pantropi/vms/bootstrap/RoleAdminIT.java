@@ -231,7 +231,7 @@ class RoleAdminIT {
         assertThat(post("/api/v1/admin/permissions", "{\"code\":\"new.permission\"}", admin)
                 .statusCode()).isIn(401, 403, 404, 405);
         assertThat(scalar("SELECT count(*) FROM vms.roles")).isEqualTo("5");
-        assertThat(scalar("SELECT count(*) FROM vms.permissions")).isEqualTo("11");
+        assertThat(scalar("SELECT count(*) FROM vms.permissions")).isEqualTo("12");
     }
 
     // ---- helpers ----

@@ -1,6 +1,7 @@
 package com.pantropi.vms.application.visitor.usecase;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
+import com.pantropi.vms.application.visitor.AuditProjection;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
@@ -80,11 +81,14 @@ public final class CancelVisitorRequest {
             // longer answers it.
             audit.recordChange(actor, "visitor_request.cancel", "visitor_request",
                     requestId.toString(),
-                    "{\"status\":\"" + previous.dbValue() + "\"}",
-                    "{\"status\":\"" + request.status().dbValue() + "\","
-                            + "\"cancelledAt\":\"" + now + "\","
-                            + "\"followedApproval\":" + withdrewAnApproval + ","
-                            + "\"visitorCount\":" + request.visitors().size() + "}");
+                    AuditProjection.before(previous),
+                    AuditProjection.start()
+                            .put("status", request.status().dbValue())
+                            .put("cancelledBy", actor)
+                            .put("cancelledAt", now)
+                            .put("followedApproval", withdrewAnApproval)
+                            .putRaw("visitorCount", String.valueOf(request.visitors().size()))
+                            .json());
 
             events.publish("VisitorRequestCancelled", "visitor_request", requestId,
                     "{\"requestId\":\"" + requestId + "\","

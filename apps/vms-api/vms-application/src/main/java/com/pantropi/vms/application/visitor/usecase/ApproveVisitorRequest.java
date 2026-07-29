@@ -1,6 +1,7 @@
 package com.pantropi.vms.application.visitor.usecase;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
+import com.pantropi.vms.application.visitor.AuditProjection;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
@@ -81,17 +82,12 @@ public final class ApproveVisitorRequest {
                 throw new RequestDecision.DecidedElsewhere(requestId);
             }
 
-            // AC-3: identifiers, states and counts. No visitor name, email or phone, and the note is
-            // deliberately not copied here — it is operator prose, and the audit record is a
-            // structural before/after, not a second place to store free text.
+            // AC-3: the allow-listed projection (US-07.4.3, T-07.4.3.1) — status, window,
+            // decision and a visitor count, never a visitor. What it may contain is decided in one
+            // place rather than restated at each of the four decision paths.
             audit.recordChange(approver, "visitor_request.approve", "visitor_request",
                     requestId.toString(),
-                    "{\"status\":\"" + previous.dbValue() + "\",\"approvedBy\":null}",
-                    "{\"status\":\"" + request.status().dbValue() + "\","
-                            + "\"approvedBy\":\"" + approver + "\","
-                            + "\"decidedAt\":\"" + now + "\","
-                            + "\"noteProvided\":" + (request.decisionReason() != null) + ","
-                            + "\"visitorCount\":" + request.visitors().size() + "}");
+                    AuditProjection.before(previous), AuditProjection.of(request));
 
             // AC-2: ids and the approved window only, for EPIC-09 credential orchestration. A
             // consumer that needs a visitor's name asks the API for it under its own authorisation.
