@@ -135,7 +135,7 @@ class VisitorRequestTest {
     @DisplayName("rejection and cancellation cancel the visitors")
     void rejectionAndCancellation() {
         VisitorRequest rejected = submitted();
-        rejected.reject(UUID.randomUUID());
+        rejected.reject(UUID.randomUUID(), "Host unavailable");
         assertThat(rejected.status()).isEqualTo(RequestStatus.REJECTED);
         assertThat(rejected.visitors()).allSatisfy(
                 v -> assertThat(v.status()).isEqualTo(VisitorStatus.CANCELLED));
@@ -146,15 +146,20 @@ class VisitorRequestTest {
     }
 
     @Test
-    @DisplayName("a decided request refuses further changes")
-    void decidedRequestIsClosed() {
+    @DisplayName("an approved request takes no more visitors and cannot be approved again")
+    void approvedRequestIsClosedToFurtherDecisions() {
         VisitorRequest r = submitted();
         r.approve(UUID.randomUUID());
+
         assertThatThrownBy(() -> r.addVisitor(guest()))
                 .isInstanceOf(VisitorRequest.RequestNotPending.class);
+        // A second approval is now an illegal transition rather than a "not pending" complaint —
+        // the state machine answers it, not an ad-hoc check (US-07.5.1 AC-4).
         assertThatThrownBy(() -> r.approve(UUID.randomUUID()))
-                .isInstanceOf(VisitorRequest.RequestNotPending.class);
-        assertThatThrownBy(r::cancel).isInstanceOf(VisitorRequest.RequestNotPending.class);
+                .isInstanceOf(RequestTransitions.IllegalTransition.class);
+        // ...but cancelling an approved request IS legal: an approval can be withdrawn.
+        r.cancel();
+        assertThat(r.status()).isEqualTo(RequestStatus.CANCELLED);
     }
 
     // ---- enum mapping ----

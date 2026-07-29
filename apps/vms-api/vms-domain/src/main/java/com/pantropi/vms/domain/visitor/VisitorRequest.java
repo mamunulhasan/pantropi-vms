@@ -24,6 +24,9 @@ public final class VisitorRequest {
     private static final int MAX_PURPOSE = 500;
     private static final int MAX_VISITORS = 50;
 
+    /** Bounded so a reason stays a reason; the limit is documented on the reject endpoint. */
+    private static final int MAX_DECISION_REASON = 1000;
+
     private final UUID id;
     private final UUID tenantId;
     private final UUID hostId;
@@ -34,6 +37,7 @@ public final class VisitorRequest {
     private final List<Visitor> visitors;
     private RequestStatus status;
     private UUID approvedBy;
+    private String decisionReason;
 
     private VisitorRequest(UUID id, UUID tenantId, UUID hostId, UUID requestedBy,
                            VisitKind visitKind, TimeWindow window, String purpose,
@@ -100,31 +104,81 @@ public final class VisitorRequest {
         visitors.add(Objects.requireNonNull(visitor));
     }
 
-    /** FM Admin approval (FR-VMS-02); approves every named visitor with the request. */
+    /**
+     * FM Admin approval (FR-VMS-02, SRS B1); approves every named visitor with the request.
+     *
+     * @throws RequestTransitions.IllegalTransition from any state but {@code SUBMITTED}
+     */
     public void approve(UUID approver) {
-        requirePending("approve");
-        this.status = RequestStatus.APPROVED;
-        this.approvedBy = Objects.requireNonNull(approver, "approver is required");
-        visitors.forEach(Visitor::markApproved);
+        Objects.requireNonNull(approver, "approver is required");
+        transitionTo(RequestStatus.APPROVED);
+        this.approvedBy = approver;
     }
 
-    /** FM Admin rejection (FR-VMS-02). */
-    public void reject(UUID approver) {
-        requirePending("reject");
-        this.status = RequestStatus.REJECTED;
-        this.approvedBy = Objects.requireNonNull(approver, "approver is required");
-        visitors.forEach(Visitor::markCancelled);
+    /**
+     * FM Admin rejection with a mandatory reason (FR-VMS-02, SRS B1).
+     *
+     * <p>The reason is an invariant of the aggregate rather than a check at the edge, so no path —
+     * an event handler, a future bulk operation — can record a rejection nobody has to justify.
+     *
+     * @throws RequestTransitions.IllegalTransition from any state but {@code SUBMITTED}. Reversing
+     *                                              an approval is a cancellation, not a rejection.
+     * @throws RejectionReasonRequired              if the reason is null, empty or whitespace
+     */
+    public void reject(UUID approver, String reason) {
+        Objects.requireNonNull(approver, "approver is required");
+        String trimmed = reason == null ? "" : reason.trim();
+        if (trimmed.isEmpty()) {
+            throw new RejectionReasonRequired();
+        }
+        if (trimmed.length() > MAX_DECISION_REASON) {
+            throw new DecisionReasonTooLong(MAX_DECISION_REASON);
+        }
+        transitionTo(RequestStatus.REJECTED);
+        this.approvedBy = approver;
+        this.decisionReason = trimmed;
     }
 
+    /**
+     * Withdraw the request. Legal from {@code SUBMITTED} and from {@code APPROVED} — an approval can
+     * be withdrawn, which is a different fact from having been refused.
+     *
+     * @throws RequestTransitions.IllegalTransition from a terminal state
+     */
     public void cancel() {
-        requirePending("cancel");
-        this.status = RequestStatus.CANCELLED;
-        visitors.forEach(Visitor::markCancelled);
+        transitionTo(RequestStatus.CANCELLED);
     }
 
+    /** Visitors may only be added while the request is still open — not a status change. */
     private void requirePending(String action) {
         if (status != RequestStatus.SUBMITTED) {
             throw new RequestNotPending(action, status);
+        }
+    }
+
+    /**
+     * The single point at which this aggregate's status changes (US-07.5.1 AC-4).
+     *
+     * <p>Guard first, then mutate, then cascade — so an illegal move leaves the request and every
+     * visitor exactly as they were.
+     */
+    private void transitionTo(RequestStatus target) {
+        RequestTransitions.require(this.status, target);
+        this.status = target;
+        cascadeToVisitors(target);
+    }
+
+    /**
+     * Applies the decision to each visitor, leaving terminal ones alone (AC-3).
+     *
+     * <p>A visitor cancelled individually before the decision is not resurrected by approving the
+     * request: someone deliberately removed that person, and approving the visit as a whole is not
+     * a decision about them.
+     */
+    private void cascadeToVisitors(RequestStatus target) {
+        for (Visitor visitor : visitors) {
+            VisitorCascade.targetFor(target, visitor.status())
+                    .ifPresent(visitor::moveTo);
         }
     }
 
@@ -180,6 +234,24 @@ public final class VisitorRequest {
     public static final class TooManyVisitors extends IllegalArgumentException {
         public TooManyVisitors(int given, int max) {
             super("A visitor request may name at most " + max + " visitors (given " + given + ")");
+        }
+    }
+
+    /** Why the request was refused; null unless it was rejected. */
+    public String decisionReason() {
+        return decisionReason;
+    }
+
+    /** A rejection nobody has to justify is not an accountable decision (US-07.4.2 AC-2). */
+    public static final class RejectionReasonRequired extends IllegalArgumentException {
+        public RejectionReasonRequired() {
+            super("A rejection must say why");
+        }
+    }
+
+    public static final class DecisionReasonTooLong extends IllegalArgumentException {
+        public DecisionReasonTooLong(int max) {
+            super("A decision reason must be at most " + max + " characters");
         }
     }
 
