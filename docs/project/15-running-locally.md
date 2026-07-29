@@ -87,6 +87,20 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/approve \
   -d '{"note":"Cleared with building security"}'
 ```
 
+Each visitor on a request may carry a name, email, phone, company and a `visitorTypeId` drawn
+from `vms.visitor_types`. Email and phone are normalised on the way in — trimmed, lower-cased,
+punctuation stripped from the number — so the same person entered twice is one person. An
+unknown or deactivated visitor type is **400**, and a malformed email or an oversized name is a
+400 naming the field without ever echoing what was typed.
+
+> **Case-insensitive columns need the extension in `public`.** `citext` types compare
+> case-insensitively only if the `=` operator is resolvable from the connection's `search_path`.
+> Created inside `vms` it is not, and PostgreSQL silently falls back to case-sensitive `text`
+> equality — usernames, emails and lockout keys all stop matching across capitalisation, while
+> the unique indexes keep behaving case-insensitively because they record their operator class
+> by OID. `V11` moves the extension to `public`. If you restore a database from elsewhere, check
+> `SELECT 'A'::citext = 'a';` returns true before trusting a login.
+
 A tenant sees its own requests at `GET /api/v1/visitor-requests`, filterable by `status` and by
 visit-date range (`from`/`to`, ISO-8601). The filters narrow within the tenant's own set and
 cannot widen it — the scope predicate is applied first, in the repository, never in the

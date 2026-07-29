@@ -5,6 +5,7 @@ import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
 import com.pantropi.vms.application.visitor.port.TenantDirectory;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
+import com.pantropi.vms.application.visitor.port.VisitorTypeDirectory;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
 import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
@@ -73,8 +74,9 @@ public class VisitorConfig {
     @Bean
     SubmitVisitorRequest submitVisitorRequest(VisitorRequestRepository requests,
                                               TenantDirectory tenants, DomainEventPublisher events,
-                                              AuditTrail audit, TransactionRunner tx) {
-        return new SubmitVisitorRequest(requests, tenants, events, audit, tx);
+                                              AuditTrail audit, TransactionRunner tx,
+                                              VisitorTypeDirectory visitorTypes) {
+        return new SubmitVisitorRequest(requests, tenants, events, audit, tx, visitorTypes);
     }
 
     /** US-07.4.1 — the decision half of the approval loop. */

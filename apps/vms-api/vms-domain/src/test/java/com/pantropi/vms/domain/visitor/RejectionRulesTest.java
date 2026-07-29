@@ -159,8 +159,8 @@ class RejectionRulesTest {
     private static VisitorRequest submitted() {
         return VisitorRequest.submit(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 new TimeWindow(WINDOW_FROM, WINDOW_TO), "Quarterly review",
-                List.of(Visitor.named("Ada Lovelace", "ada@example.test", null, null),
-                        Visitor.named("Alan Turing", "alan@example.test", null, null)));
+                List.of(Visitor.named("Ada Lovelace", "ada@example.test", null, null, null),
+                        Visitor.named("Alan Turing", "alan@example.test", null, null, null)));
     }
 
     private static VisitorRequest inState(RequestStatus status) {

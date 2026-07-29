@@ -26,7 +26,7 @@ class VisitorRequestTest {
     private final UUID requester = UUID.randomUUID();
 
     private Visitor guest() {
-        return Visitor.named("Ada Lovelace", "ada@example.test", "+880100000000", "Analytical Ltd");
+        return Visitor.named("Ada Lovelace", "ada@example.test", "+880100000000", "Analytical Ltd", null);
     }
 
     private VisitorRequest submitted() {
@@ -70,7 +70,7 @@ class VisitorRequestTest {
                 .isInstanceOf(VisitorRequest.NoVisitorsNamed.class);
 
         List<Visitor> tooMany = java.util.stream.IntStream.range(0, 51)
-                .mapToObj(i -> Visitor.named("Guest " + i, null, null, null)).toList();
+                .mapToObj(i -> Visitor.named("Guest " + i, null, null, null, null)).toList();
         assertThatThrownBy(() -> VisitorRequest.submit(tenant, host, requester,
                 new TimeWindow(from, to), null, tooMany))
                 .isInstanceOf(VisitorRequest.TooManyVisitors.class);
@@ -93,7 +93,7 @@ class VisitorRequestTest {
         VisitorRequest r = submitted();
         assertThatThrownBy(() -> r.visitors().add(guest()))
                 .isInstanceOf(UnsupportedOperationException.class);
-        r.addVisitor(Visitor.named("Grace Hopper", null, null, null));
+        r.addVisitor(Visitor.named("Grace Hopper", null, null, null, null));
         assertThat(r.visitors()).hasSize(2);
     }
 
@@ -102,20 +102,20 @@ class VisitorRequestTest {
     @Test
     @DisplayName("a visitor needs a name; optional fields are length-bounded and trimmed")
     void visitorDetailRules() {
-        assertThatThrownBy(() -> Visitor.named("  ", null, null, null))
+        assertThatThrownBy(() -> Visitor.named("  ", null, null, null, null))
                 .isInstanceOfSatisfying(Visitor.InvalidVisitorDetail.class,
                         e -> assertThat(e.field()).isEqualTo("visitor name"));
-        assertThatThrownBy(() -> Visitor.named("Ada", "x".repeat(321), null, null))
+        assertThatThrownBy(() -> Visitor.named("Ada", "x".repeat(321) + "@example.test", null, null, null))
                 .isInstanceOf(Visitor.InvalidVisitorDetail.class);
-        assertThat(Visitor.named("  Ada  ", null, null, null).fullName()).isEqualTo("Ada");
-        assertThat(Visitor.named("Ada", "  ", null, null).email()).isNull();
+        assertThat(Visitor.named("  Ada  ", null, null, null, null).fullName()).isEqualTo("Ada");
+        assertThat(Visitor.named("Ada", "  ", null, null, null).email()).isNull();
     }
 
     @Test
     @DisplayName("a validation message names the field but never echoes the offending value")
     void validationDoesNotEchoPersonalData() {
         String email = "very.private.person@example.test".repeat(20);
-        assertThatThrownBy(() -> Visitor.named("Ada", email, null, null))
+        assertThatThrownBy(() -> Visitor.named("Ada", email, null, null, null))
                 .isInstanceOf(Visitor.InvalidVisitorDetail.class)
                 .hasMessageNotContaining("very.private.person");
     }

@@ -10,6 +10,7 @@ import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.RequestDecision;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
 import com.pantropi.vms.domain.visitor.RequestTransitions;
+import com.pantropi.vms.domain.visitor.Visitor;
 import com.pantropi.vms.domain.visitor.VisitorRequest;
 import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
 import com.pantropi.vms.interfaces.rest.security.RequiresPermission;
@@ -117,6 +118,20 @@ public class VisitorRequestController {
                         .map(v -> new VisitorLine(v.fullName(), v.status())).toList());
     }
 
+    /**
+     * A malformed visitor detail or an unusable visitor type (US-07.1.2 AC-3, AC-4).
+     *
+     * <p>The response names the field and never echoes the value — the exception types carry the
+     * field name for exactly this reason, so a bad email cannot be reflected back into a response,
+     * a log line or an error-reporting payload.
+     */
+    @ExceptionHandler({Visitor.InvalidVisitorDetail.class,
+            SubmitVisitorRequest.UnknownVisitorType.class})
+    public ResponseEntity<DecisionError> onInvalidVisitor(RuntimeException e) {
+        String field = e instanceof Visitor.InvalidVisitorDetail d ? d.field() : "visitorTypeId";
+        return ResponseEntity.badRequest().body(new DecisionError("invalid", field));
+    }
+
     /** AC-2: a filter we do not understand is refused, never quietly dropped. */
     @ExceptionHandler(MyVisitorRequests.UnknownStatus.class)
     public ResponseEntity<DecisionError> onUnknownStatus(MyVisitorRequests.UnknownStatus e) {
@@ -168,7 +183,8 @@ public class VisitorRequestController {
                         body.hostId(), body.scheduledFrom(), body.scheduledTo(), body.purpose(),
                         body.visitors().stream()
                                 .map(v -> new SubmitVisitorRequest.VisitorDetail(
-                                        v.fullName(), v.email(), v.phone(), v.company()))
+                                        v.fullName(), v.email(), v.phone(), v.company(),
+                                        v.visitorTypeId()))
                                 .toList()));
 
         return ResponseEntity.created(URI.create("/api/v1/visitor-requests/" + id))
@@ -317,7 +333,8 @@ public class VisitorRequestController {
     public record SubmitRequest(UUID hostId, Instant scheduledFrom, Instant scheduledTo,
                                 String purpose, List<VisitorPayload> visitors) {}
 
-    public record VisitorPayload(String fullName, String email, String phone, String company) {}
+    public record VisitorPayload(String fullName, String email, String phone, String company,
+                                UUID visitorTypeId) {}
 
     public record SubmittedResponse(String id, String status) {}
 }

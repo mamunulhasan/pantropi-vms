@@ -128,6 +128,13 @@ class AccountSecurityIT {
 
         assertThat(scalar("SELECT count(*) FROM vms.login_attempts "
                 + "WHERE username = 'mixedcase'")).isEqualTo("1");
+        // Regression guard for V11. The assertion above passes even with a case-SENSITIVE
+        // comparison, because the literal happens to match the stored spelling exactly — so it
+        // proved the unique index was case-insensitive, not that a lookup was. Reading the same row
+        // back under a different capitalisation is the comparison the citext column exists for, and
+        // it answered zero while the extension sat in a schema no application connection could see.
+        assertThat(scalar("SELECT count(*) FROM vms.login_attempts "
+                + "WHERE username = 'MIXEDCASE'")).isEqualTo("1");
         assertThat(login("mixedcase", PASSWORD).statusCode()).isEqualTo(401);
     }
 
