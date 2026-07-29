@@ -1,7 +1,6 @@
 package com.pantropi.vms.infrastructure.visitor;
 
 import com.pantropi.vms.application.identity.usecase.ScopePolicy;
-import com.pantropi.vms.application.shared.PageRequest;
 import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
 import com.pantropi.vms.domain.identity.ScopedEntity;
 import com.pantropi.vms.domain.visitor.RequestStatus;
@@ -41,14 +40,25 @@ public final class JdbcApprovalQueueStore implements ApprovalQueueStore {
      * <p>Cancelled visitors are counted too: the queue says how many people the request is for, and
      * an approver deciding on a group of four should not see three because one withdrew.
      */
+    private static final String FROM = """
+              FROM vms.visitor_requests r
+              JOIN vms.tenants t ON t.id = r.tenant_id
+              LEFT JOIN vms.hosts h ON h.id = r.host_id""";
+
     private static final String SELECT = """
             SELECT r.id, r.tenant_id, t.name AS tenant_name, r.host_id, h.full_name AS host_name,
                    r.scheduled_from, r.scheduled_to, r.created_at,
                    (SELECT count(*) FROM vms.visitors v WHERE v.request_id = r.id) AS visitor_count
-              FROM vms.visitor_requests r
-              JOIN vms.tenants t ON t.id = r.tenant_id
-              LEFT JOIN vms.hosts h ON h.id = r.host_id
-             WHERE r.status = ?::vms.request_status""";
+            """ + FROM;
+
+    /**
+     * The count shares {@link #FROM} so it cannot drift from the page query.
+     *
+     * <p>Two independently written {@code FROM} clauses is how a total ends up disagreeing with the
+     * rows underneath it — the host join in particular has to be present in both, because the name
+     * search references it.
+     */
+    private static final String COUNT = "SELECT count(*)" + FROM;
 
     private final JdbcTemplate jdbc;
     private final ScopePolicy scope;
@@ -59,29 +69,51 @@ public final class JdbcApprovalQueueStore implements ApprovalQueueStore {
     }
 
     @Override
-    public Page pending(PageRequest request) {
-        // AC-3 is this line: "pending" is a status filter, so anything approved, rejected or
-        // cancelled leaves the queue on the next read with nothing to clean up.
-        String pending = RequestStatus.SUBMITTED.dbValue();
-
+    public Page pending(Filter filter) {
         VisitorScopeSql.Clause clause = VisitorScopeSql.on(
                 scope.filterFor(ScopedEntity.VISITOR_REQUEST), "r.tenant_id", null);
 
-        List<Object> countArgs = new ArrayList<>();
-        countArgs.add(pending);
-        countArgs.addAll(clause.args());
+        // Scope first, always, whatever the filter says (AC-5). Assembled here rather than left to
+        // each filter branch to remember, so there is no combination of parameters that omits it.
+        StringBuilder where = new StringBuilder(" WHERE r.status = ?::vms.request_status")
+                .append(clause.and());
+        List<Object> args = new ArrayList<>();
+        args.add(filter.status().dbValue());
+        args.addAll(clause.args());
 
-        Long total = jdbc.queryForObject("""
-                SELECT count(*) FROM vms.visitor_requests r
-                 WHERE r.status = ?::vms.request_status""" + clause.and(),
-                Long.class, countArgs.toArray());
+        if (filter.tenantId() != null) {
+            where.append(" AND r.tenant_id = ?");
+            args.add(filter.tenantId());
+        }
+        if (filter.visitFrom() != null) {
+            where.append(" AND r.scheduled_from >= ?");
+            args.add(Timestamp.from(filter.visitFrom()));
+        }
+        if (filter.visitTo() != null) {
+            where.append(" AND r.scheduled_from < ?");
+            args.add(Timestamp.from(filter.visitTo()));
+        }
+        if (filter.nameLike() != null) {
+            // AC-2/AC-4: parameterised and case-insensitive, with LIKE metacharacters escaped so a
+            // search for "100%" is a search for that text rather than a match-everything pattern.
+            // The visitor name is searchable and is never returned — the queue lists counts, not
+            // people (US-07.3.1).
+            where.append(" AND (h.full_name ILIKE ? ESCAPE '\\'"
+                    + " OR EXISTS (SELECT 1 FROM vms.visitors v2"
+                    + " WHERE v2.request_id = r.id AND v2.full_name ILIKE ? ESCAPE '\\'))");
+            String pattern = "%" + escapeLike(filter.nameLike()) + "%";
+            args.add(pattern);
+            args.add(pattern);
+        }
 
-        List<Object> pageArgs = new ArrayList<>(countArgs);
-        pageArgs.add(request.size());
-        pageArgs.add(request.offset());
+        Long total = jdbc.queryForObject(COUNT + where, Long.class, args.toArray());
+
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(filter.page().size());
+        pageArgs.add(filter.page().offset());
 
         List<PendingRequest> content = jdbc.query(
-                SELECT + clause.and() + " ORDER BY r.created_at DESC, r.id DESC LIMIT ? OFFSET ?",
+                SELECT + where + " ORDER BY r.created_at DESC, r.id DESC LIMIT ? OFFSET ?",
                 (rs, i) -> new PendingRequest(
                         rs.getObject("id", UUID.class),
                         rs.getObject("tenant_id", UUID.class),
@@ -94,7 +126,18 @@ public final class JdbcApprovalQueueStore implements ApprovalQueueStore {
                         instant(rs.getTimestamp("created_at"))),
                 pageArgs.toArray());
 
-        return new Page(content, total == null ? 0 : total, request.page(), request.size());
+        return new Page(content, total == null ? 0 : total, filter.page().page(),
+                filter.page().size());
+    }
+
+    /**
+     * Escapes the three characters {@code LIKE} treats specially.
+     *
+     * <p>The backslash first, or escaping the wildcards would then have their new backslashes
+     * escaped in turn and the pattern would mean something else again.
+     */
+    private static String escapeLike(String raw) {
+        return raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static java.time.Instant instant(Timestamp value) {

@@ -4,6 +4,7 @@ import com.pantropi.vms.application.identity.port.ScopeContext;
 import com.pantropi.vms.application.identity.usecase.ScopePolicy;
 import com.pantropi.vms.application.shared.PageRequest;
 import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
+import com.pantropi.vms.domain.visitor.RequestStatus;
 import com.pantropi.vms.infrastructure.identity.Pbkdf2PasswordHasher;
 import com.pantropi.vms.infrastructure.visitor.JdbcApprovalQueueStore;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
@@ -199,6 +200,146 @@ class ApprovalQueueIT {
         assertThat(get("/api/v1/visitor-requests/pending", null).statusCode()).isEqualTo(401);
     }
 
+    // ---- US-07.3.2: filtering and searching ----
+
+    @Test
+    @DisplayName("US-07.3.2 AC-1: tenant, date range and status filters combine conjunctively")
+    void filtersCombine() throws Exception {
+        String mineSoon = submitAs("tenantuser", 1);
+        String mineLater = submitAs("tenantuser", 1, 200);
+        String theirs = submitAs("tenantbuser", 1);
+        String bearer = token("fmadmin", "fm-admin-password-123");
+        Instant cutoff = Instant.now().plus(100, ChronoUnit.DAYS);
+
+        // Tenant alone.
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&tenantId=" + tenantA, bearer)))
+                .contains(mineSoon, mineLater).doesNotContain(theirs);
+
+        // Tenant AND range: conjunctive, so the later one drops out too.
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&tenantId=" + tenantA
+                + "&to=" + cutoff, bearer)))
+                .contains(mineSoon).doesNotContain(mineLater).doesNotContain(theirs);
+    }
+
+    @Test
+    @DisplayName("US-07.3.2 AC-1: the queue is submitted-only by default, and a status is an "
+            + "explicit opt-in")
+    void statusIsAnOptIn() throws Exception {
+        String decided = submitAs("tenantuser", 1);
+        String bearer = token("fmadmin", "fm-admin-password-123");
+        post("/api/v1/visitor-requests/" + decided + "/approve", null, bearer);
+
+        // US-07.3.1 AC-3 still holds: loading the queue does not show it.
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100", bearer)))
+                .doesNotContain(decided);
+        // ...and asking for approved requests is a different question, which the filter answers.
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&status=approved", bearer)))
+                .contains(decided);
+    }
+
+    @Test
+    @DisplayName("US-07.3.2 AC-2: searching by visitor or host name is case-insensitive")
+    void searchByName() throws Exception {
+        String withAda = submitNamed("tenantuser", "Ada Lovelace");
+        String withGrace = submitNamed("tenantuser", "Grace Hopper");
+        String bearer = token("fmadmin", "fm-admin-password-123");
+
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&search=lovelace", bearer)))
+                .contains(withAda).doesNotContain(withGrace);
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&search=LOVELACE", bearer)))
+                .contains(withAda);
+        // The host name is searchable too — both belong to Host A.
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&search=host%20a", bearer)))
+                .contains(withAda, withGrace);
+    }
+
+    @Test
+    @DisplayName("US-07.3.2 AC-2: a searchable visitor name is still never returned")
+    void searchDoesNotWidenTheProjection() throws Exception {
+        String id = submitNamed("tenantuser", "Ada Lovelace");
+
+        var res = get("/api/v1/visitor-requests/pending?size=100&search=Lovelace",
+                token("fmadmin", "fm-admin-password-123"));
+
+        // Searchable as an input, absent as an output: the queue lists counts, not people.
+        assertThat(ids(res)).contains(id);
+        assertThat(res.body()).doesNotContain("Ada Lovelace").doesNotContain("Lovelace");
+    }
+
+    @Test
+    @DisplayName("US-07.3.2 AC-4: LIKE metacharacters are escaped, so a wildcard is literal text")
+    void wildcardsAreEscaped() throws Exception {
+        String literal = submitNamed("tenantuser", "100% Cotton");
+        String other = submitNamed("tenantuser", "Ada Lovelace");
+        String bearer = token("fmadmin", "fm-admin-password-123");
+
+        // Unescaped, "%" alone would match every row. Escaped, it matches the one name with a
+        // percent sign in it.
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&search=%25", bearer)))
+                .contains(literal).doesNotContain(other);
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&search=100%25%20C", bearer)))
+                .contains(literal);
+        // "_" is the single-character wildcard; escaped, it finds nothing rather than everything.
+        assertThat(ids(get("/api/v1/visitor-requests/pending?size=100&search=_", bearer))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("US-07.3.2 AC-4: an injection attempt is data, not SQL")
+    void injectionIsJustText() throws Exception {
+        submitNamed("tenantuser", "Ada Lovelace");
+        String bearer = token("fmadmin", "fm-admin-password-123");
+
+        var res = get("/api/v1/visitor-requests/pending?size=100"
+                + "&search=%27%20OR%201%3D1%20--", bearer);
+
+        assertThat(res.statusCode()).isEqualTo(200);
+        assertThat(ids(res)).isEmpty();     // it matched nothing, which is what a name search does
+        assertThat(scalar("SELECT count(*) FROM vms.visitor_requests")).isNotEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("T-07.3.2.2: an unknown status and an inverted range are both 400")
+    void invalidFiltersAreRefused() throws Exception {
+        String bearer = token("fmadmin", "fm-admin-password-123");
+        Instant from = Instant.now().plus(60, ChronoUnit.DAYS);
+
+        var badStatus = get("/api/v1/visitor-requests/pending?status=aproved", bearer);
+        assertThat(badStatus.statusCode()).isEqualTo(400);
+        assertThat(badStatus.body()).contains("submitted");
+        // The message says what was expected, not what was sent — a filter value must not be
+        // reflected back where it could reach a log.
+        assertThat(badStatus.body()).doesNotContain("aproved");
+
+        var badRange = get("/api/v1/visitor-requests/pending?from=" + from
+                + "&to=" + from.minus(1, ChronoUnit.DAYS), bearer);
+        assertThat(badRange.statusCode()).isEqualTo(400);
+
+        var longSearch = get("/api/v1/visitor-requests/pending?search=" + "x".repeat(101), bearer);
+        assertThat(longSearch.statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("US-07.3.2 AC-5: a filter for a tenant outside my scope returns nothing")
+    void filterCannotReachOutsideScope() throws Exception {
+        submitAs("tenantuser", 1);          // tenant A
+        submitAs("tenantbuser", 1);         // tenant B
+        JdbcTemplate jdbc = new JdbcTemplate(pg.getPostgresDatabase());
+        UUID fmAdmin = UUID.fromString(scalar("SELECT id FROM vms.users WHERE username='fmadmin'"));
+
+        // An approver confined to tenant A, asking explicitly for tenant B.
+        ApprovalQueueStore confined = new JdbcApprovalQueueStore(jdbc,
+                new ScopePolicy(fixedScope(fmAdmin, "FM_ADMIN", tenantA),
+                        ScopePolicy.Posture.OWN_SCOPE));
+
+        var page = confined.pending(new ApprovalQueueStore.Filter(RequestStatus.SUBMITTED, tenantB,
+                null, null, null, new PageRequest(0, 100)));
+
+        // The scope predicate is applied first, so the filter narrows an already-empty set rather
+        // than selecting from somebody else's.
+        assertThat(page.content()).isEmpty();
+        assertThat(page.totalElements()).isZero();
+    }
+
     // ---- AC-6: swap the strategy, observe a filtered result ----
 
     @Test
@@ -219,8 +360,10 @@ class ApprovalQueueIT {
                 new ScopePolicy(fixedScope(fmAdmin, "FM_ADMIN", tenantA),
                         ScopePolicy.Posture.OWN_SCOPE));
 
-        var everything = buildingWide.pending(new PageRequest(0, 100));
-        var confined = ownTenantOnly.pending(new PageRequest(0, 100));
+        var everything = buildingWide.pending(new ApprovalQueueStore.Filter(RequestStatus.SUBMITTED, null, null, null,
+                null, new PageRequest(0, 100)));
+        var confined = ownTenantOnly.pending(new ApprovalQueueStore.Filter(RequestStatus.SUBMITTED, null, null, null,
+                null, new PageRequest(0, 100)));
 
         assertThat(everything.content()).extracting(ApprovalQueueStore.PendingRequest::tenantId)
                 .contains(tenantA, tenantB);
@@ -240,7 +383,8 @@ class ApprovalQueueIT {
                 new ScopePolicy(fixedScope(fmAdmin, "FM_ADMIN", null),
                         ScopePolicy.Posture.OWN_SCOPE));
 
-        var page = unscoped.pending(new PageRequest(0, 100));
+        var page = unscoped.pending(new ApprovalQueueStore.Filter(RequestStatus.SUBMITTED, null, null, null,
+                null, new PageRequest(0, 100)));
 
         assertThat(page.content()).isEmpty();
         assertThat(page.totalElements()).isZero();
@@ -251,6 +395,19 @@ class ApprovalQueueIT {
     }
 
     // ---- helpers ----
+
+    private String submitNamed(String username, String visitorName) throws Exception {
+        return submitBody(username, "{\"fullName\":\"" + visitorName + "\"}", 30);
+    }
+
+    private String submitAs(String username, int visitors, int daysAhead) throws Exception {
+        StringBuilder people = new StringBuilder();
+        for (int i = 0; i < visitors; i++) {
+            people.append(i == 0 ? "" : ",")
+                    .append("{\"fullName\":\"Guest ").append(i).append("\"}");
+        }
+        return submitBody(username, people.toString(), daysAhead);
+    }
 
     private String submitAs(String username, int visitors) throws Exception {
         StringBuilder people = new StringBuilder();
@@ -268,7 +425,12 @@ class ApprovalQueueIT {
     }
 
     private String submitBody(String username, String visitorsJson) throws Exception {
-        Instant from = Instant.now().plus(30, ChronoUnit.DAYS);
+        return submitBody(username, visitorsJson, 30);
+    }
+
+    private String submitBody(String username, String visitorsJson, int daysAhead)
+            throws Exception {
+        Instant from = Instant.now().plus(daysAhead, ChronoUnit.DAYS);
         String host = username.equals("tenantuser") ? "\"hostId\":\"" + hostA + "\"," : "";
         String password = username.equals("tenantuser")
                 ? "tenant-password-1234" : "tenantb-password-1234";

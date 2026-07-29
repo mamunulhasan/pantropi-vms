@@ -149,7 +149,19 @@ curl -s "http://localhost:8081/api/v1/visitor-requests?status=rejected" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-The queue an approver works from is `GET /api/v1/visitor-requests/pending`. It lists only
+The queue an approver works from is `GET /api/v1/visitor-requests/pending`.
+It filters by `tenantId`, by a visit-date range (`from`/`to`), by `status`, and by a
+`search` substring matched case-insensitively against **visitor and host names**. Filters combine
+conjunctively and are applied after the scope predicate, so they narrow what an approver may
+already see and never widen it.
+
+`status` defaults to `submitted` — loading the queue never shows a decided request. Asking for
+`?status=approved` is a different question, and the filter answers it. An unrecognised status,
+an inverted date range, or a search longer than 100 characters is **400**; the message names the
+valid values but never repeats what you sent, so a filter value cannot reach an access log.
+
+A visitor's name is searchable and is still never returned. The queue lists counts, not people.
+ It lists only
 `submitted` requests, newest first, with tenant, host, window and **visitor count** — never a
 visitor's email or phone, which are not selected at all. Page size is capped at **100**; asking for
 more is clamped rather than refused, and the response reports the `size` actually applied alongside
@@ -395,7 +407,7 @@ invalidation is US-04.9.2 — see the Redis note in
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 | POST | `/api/v1/visitor-requests/{id}/approve` — optional `{"note":"…"}` | `visitor.approve` |
 | POST | `/api/v1/visitor-requests/{id}/reject` — **required** `{"reason":"…"}`, ≤1000 chars | `visitor.approve` |
-| GET | `/api/v1/visitor-requests/pending?page=&size=` — **max size 100**, clamped not refused | `visitor.approve` |
+| GET | `/api/v1/visitor-requests/pending?status=&tenantId=&from=&to=&search=&page=&size=` — **max size 100**, clamped not refused | `visitor.approve` |
 | GET | `/api/v1/visitor-requests?status=&from=&to=&page=&size=` — own tenant only | `visitor.request` |
 | GET | `/api/v1/visitor-requests/{id}` — own tenant only; 404 for anyone else's | `visitor.request` |
 | PATCH | `/api/v1/visitor-requests/{id}` — partial edit, `submitted` only | `visitor.request` |

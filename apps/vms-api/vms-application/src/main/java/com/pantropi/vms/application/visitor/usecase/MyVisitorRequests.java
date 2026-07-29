@@ -69,8 +69,12 @@ public final class MyVisitorRequests {
 
     /** Names the valid values, so a caller can fix the request without reading the source. */
     public static final class UnknownStatus extends IllegalArgumentException {
-        public UnknownStatus(String given) {
-            super("Unknown status '" + given + "'; expected one of "
+        public UnknownStatus(String ignoredValue) {
+            // The offending value is deliberately absent. T-07.3.2.2 asks that filter values not
+            // reach access logs, and this message becomes a response body and a log line — echoing
+            // arbitrary caller input into both is how a filter parameter ends up somewhere it was
+            // never meant to be. Naming the valid values is what actually helps the caller anyway.
+            super("Unknown status; expected one of "
                     + Arrays.stream(RequestStatus.values()).map(RequestStatus::dbValue)
                             .collect(Collectors.joining(", ")));
         }
