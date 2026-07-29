@@ -1,6 +1,8 @@
 package com.pantropi.vms.interfaces.rest.visitor;
 
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
+import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
+import com.pantropi.vms.application.visitor.usecase.RequestDecision;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
 import com.pantropi.vms.domain.visitor.RequestTransitions;
 import com.pantropi.vms.domain.visitor.VisitorRequest;
@@ -17,11 +19,13 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Visitor request submission and approval (US-07.1.1, US-07.4.1) — FR-VMS-01/02 (SRS B1).
+ * Visitor request submission and decisions (US-07.1.1, US-07.4.1, US-07.4.2) — FR-VMS-01/02
+ * (SRS B1).
  *
  * <p>{@code POST /api/v1/visitor-requests} is guarded by {@code visitor.request} at the class level
- * (US-03.2.1); {@code POST /{id}/approve} overrides that with {@code visitor.approve}, because
- * raising a request and deciding one are separate authorities held by separate roles.
+ * (US-03.2.1); {@code POST /{id}/approve} and {@code POST /{id}/reject} override that with
+ * {@code visitor.approve}, because raising a request and deciding one are separate authorities held
+ * by separate roles.
  *
  * <p>The controller holds only HTTP mapping: it takes the acting user's id from the validated token
  * and passes commands with no field for tenant, status, approver or decision time, so none of those
@@ -35,11 +39,14 @@ public class VisitorRequestController {
 
     private final SubmitVisitorRequest submitVisitorRequest;
     private final ApproveVisitorRequest approveVisitorRequest;
+    private final RejectVisitorRequest rejectVisitorRequest;
 
     public VisitorRequestController(SubmitVisitorRequest submitVisitorRequest,
-                                    ApproveVisitorRequest approveVisitorRequest) {
+                                    ApproveVisitorRequest approveVisitorRequest,
+                                    RejectVisitorRequest rejectVisitorRequest) {
         this.submitVisitorRequest = submitVisitorRequest;
         this.approveVisitorRequest = approveVisitorRequest;
+        this.rejectVisitorRequest = rejectVisitorRequest;
     }
 
     @PostMapping
@@ -81,12 +88,44 @@ public class VisitorRequestController {
             @PathVariable UUID id,
             @RequestBody(required = false) DecisionRequest body) {
 
-        ApproveVisitorRequest.Decision decision = approveVisitorRequest.approve(
+        RequestDecision decision = approveVisitorRequest.approve(
                 UUID.fromString(principal.userId()), id, body == null ? null : body.note());
 
         return ResponseEntity.ok(new DecisionResponse(decision.requestId().toString(),
                 decision.status(), decision.decidedBy().toString(), decision.decidedAt(),
                 decision.note()));
+    }
+
+    /**
+     * FM Admin rejection (US-07.4.2, T-07.4.2.3) — FR-VMS-02 (SRS B1).
+     *
+     * <p>Same authority as approval: {@code visitor.approve} is the permission to <em>decide</em>,
+     * and the grant matrix has no separate one for refusing.
+     *
+     * <p>The reason is mandatory and is enforced by the aggregate, not here — AC-2 asks for 400 from
+     * a direct API call that bypasses the UI, and a check written in this method would be one a
+     * future bulk-rejection endpoint would have to remember to repeat.
+     */
+    @PostMapping("/{id}/reject")
+    @RequiresPermission("visitor.approve")
+    public ResponseEntity<DecisionResponse> reject(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal,
+            @PathVariable UUID id,
+            @RequestBody(required = false) RejectRequest body) {
+
+        RequestDecision decision = rejectVisitorRequest.reject(
+                UUID.fromString(principal.userId()), id, body == null ? null : body.reason());
+
+        return ResponseEntity.ok(new DecisionResponse(decision.requestId().toString(),
+                decision.status(), decision.decidedBy().toString(), decision.decidedAt(),
+                decision.note()));
+    }
+
+    /** AC-2: a refusal nobody has to justify is not an accountable decision. */
+    @ExceptionHandler(VisitorRequest.RejectionReasonRequired.class)
+    public ResponseEntity<DecisionError> onMissingReason() {
+        return ResponseEntity.badRequest()
+                .body(new DecisionError("reason_required", "A rejection must say why"));
     }
 
     /**
@@ -96,13 +135,13 @@ public class VisitorRequestController {
      * situation: the request is no longer theirs to decide, and the fix is to look again.
      */
     @ExceptionHandler({RequestTransitions.IllegalTransition.class,
-            ApproveVisitorRequest.DecidedElsewhere.class})
+            RequestDecision.DecidedElsewhere.class})
     public ResponseEntity<DecisionError> onAlreadyDecided(RuntimeException e) {
         String state = e instanceof RequestTransitions.IllegalTransition t
                 ? t.from.dbValue() : "decided";
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new DecisionError("already_decided", "The request is " + state
-                        + " and can no longer be approved"));
+                        + " and can no longer be decided"));
     }
 
     /**
@@ -115,7 +154,7 @@ public class VisitorRequestController {
                 .body(new DecisionError("window_elapsed", e.getMessage()));
     }
 
-    @ExceptionHandler(ApproveVisitorRequest.RequestNotFound.class)
+    @ExceptionHandler(RequestDecision.NotFound.class)
     public ResponseEntity<Void> onNotFound() {
         return ResponseEntity.notFound().build();
     }
@@ -127,6 +166,9 @@ public class VisitorRequestController {
 
     /** Optional note only — everything else about a decision is server-determined. */
     public record DecisionRequest(String note) {}
+
+    /** The reason is required; an absent body is the same as an absent reason, and both are 400. */
+    public record RejectRequest(String reason) {}
 
     public record DecisionResponse(String id, String status, String decidedBy, Instant decidedAt,
                                    String note) {}

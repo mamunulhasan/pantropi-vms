@@ -87,6 +87,11 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/approve \
   -d '{"note":"Cleared with building security"}'
 ```
 
+Rejecting instead takes a **required** reason — `POST …/{id}/reject` with `{"reason":"Host is on
+leave"}`. An empty, whitespace-only or absent reason is **400**, enforced server-side so a modified
+client cannot omit it. The reason is stored exactly as typed, markup included; encoding it belongs at
+render time, and mangling it here would corrupt legitimate text like `declined, 5 < 10 people`.
+
 Approving twice gives **409**; approving a visit whose window has already passed gives **422**, since
 that would mint a credential that is expired the moment it exists. Two FM Admins approving at the
 same moment produce exactly one success and one 409 — the decision is a compare-and-set on the
@@ -311,6 +316,7 @@ invalidation is US-04.9.2 — see the Redis note in
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 | POST | `/api/v1/visitor-requests/{id}/approve` — optional `{"note":"…"}` | `visitor.approve` |
+| POST | `/api/v1/visitor-requests/{id}/reject` — **required** `{"reason":"…"}`, ≤1000 chars | `visitor.approve` |
 
 Anything else is denied by default (US-03.2.1).
 
