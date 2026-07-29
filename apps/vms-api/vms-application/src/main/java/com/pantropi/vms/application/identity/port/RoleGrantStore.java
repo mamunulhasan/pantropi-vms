@@ -32,5 +32,37 @@ public interface RoleGrantStore {
      */
     Optional<String> activeUserRole(UUID userId);
 
+    /** The permission catalogue with descriptions, for the administration screen (US-03.3.1 AC-1). */
+    List<Permission> permissionCatalogue();
+
+    /** Active users per role, for display. Roles with none appear as zero, not absent. */
+    Map<String, Integer> activeUserCountsByRole();
+
+    /**
+     * The same counts, but <strong>locking those user rows</strong> for the calling transaction
+     * (US-03.3.1, T-03.3.1.1).
+     *
+     * <p>Separate from the display read on purpose: taking a row lock to render a screen would make
+     * every administrator looking at the roles page contend with every one changing it.
+     *
+     * <p>The administrative-lockout guard reads through this so that a grant change and a user
+     * deactivation cannot each observe a state the other is about to invalidate. Same reasoning as
+     * the Master Admin guard, and for the same reason it must be called inside a transaction.
+     *
+     * <p>Roles with no active users appear with a count of zero rather than being absent.
+     */
+    Map<String, Integer> lockActiveUserCountsByRole();
+
+    /**
+     * Replace a role's grants with exactly this set (US-03.3.1 AC-2).
+     *
+     * <p>Replace rather than add/remove deltas: the caller submits the set it wants, which is what
+     * the administration screen shows, and applying a delta computed against a stale read is the
+     * failure the version token exists to prevent.
+     */
+    void replaceGrants(String roleCode, Set<String> permissionCodes);
+
     record Role(UUID id, String code, String name, String description) {}
+
+    record Permission(String code, String description) {}
 }

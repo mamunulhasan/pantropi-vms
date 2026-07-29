@@ -81,6 +81,64 @@ public final class JdbcRoleGrantStore implements RoleGrantStore {
     }
 
     @Override
+    public List<Permission> permissionCatalogue() {
+        return jdbc.query("SELECT code, description FROM vms.permissions ORDER BY code",
+                (rs, i) -> new Permission(rs.getString("code"), rs.getString("description")));
+    }
+
+    @Override
+    public Map<String, Integer> activeUserCountsByRole() {
+        return countsByRole();
+    }
+
+    @Override
+    public Map<String, Integer> lockActiveUserCountsByRole() {
+        // The lock is taken by a separate SELECT over the same rows: an aggregate cannot carry
+        // FOR UPDATE, so counting and locking are two statements inside one transaction. The lock
+        // is taken first, so the count that follows cannot be invalidated before the caller uses it.
+        jdbc.query("""
+                SELECT u.id FROM vms.users u WHERE u.is_active = true FOR UPDATE
+                """, (rs, i) -> rs.getObject("id", UUID.class));
+        return countsByRole();
+    }
+
+    private Map<String, Integer> countsByRole() {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Role role : roles()) {
+            counts.put(role.code(), 0);   // a role with no users is zero, not absent
+        }
+        jdbc.query("""
+                SELECT r.code, count(u.id) AS active_users
+                FROM vms.roles r
+                LEFT JOIN vms.users u ON u.role_id = r.id AND u.is_active = true
+                GROUP BY r.code
+                """, rs -> {
+            counts.put(rs.getString("code"), rs.getInt("active_users"));
+        });
+        return counts;
+    }
+
+    @Override
+    public void replaceGrants(String roleCode, Set<String> permissionCodes) {
+        UUID roleId = roleByCode(roleCode)
+                .map(Role::id)
+                .orElseThrow(() -> new IllegalArgumentException("No such role: " + roleCode));
+
+        // Delete-then-insert inside the caller's transaction. Computing a minimal delta would be
+        // the same number of statements and would have to be right about which rows changed; this
+        // cannot be wrong about that.
+        jdbc.update("DELETE FROM vms.role_permissions WHERE role_id = ?", roleId);
+
+        for (String code : permissionCodes) {
+            jdbc.update("""
+                    INSERT INTO vms.role_permissions (role_id, permission_id)
+                    SELECT ?, p.id FROM vms.permissions p WHERE p.code = ?
+                    ON CONFLICT (role_id, permission_id) DO NOTHING
+                    """, roleId, code);
+        }
+    }
+
+    @Override
     public Optional<String> activeUserRole(UUID userId) {
         return jdbc.query("""
                 SELECT r.code FROM vms.users u

@@ -124,5 +124,11 @@ class EffectivePermissionsTest {
         public Optional<String> activeUserRole(UUID userId) {
             return Optional.ofNullable(activeRoles.get(userId));
         }
+        public List<Permission> permissionCatalogue() { return List.of(); }
+        public Map<String, Integer> activeUserCountsByRole() { return Map.of(); }
+        public Map<String, Integer> lockActiveUserCountsByRole() { return Map.of(); }
+        public void replaceGrants(String roleCode, Set<String> codes) {
+            grants.put(roleCode, codes);
+        }
     }
 }
