@@ -7,6 +7,7 @@ import com.pantropi.vms.application.visitor.port.TenantDirectory;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
+import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -54,5 +55,13 @@ public class VisitorConfig {
                                                 DomainEventPublisher events, AuditTrail audit,
                                                 TransactionRunner tx, ClockPort clock) {
         return new ApproveVisitorRequest(requests, events, audit, tx, clock);
+    }
+
+    /** US-07.4.2 — the other half of the decision, with the reason as an aggregate invariant. */
+    @Bean
+    RejectVisitorRequest rejectVisitorRequest(VisitorRequestRepository requests,
+                                              DomainEventPublisher events, AuditTrail audit,
+                                              TransactionRunner tx, ClockPort clock) {
+        return new RejectVisitorRequest(requests, events, audit, tx, clock);
     }
 }

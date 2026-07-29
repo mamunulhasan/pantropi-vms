@@ -6,6 +6,7 @@ import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
+import com.pantropi.vms.application.visitor.usecase.RequestDecision;
 import com.pantropi.vms.domain.visitor.RequestStatus;
 import com.pantropi.vms.domain.visitor.RequestTransitions;
 import com.pantropi.vms.domain.visitor.TimeWindow;
@@ -54,7 +55,7 @@ class ApproveVisitorRequestTest {
         VisitorRequest request = repo.hold(submitted());
         UUID approver = UUID.randomUUID();
 
-        ApproveVisitorRequest.Decision decision =
+        RequestDecision decision =
                 useCase.approve(approver, request.id(), "Cleared with security");
 
         assertThat(decision.status()).isEqualTo("approved");
@@ -140,7 +141,7 @@ class ApproveVisitorRequestTest {
         repo.decisionLands = false;       // the database refuses: someone decided it first
 
         assertThatThrownBy(() -> useCase.approve(UUID.randomUUID(), request.id(), null))
-                .isInstanceOf(ApproveVisitorRequest.DecidedElsewhere.class);
+                .isInstanceOf(RequestDecision.DecidedElsewhere.class);
 
         // The loser must contribute nothing. In production the transaction rolls these back; here
         // the assertion is stronger — it never got as far as writing them.
@@ -164,7 +165,7 @@ class ApproveVisitorRequestTest {
         repo.hold(second);
         repo.decisionLands = false;
         assertThatThrownBy(() -> useCase.approve(UUID.randomUUID(), second.id(), null))
-                .isInstanceOf(ApproveVisitorRequest.DecidedElsewhere.class);
+                .isInstanceOf(RequestDecision.DecidedElsewhere.class);
 
         assertThat(events.published).hasSize(1);
         assertThat(audit.entries).hasSize(1);
@@ -207,7 +208,7 @@ class ApproveVisitorRequestTest {
     @DisplayName("a request that is absent — or out of scope — is not found, and nothing is written")
     void notFound() {
         assertThatThrownBy(() -> useCase.approve(UUID.randomUUID(), UUID.randomUUID(), null))
-                .isInstanceOf(ApproveVisitorRequest.RequestNotFound.class);
+                .isInstanceOf(RequestDecision.NotFound.class);
 
         assertThat(events.published).isEmpty();
         assertThat(audit.entries).isEmpty();

@@ -53,17 +53,17 @@ public final class ApproveVisitorRequest {
      * @param note      optional explanation, stored with the decision and visible to the tenant
      *                  (AC-4)
      * @return the decided state, for the response body
-     * @throws RequestNotFound                                    if it does not exist, or is not
+     * @throws RequestDecision.NotFound                           if it does not exist, or is not
      *                                                            the caller's to see
      * @throws com.pantropi.vms.domain.visitor.RequestTransitions.IllegalTransition
      *                                                            if already decided (AC-5)
      * @throws VisitorRequest.WindowAlreadyElapsed                if the visit is over (AC-7)
-     * @throws DecidedElsewhere                                   if another admin got there first
+     * @throws RequestDecision.DecidedElsewhere                   if another admin got there first
      *                                                            (AC-6)
      */
-    public Decision approve(UUID approver, UUID requestId, String note) {
+    public RequestDecision approve(UUID approver, UUID requestId, String note) {
         VisitorRequest request = requests.findById(requestId)
-                .orElseThrow(() -> new RequestNotFound(requestId));
+                .orElseThrow(() -> new RequestDecision.NotFound(requestId));
 
         // Captured before the transition, so the audit trail can show what actually changed (AC-3).
         RequestStatus previous = request.status();
@@ -78,7 +78,7 @@ public final class ApproveVisitorRequest {
                 // Someone decided it between our read and our write. Throwing rolls back the audit
                 // and outbox writes below, which have not happened yet — but the transaction is the
                 // guarantee, not the ordering of these lines.
-                throw new DecidedElsewhere(requestId);
+                throw new RequestDecision.DecidedElsewhere(requestId);
             }
 
             // AC-3: identifiers, states and counts. No visitor name, email or phone, and the note is
@@ -104,7 +104,7 @@ public final class ApproveVisitorRequest {
                             + "\"scheduledFrom\":\"" + request.window().from() + "\","
                             + "\"scheduledTo\":\"" + request.window().to() + "\"}");
 
-            return new Decision(requestId, request.status().dbValue(), approver, now,
+            return new RequestDecision(requestId, request.status().dbValue(), approver, now,
                     request.decisionReason());
         });
     }
@@ -114,24 +114,4 @@ public final class ApproveVisitorRequest {
                 .collect(Collectors.joining(",", "[", "]"));
     }
 
-    /** What the endpoint reports back: the new state, and who decided it when. No visitor PII. */
-    public record Decision(UUID requestId, String status, UUID decidedBy, Instant decidedAt,
-                           String note) {}
-
-    /**
-     * Absent, or out of the caller's scope — the two are the same answer on purpose, so an id
-     * cannot be used to probe for requests belonging to someone else (US-03.4.1).
-     */
-    public static final class RequestNotFound extends RuntimeException {
-        public RequestNotFound(UUID id) {
-            super("No visitor request " + id);
-        }
-    }
-
-    /** Lost the race for a decision (AC-6). The current state is worth re-reading, so 409. */
-    public static final class DecidedElsewhere extends IllegalStateException {
-        public DecidedElsewhere(UUID id) {
-            super("Visitor request " + id + " was decided by someone else while you were deciding");
-        }
-    }
 }
