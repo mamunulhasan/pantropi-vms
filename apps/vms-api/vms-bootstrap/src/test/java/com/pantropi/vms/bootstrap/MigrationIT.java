@@ -77,7 +77,7 @@ class MigrationIT {
     @DisplayName("AC-1: baseline creates every table, enum, trigger and comment; history records V1+V2")
     void baselineCreatesFullSchema() throws Exception {
         MigrateResult result = flyway().migrate();
-        assertThat(result.migrationsExecuted).isEqualTo(9);
+        assertThat(result.migrationsExecuted).isEqualTo(10);
 
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             assertThat(query(s, """
@@ -114,7 +114,7 @@ class MigrationIT {
 
             assertThat(query(s, """
                     SELECT version FROM vms.flyway_schema_history WHERE success AND version IS NOT NULL"""))
-                    .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9");
+                    .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
         }
     }
 

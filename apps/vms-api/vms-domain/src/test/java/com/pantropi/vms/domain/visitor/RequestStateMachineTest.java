@@ -24,6 +24,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class RequestStateMachineTest {
 
+    /** Fixed and well before the 2030 test window, so the elapsed-window rule never fires here. */
+    private static final Instant NOW = Instant.parse("2029-12-31T00:00:00Z");
+
     /** AC-1, written out independently of the table so the test is a second opinion, not an echo. */
     private static final Set<String> EXPECTED_LEGAL = Set.of(
             "SUBMITTED->APPROVED",
@@ -161,7 +164,7 @@ class RequestStateMachineTest {
         Visitor withdrawn = request.visitors().get(1);
         withdrawn.moveTo(VisitorStatus.CANCELLED);
 
-        request.approve(UUID.randomUUID());
+        request.approve(UUID.randomUUID(), null, NOW);
 
         assertThat(request.visitors().get(0).status()).isEqualTo(VisitorStatus.APPROVED);
         assertThat(request.visitors().get(1).status()).isEqualTo(VisitorStatus.CANCELLED);
@@ -173,9 +176,9 @@ class RequestStateMachineTest {
     @DisplayName("AC-4: an illegal transition leaves the request and its visitors untouched")
     void illegalTransitionMutatesNothing() {
         VisitorRequest request = requestWithTwoVisitors();
-        request.reject(UUID.randomUUID(), "Not this week");
+        request.reject(UUID.randomUUID(), "Not this week", NOW);
 
-        assertThatThrownBy(() -> request.approve(UUID.randomUUID()))
+        assertThatThrownBy(() -> request.approve(UUID.randomUUID(), null, NOW))
                 .isInstanceOf(RequestTransitions.IllegalTransition.class);
 
         assertThat(request.status()).isEqualTo(RequestStatus.REJECTED);
@@ -187,9 +190,9 @@ class RequestStateMachineTest {
     @DisplayName("an approved request can still be cancelled, and its visitors follow")
     void approvedCanBeWithdrawn() {
         VisitorRequest request = requestWithTwoVisitors();
-        request.approve(UUID.randomUUID());
+        request.approve(UUID.randomUUID(), null, NOW);
 
-        assertThatCode(request::cancel).doesNotThrowAnyException();
+        assertThatCode(() -> request.cancel(NOW)).doesNotThrowAnyException();
 
         assertThat(request.status()).isEqualTo(RequestStatus.CANCELLED);
         assertThat(request.visitors()).allSatisfy(
@@ -203,7 +206,7 @@ class RequestStateMachineTest {
     void rejectionNeedsAReason() {
         for (String blank : new String[]{null, "", "   ", "\t\n"}) {
             VisitorRequest request = requestWithTwoVisitors();
-            assertThatThrownBy(() -> request.reject(UUID.randomUUID(), blank))
+            assertThatThrownBy(() -> request.reject(UUID.randomUUID(), blank, NOW))
                     .isInstanceOf(VisitorRequest.RejectionReasonRequired.class);
             assertThat(request.status()).isEqualTo(RequestStatus.SUBMITTED);
         }
@@ -213,12 +216,12 @@ class RequestStateMachineTest {
     @DisplayName("US-07.4.2: the reason is trimmed, kept, and bounded")
     void reasonIsStored() {
         VisitorRequest request = requestWithTwoVisitors();
-        request.reject(UUID.randomUUID(), "  Host is on leave  ");
+        request.reject(UUID.randomUUID(), "  Host is on leave  ", NOW);
 
         assertThat(request.decisionReason()).isEqualTo("Host is on leave");
 
         VisitorRequest other = requestWithTwoVisitors();
-        assertThatThrownBy(() -> other.reject(UUID.randomUUID(), "x".repeat(1001)))
+        assertThatThrownBy(() -> other.reject(UUID.randomUUID(), "x".repeat(1001), NOW))
                 .isInstanceOf(VisitorRequest.DecisionReasonTooLong.class);
         assertThat(other.status()).isEqualTo(RequestStatus.SUBMITTED);
     }
@@ -227,7 +230,7 @@ class RequestStateMachineTest {
     @DisplayName("an approval carries no reason — only a refusal has to be justified")
     void approvalHasNoReason() {
         VisitorRequest request = requestWithTwoVisitors();
-        request.approve(UUID.randomUUID());
+        request.approve(UUID.randomUUID(), null, NOW);
 
         assertThat(request.decisionReason()).isNull();
     }

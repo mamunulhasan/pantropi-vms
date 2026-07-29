@@ -5,6 +5,8 @@ import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
 import com.pantropi.vms.application.visitor.port.TenantDirectory;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
+import com.pantropi.vms.application.shared.port.ClockPort;
+import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -44,5 +46,13 @@ public class VisitorConfig {
                                               TenantDirectory tenants, DomainEventPublisher events,
                                               AuditTrail audit, TransactionRunner tx) {
         return new SubmitVisitorRequest(requests, tenants, events, audit, tx);
+    }
+
+    /** US-07.4.1 — the decision half of the approval loop. */
+    @Bean
+    ApproveVisitorRequest approveVisitorRequest(VisitorRequestRepository requests,
+                                                DomainEventPublisher events, AuditTrail audit,
+                                                TransactionRunner tx, ClockPort clock) {
+        return new ApproveVisitorRequest(requests, events, audit, tx, clock);
     }
 }

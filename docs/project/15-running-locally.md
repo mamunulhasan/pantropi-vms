@@ -80,7 +80,17 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests \
   -d '{"scheduledFrom":"2026-09-01T09:00:00Z","scheduledTo":"2026-09-01T11:00:00Z",
        "purpose":"Quarterly review",
        "visitors":[{"fullName":"Ada Lovelace","email":"ada@example.test"}]}'
+
+# 5. approve it as an FM Admin (FR-VMS-02) — log in as fmadmin first for FM_TOKEN
+curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/approve \
+  -H "Authorization: Bearer $FM_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"note":"Cleared with building security"}'
 ```
+
+Approving twice gives **409**; approving a visit whose window has already passed gives **422**, since
+that would mint a credential that is expired the moment it exists. Two FM Admins approving at the
+same moment produce exactly one success and one 409 — the decision is a compare-and-set on the
+status, so the second write matches no row and its outbox event rolls back with it.
 
 ### Roles now hold what the matrix says (US-03.1.1)
 
@@ -300,6 +310,7 @@ invalidation is US-04.9.2 — see the Redis note in
 | DELETE | `/api/v1/admin/holidays/{id}` — *the only delete in master data* | `masterdata.edit` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
+| POST | `/api/v1/visitor-requests/{id}/approve` — optional `{"note":"…"}` | `visitor.approve` |
 
 Anything else is denied by default (US-03.2.1).
 

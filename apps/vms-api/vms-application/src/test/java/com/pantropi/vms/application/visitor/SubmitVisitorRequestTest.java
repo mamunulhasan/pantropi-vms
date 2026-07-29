@@ -163,6 +163,11 @@ class SubmitVisitorRequestTest {
         VisitorRequest saved;
         public void save(VisitorRequest r) { saved = r; }
         public Optional<VisitorRequest> findById(UUID id) { return Optional.ofNullable(saved); }
+        public boolean saveDecision(VisitorRequest r,
+                                    com.pantropi.vms.domain.visitor.RequestStatus expected) {
+            saved = r;
+            return true;
+        }
     }
 
     private static final class FakeTenants implements TenantDirectory {

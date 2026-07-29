@@ -16,6 +16,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class VisitorRequestTest {
 
+    /** An hour before the visit window below, so the elapsed-window rule never fires here. */
+    private static final Instant NOW = Instant.parse("2026-08-01T08:00:00Z");
+
     private final Instant from = Instant.parse("2026-08-01T09:00:00Z");
     private final Instant to = from.plus(2, ChronoUnit.HOURS);
     private final UUID tenant = UUID.randomUUID();
@@ -124,7 +127,7 @@ class VisitorRequestTest {
     void approval() {
         VisitorRequest r = submitted();
         UUID approver = UUID.randomUUID();
-        r.approve(approver);
+        r.approve(approver, null, NOW);
         assertThat(r.status()).isEqualTo(RequestStatus.APPROVED);
         assertThat(r.approvedBy()).isEqualTo(approver);
         assertThat(r.visitors()).allSatisfy(
@@ -135,13 +138,13 @@ class VisitorRequestTest {
     @DisplayName("rejection and cancellation cancel the visitors")
     void rejectionAndCancellation() {
         VisitorRequest rejected = submitted();
-        rejected.reject(UUID.randomUUID(), "Host unavailable");
+        rejected.reject(UUID.randomUUID(), "Host unavailable", NOW);
         assertThat(rejected.status()).isEqualTo(RequestStatus.REJECTED);
         assertThat(rejected.visitors()).allSatisfy(
                 v -> assertThat(v.status()).isEqualTo(VisitorStatus.CANCELLED));
 
         VisitorRequest cancelled = submitted();
-        cancelled.cancel();
+        cancelled.cancel(NOW);
         assertThat(cancelled.status()).isEqualTo(RequestStatus.CANCELLED);
     }
 
@@ -149,16 +152,16 @@ class VisitorRequestTest {
     @DisplayName("an approved request takes no more visitors and cannot be approved again")
     void approvedRequestIsClosedToFurtherDecisions() {
         VisitorRequest r = submitted();
-        r.approve(UUID.randomUUID());
+        r.approve(UUID.randomUUID(), null, NOW);
 
         assertThatThrownBy(() -> r.addVisitor(guest()))
                 .isInstanceOf(VisitorRequest.RequestNotPending.class);
         // A second approval is now an illegal transition rather than a "not pending" complaint —
         // the state machine answers it, not an ad-hoc check (US-07.5.1 AC-4).
-        assertThatThrownBy(() -> r.approve(UUID.randomUUID()))
+        assertThatThrownBy(() -> r.approve(UUID.randomUUID(), null, NOW))
                 .isInstanceOf(RequestTransitions.IllegalTransition.class);
         // ...but cancelling an approved request IS legal: an approval can be withdrawn.
-        r.cancel();
+        r.cancel(NOW);
         assertThat(r.status()).isEqualTo(RequestStatus.CANCELLED);
     }
 
