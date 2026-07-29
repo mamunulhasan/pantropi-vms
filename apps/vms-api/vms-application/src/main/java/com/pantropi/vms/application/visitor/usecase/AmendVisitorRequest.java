@@ -1,6 +1,7 @@
 package com.pantropi.vms.application.visitor.usecase;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
+import com.pantropi.vms.application.visitor.AuditProjection;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
@@ -104,14 +105,17 @@ public final class AmendVisitorRequest {
             // email or a phone number.
             audit.recordChange(actor, "visitor_request.amend", "visitor_request",
                     requestId.toString(),
-                    "{\"status\":\"" + current.dbValue() + "\"}",
-                    "{\"status\":\"" + request.status().dbValue() + "\","
-                            + "\"amendedAt\":\"" + now + "\","
-                            + "\"hostChanged\":" + (amendment.hostId() != null) + ","
-                            + "\"windowChanged\":" + (window != null) + ","
-                            + "\"purposeChanged\":" + (amendment.purpose() != null) + ","
-                            + "\"visitorsReplaced\":" + (amendment.visitors() != null) + ","
-                            + "\"visitorCount\":" + request.visitors().size() + "}");
+                    AuditProjection.before(current),
+                    AuditProjection.start()
+                            .put("status", request.status().dbValue())
+                            .put("amendedBy", actor)
+                            .put("amendedAt", now)
+                            .put("hostChanged", amendment.hostId() != null)
+                            .put("windowChanged", window != null)
+                            .put("purposeChanged", amendment.purpose() != null)
+                            .put("visitorsReplaced", amendment.visitors() != null)
+                            .putRaw("visitorCount", String.valueOf(request.visitors().size()))
+                            .json());
 
             events.publish("VisitorRequestAmended", "visitor_request", requestId,
                     "{\"requestId\":\"" + requestId + "\","

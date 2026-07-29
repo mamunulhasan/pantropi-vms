@@ -1,7 +1,7 @@
 package com.pantropi.vms.application.visitor.usecase;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
-import com.pantropi.vms.application.shared.JsonText;
+import com.pantropi.vms.application.visitor.AuditProjection;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  * a refusal has to be <em>defensible after the fact</em>. Months later the question is not that a
  * request was refused but on what grounds, and the audit trail is the only immutable place that can
  * answer it. That makes operator free text part of a {@code jsonb} payload built by concatenation,
- * which is why it goes through {@link JsonText} rather than being pasted in.
+ * which is why the projection escapes it rather than pasting it in.
  *
  * <h2>The reason stays out of the event</h2>
  * The event exists so other contexts can react to the decision; none of them needs the prose, and an
@@ -86,12 +86,7 @@ public final class RejectVisitorRequest {
             // audit payload in the system that carries text a person typed.
             audit.recordChange(approver, "visitor_request.reject", "visitor_request",
                     requestId.toString(),
-                    "{\"status\":\"" + previous.dbValue() + "\"}",
-                    "{\"status\":\"" + request.status().dbValue() + "\","
-                            + "\"decidedBy\":\"" + approver + "\","
-                            + "\"decidedAt\":\"" + now + "\","
-                            + "\"reason\":" + JsonText.quoted(request.decisionReason()) + ","
-                            + "\"visitorCount\":" + request.visitors().size() + "}");
+                    AuditProjection.before(previous), AuditProjection.of(request));
 
             // AC-3/AC-4: the decision, for anything that tracks request lifecycle. Nothing here is
             // consumed by credential orchestration — a rejection never reaches EPIC-09.

@@ -47,8 +47,10 @@ class RoleGrantMatrixIT {
                 Permissions.MASTERDATA_VIEW));
         m.put("FM_ADMIN", Set.of(Permissions.VISITOR_APPROVE));
         m.put("MASTER_ADMIN", Set.of(Permissions.VISITOR_APPROVE, Permissions.CREDENTIAL_ISSUE));
+        // AUDIT_VIEW is US-07.4.3's, and SYSTEM_ADMIN is the only role that gets it: reading back
+        // who decided what is oversight, not part of taking the decision.
         m.put("SYSTEM_ADMIN", Set.of(Permissions.USER_MANAGE, Permissions.MASTERDATA_EDIT,
-                Permissions.SETTINGS_MANAGE, Permissions.MASTERDATA_VIEW));
+                Permissions.SETTINGS_MANAGE, Permissions.MASTERDATA_VIEW, Permissions.AUDIT_VIEW));
         return m;
     }
 
@@ -66,11 +68,11 @@ class RoleGrantMatrixIT {
     }
 
     @Test
-    @DisplayName("AC-1: exactly the five seeded roles and eleven seeded permissions exist")
+    @DisplayName("AC-1: exactly the five seeded roles and twelve seeded permissions exist")
     void seededRolesAndPermissions() throws Exception {
         assertThat(query("SELECT code FROM vms.roles")).containsExactlyInAnyOrder(
                 "MASTER_ADMIN", "FLOOR_RECEPTIONIST", "FM_ADMIN", "TENANT", "SYSTEM_ADMIN");
-        assertThat(query("SELECT code FROM vms.permissions")).hasSize(11);
+        assertThat(query("SELECT code FROM vms.permissions")).hasSize(12);
     }
 
     @Test

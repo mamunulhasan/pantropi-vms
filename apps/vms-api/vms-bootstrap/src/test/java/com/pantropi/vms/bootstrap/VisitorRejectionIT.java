@@ -106,7 +106,7 @@ class VisitorRejectionIT {
         assertThat(scalar("SELECT count(*) FROM vms.audit_logs"
                 + " WHERE action='visitor_request.reject' AND entity_id='" + id + "'"))
                 .isEqualTo("1");
-        assertThat(scalar("SELECT after_state->>'reason' FROM vms.audit_logs"
+        assertThat(scalar("SELECT after_state->>'decisionReason' FROM vms.audit_logs"
                 + " WHERE action='visitor_request.reject' AND entity_id='" + id + "'"))
                 .isEqualTo("Host is on leave that week");
         assertThat(scalar("SELECT count(*) FROM vms.audit_logs WHERE entity_id='" + id
@@ -203,7 +203,7 @@ class VisitorRejectionIT {
                 .isEqualTo(stored);
         // AC-6 also means the audit payload must still be valid jsonb — this read would fail if the
         // raw newline had been concatenated in unescaped.
-        assertThat(scalar("SELECT after_state->>'reason' FROM vms.audit_logs"
+        assertThat(scalar("SELECT after_state->>'decisionReason' FROM vms.audit_logs"
                 + " WHERE action='visitor_request.reject' AND entity_id='" + id + "'"))
                 .isEqualTo(stored);
         // The response is JSON, and the markup comes back as data inside a JSON string.

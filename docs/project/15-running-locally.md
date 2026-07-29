@@ -87,6 +87,22 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/approve \
   -d '{"note":"Cleared with building security"}'
 ```
 
+Every decision on a request is recorded in `vms.audit_logs` and readable at
+`GET /api/v1/visitor-requests/{id}/history`, chronologically, under **`audit.view`** — which
+only `SYSTEM_ADMIN` holds. Not the FM Admins who take the decisions: reading back who decided
+what is oversight, not part of deciding.
+
+> **The audit table is append-only in the database.** `V12` installs a trigger that raises on
+> `UPDATE` or `DELETE`, so tampering fails loudly even for a superuser — which is what the
+> local datasource connects as. A `REVOKE` backs it up for ordinary roles. `INSERT` is
+> untouched, and `TRUNCATE` is left to the table owner so a future retention policy has
+> somewhere to stand.
+
+```bash
+curl -s http://localhost:8081/api/v1/visitor-requests/<id>/history \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN"
+```
+
 A tenant can amend its own request while it is still `submitted` — `PATCH` with only the fields
 it wants changed; anything absent is left alone. Once a decision has been taken the request is
 closed to amendment (**409**), because altering what somebody decided on would make their
@@ -167,7 +183,7 @@ developer exercising a role locally should be exercising what the deployed syste
 
 | Role | Permissions |
 |---|---|
-| `SYSTEM_ADMIN` | `user.manage`, `masterdata.view`, `masterdata.edit`, `settings.manage` |
+| `SYSTEM_ADMIN` | `user.manage`, `masterdata.view`, `masterdata.edit`, `settings.manage`, `audit.view` |
 | `MASTER_ADMIN` | `visitor.approve`, `credential.issue` |
 | `FM_ADMIN` | `visitor.approve` |
 | `FLOOR_RECEPTIONIST` | `visitor.register`, `masterdata.view` |
@@ -384,6 +400,7 @@ invalidation is US-04.9.2 — see the Redis note in
 | GET | `/api/v1/visitor-requests/{id}` — own tenant only; 404 for anyone else's | `visitor.request` |
 | PATCH | `/api/v1/visitor-requests/{id}` — partial edit, `submitted` only | `visitor.request` |
 | POST | `/api/v1/visitor-requests/{id}/cancel` — legal from `submitted` **and** `approved` | `visitor.request` |
+| GET | `/api/v1/visitor-requests/{id}/history` — chronological decision trail | `audit.view` |
 
 Anything else is denied by default (US-03.2.1).
 

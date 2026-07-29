@@ -77,7 +77,7 @@ class MigrationIT {
     @DisplayName("AC-1: baseline creates every table, enum, trigger and comment; history records V1+V2")
     void baselineCreatesFullSchema() throws Exception {
         MigrateResult result = flyway().migrate();
-        assertThat(result.migrationsExecuted).isEqualTo(11);
+        assertThat(result.migrationsExecuted).isEqualTo(12);
 
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             assertThat(query(s, """
@@ -91,13 +91,22 @@ class MigrationIT {
                     WHERE n.nspname='vms' AND t.typtype='e'"""))
                     .containsExactlyInAnyOrderElementsOf(EXPECTED_ENUMS);
 
-            // trigger function + the updated_at trigger loop applied to 16 tables
+            // the updated_at trigger loop, applied to 16 tables
             assertThat(query(s, """
                     SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
                     WHERE n.nspname='vms'""")).contains("set_updated_at");
             assertThat(query(s, """
                     SELECT DISTINCT event_object_table FROM information_schema.triggers
-                    WHERE trigger_schema='vms'""")).hasSize(16);
+                    WHERE trigger_schema='vms' AND trigger_name LIKE 'trg_%_updated'"""))
+                    .hasSize(16);
+
+            // V12's append-only guard is a trigger too, and it is not one of the sixteen. Asserted
+            // by name rather than by growing the count above, which would have made the two rules
+            // indistinguishable the next time either changed.
+            assertThat(query(s, """
+                    SELECT trigger_name FROM information_schema.triggers
+                    WHERE trigger_schema='vms' AND event_object_table='audit_logs'"""))
+                    .contains("trg_audit_logs_append_only");
 
             // comments carry requirement references — sample the load-bearing ones
             assertThat(scalar(s, """
@@ -120,7 +129,7 @@ class MigrationIT {
                     SELECT version FROM vms.flyway_schema_history
                      WHERE success AND version IS NOT NULL"""))
                     .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                            "11");
+                            "11", "12");
         }
     }
 
@@ -148,14 +157,15 @@ class MigrationIT {
 
     private static void assertSeedCounts(Statement s) throws Exception {
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.roles")).isEqualTo("5");
-        assertThat(scalar(s, "SELECT count(*)::text FROM vms.permissions")).isEqualTo("11");
+        assertThat(scalar(s, "SELECT count(*)::text FROM vms.permissions")).isEqualTo("12");
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.visitor_types")).isEqualTo("4");
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.pass_types")).isEqualTo("3");
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.system_settings")).isEqualTo("4");
         // V9 states the whole matrix (US-03.1.1, T-03.1.1.2), completing the lift of D-15.
         // RoleGrantMatrixIT asserts it role by role; this only pins the total so a stray grant
         // added elsewhere is noticed here too.
-        assertThat(scalar(s, "SELECT count(*)::text FROM vms.role_permissions")).isEqualTo("10");
+        // Ten from V9's matrix, plus V12's audit.view grant to SYSTEM_ADMIN.
+        assertThat(scalar(s, "SELECT count(*)::text FROM vms.role_permissions")).isEqualTo("11");
         assertThat(query(s, """
                 SELECT p.code FROM vms.role_permissions rp
                 JOIN vms.roles r ON r.id = rp.role_id AND r.code = 'MASTER_ADMIN'
