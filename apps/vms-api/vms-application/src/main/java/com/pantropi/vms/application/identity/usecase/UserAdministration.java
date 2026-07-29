@@ -7,6 +7,7 @@ import com.pantropi.vms.application.identity.port.UserAdministrationStore.NewUse
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.Page;
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.UserFilter;
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.UserView;
+import com.pantropi.vms.application.shared.port.TransactionRunner;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -32,11 +33,16 @@ public final class UserAdministration {
     private final UserAdministrationStore store;
     private final SessionStore sessions;
     private final AuditTrail audit;
+    private final MasterAdminPolicy masterAdmins;
+    private final TransactionRunner transactions;
 
-    public UserAdministration(UserAdministrationStore store, SessionStore sessions, AuditTrail audit) {
+    public UserAdministration(UserAdministrationStore store, SessionStore sessions, AuditTrail audit,
+                              MasterAdminPolicy masterAdmins, TransactionRunner transactions) {
         this.store = store;
         this.sessions = sessions;
         this.audit = audit;
+        this.masterAdmins = masterAdmins;
+        this.transactions = transactions;
     }
 
     public UUID create(UUID actorId, NewUser u) {
@@ -68,14 +74,26 @@ public final class UserAdministration {
                 viewJson(before), viewJson(after));
     }
 
+    /**
+     * Deactivate a user, refusing to retire the last holder of the FR-ADM-01 (SRS B1) authority.
+     *
+     * <p>The guard runs inside the transaction that performs the write, and takes a row lock on the
+     * active Master Admins — the same lock the reception-side guard takes (US-04.4.1 AC-6). Without
+     * that, deactivating the second-to-last administrator and retiring the last one's reception can
+     * run concurrently, each reading a state the other is about to invalidate, and both succeed.
+     */
     public void deactivate(UUID actorId, UUID userId) {
-        UserView before = store.findById(userId).orElseThrow(() -> new UserNotFound(userId));
-        store.setActive(userId, false);
-        int revoked = sessions.revokeAllForUser(userId, "user_deactivated"); // AC-3
-        audit.recordChange(actorId, "user.deactivated", "user", userId.toString(),
-                viewJson(before), viewJson(withActive(before, false)));
-        audit.record(actorId, "user.sessions_revoked", "user", userId.toString(),
-                revoked + " session(s) revoked");
+        transactions.run(() -> {
+            UserView before = store.findById(userId).orElseThrow(() -> new UserNotFound(userId));
+            masterAdmins.assertUserDeactivatable(userId);
+
+            store.setActive(userId, false);
+            int revoked = sessions.revokeAllForUser(userId, "user_deactivated"); // AC-3
+            audit.recordChange(actorId, "user.deactivated", "user", userId.toString(),
+                    viewJson(before), viewJson(withActive(before, false)));
+            audit.record(actorId, "user.sessions_revoked", "user", userId.toString(),
+                    revoked + " session(s) revoked");
+        });
     }
 
     public void reactivate(UUID actorId, UUID userId) {

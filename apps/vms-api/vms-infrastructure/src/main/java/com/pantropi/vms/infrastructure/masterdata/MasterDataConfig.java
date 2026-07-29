@@ -8,7 +8,12 @@ import com.pantropi.vms.application.masterdata.VisitorTypeDefinition;
 import com.pantropi.vms.domain.masterdata.PassType;
 import com.pantropi.vms.domain.masterdata.Floor;
 import com.pantropi.vms.domain.masterdata.VisitorType;
+import com.pantropi.vms.application.masterdata.ReceptionDefinition;
 import com.pantropi.vms.application.masterdata.TenantDefinition;
+import com.pantropi.vms.application.masterdata.port.ReceptionDirectory;
+import com.pantropi.vms.application.masterdata.usecase.ReceptionAdministration;
+import com.pantropi.vms.application.identity.usecase.MasterAdminPolicy;
+import com.pantropi.vms.domain.masterdata.Reception;
 import com.pantropi.vms.application.masterdata.port.HolidayCalendarStore;
 import com.pantropi.vms.application.masterdata.port.TenantDependencies;
 import com.pantropi.vms.domain.masterdata.Tenant;
@@ -136,6 +141,32 @@ public class MasterDataConfig {
     MasterDataAdministration<Tenant> tenantAdministration(MasterDataStore<Tenant> store,
                                                           AuditTrail audit) {
         return new MasterDataAdministration<>(new TenantDefinition(), store, audit);
+    }
+
+    // ---- US-04.4.1 receptions: floor-scoped, with the singular central designation ----
+
+    @Bean
+    MasterDataStore<Reception> receptionStore(DataSource dataSource) {
+        return new JdbcReceptionStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    ReceptionDirectory receptionDirectory(DataSource dataSource) {
+        return new JdbcReceptionDirectory(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    MasterDataAdministration<Reception> receptionAdministration(MasterDataStore<Reception> store,
+                                                                AuditTrail audit) {
+        return new MasterDataAdministration<>(new ReceptionDefinition(), store, audit);
+    }
+
+    @Bean
+    ReceptionAdministration receptionOperations(MasterDataStore<Reception> store,
+                                                ReceptionDirectory receptions,
+                                                MasterAdminPolicy masterAdmins,
+                                                TransactionRunner transactions, AuditTrail audit) {
+        return new ReceptionAdministration(store, receptions, masterAdmins, transactions, audit);
     }
 
     // ---- US-04.7.1 holiday calendar: its own port and use case, not the shared pattern ----

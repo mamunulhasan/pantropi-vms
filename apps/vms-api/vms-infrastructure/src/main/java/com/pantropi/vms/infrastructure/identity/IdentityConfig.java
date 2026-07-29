@@ -159,8 +159,11 @@ public class IdentityConfig {
     com.pantropi.vms.application.identity.usecase.UserAdministration userAdministration(
             com.pantropi.vms.application.identity.port.UserAdministrationStore store,
             com.pantropi.vms.application.identity.port.SessionStore sessions,
-            com.pantropi.vms.application.identity.port.AuditTrail audit) {
-        return new com.pantropi.vms.application.identity.usecase.UserAdministration(store, sessions, audit);
+            com.pantropi.vms.application.identity.port.AuditTrail audit,
+            com.pantropi.vms.application.identity.usecase.MasterAdminPolicy masterAdmins,
+            com.pantropi.vms.application.shared.port.TransactionRunner transactions) {
+        return new com.pantropi.vms.application.identity.usecase.UserAdministration(
+                store, sessions, audit, masterAdmins, transactions);
     }
 
     @Bean
