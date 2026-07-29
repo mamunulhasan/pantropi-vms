@@ -245,6 +245,9 @@ invalidation is US-04.9.2 — see the Redis note in
 | GET | `/api/v1/admin/tenants`, `/tenants/{id}`, `/tenants/{id}/dependents` | `masterdata.view` |
 | POST/PUT | `/api/v1/admin/tenants`, `/tenants/{id}` | `masterdata.edit` |
 | POST | `…/tenants/{id}/deactivate`, `/reactivate` | `masterdata.edit` |
+| GET | `/api/v1/admin/receptions`, `/receptions/{id}`, `/receptions/{id}/dependents` | `masterdata.view` |
+| POST/PUT | `/api/v1/admin/receptions`, `/receptions/{id}` | `masterdata.edit` |
+| POST | `…/receptions/{id}/designate-central?confirm=`, `/deactivate`, `/reactivate` | `masterdata.edit` |
 | GET | `/api/v1/admin/holidays?year=` or `?from=&to=` | `masterdata.view` |
 | POST/PUT | `/api/v1/admin/holidays`, `/holidays/{id}` | `masterdata.edit` |
 | POST | `/api/v1/admin/holidays/import` | `masterdata.edit` |

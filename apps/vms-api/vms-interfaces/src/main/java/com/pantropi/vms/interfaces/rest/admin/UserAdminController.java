@@ -121,6 +121,17 @@ public class UserAdminController {
         return ResponseEntity.notFound().build();
     }
 
+    /**
+     * Refused because of the current state of the system, not because of who asked — so 409, not
+     * 403. The message says what would have to change first (US-02.4.1 AC-4, US-04.4.1).
+     */
+    @ExceptionHandler(com.pantropi.vms.application.identity.usecase.MasterAdminPolicy.LastMasterAdmin.class)
+    public ResponseEntity<ErrorResponse> onLastMasterAdmin(
+            com.pantropi.vms.application.identity.usecase.MasterAdminPolicy.LastMasterAdmin e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("last_master_admin", e.getMessage()));
+    }
+
     public record CreateRequest(String username, String email, String fullName, String roleCode,
                                 UUID receptionId, UUID tenantId) {}
     public record UpdateRequest(String roleCode, UUID receptionId, UUID tenantId) {}

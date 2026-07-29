@@ -93,6 +93,16 @@ class AdminUseCasesTest {
     }
 
     private static final class FakeDirectory implements AdminDirectory {
+        public java.util.List<RoleHolder> lockActiveHoldersOf(String roleCode) {
+            // The locking read, faked: the count is what the policy reasons about, and the
+            // reception is what the stranding guard compares against.
+            java.util.List<RoleHolder> holders = new java.util.ArrayList<>();
+            for (int i = 0; i < masterAdmins; i++) {
+                holders.add(new RoleHolder(java.util.UUID.randomUUID(), centralReception, true));
+            }
+            return holders;
+        }
+
         final long users;
         final long masterAdmins;
         final boolean hasSystemAdminRole;

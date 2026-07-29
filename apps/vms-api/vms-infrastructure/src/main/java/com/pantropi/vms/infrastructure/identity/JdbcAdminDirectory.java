@@ -3,6 +3,7 @@ package com.pantropi.vms.infrastructure.identity;
 import com.pantropi.vms.application.identity.port.AdminDirectory;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -45,6 +46,28 @@ public final class JdbcAdminDirectory implements AdminDirectory {
                 "SELECT is_central FROM vms.receptions WHERE id = ?",
                 (rs, i) -> rs.getBoolean("is_central"), receptionId).stream().findFirst().orElse(false);
         return Boolean.TRUE.equals(central);
+    }
+
+    @Override
+    public List<RoleHolder> lockActiveHoldersOf(String roleCode) {
+        // FOR UPDATE OF u: lock the user rows, not the joined role row — locking vms.roles would
+        // serialise every operation touching any user of that role, which is far more than this
+        // guard needs.
+        //
+        // Must run inside a transaction. Outside one, JdbcTemplate autocommits and the lock is
+        // released the moment this returns, leaving the read no better than an unlocked one.
+        return jdbc.query("""
+                SELECT u.id, u.reception_id,
+                       COALESCE(rc.is_active AND rc.is_central, false) AS station_valid
+                FROM vms.users u
+                JOIN vms.roles r ON r.id = u.role_id
+                LEFT JOIN vms.receptions rc ON rc.id = u.reception_id
+                WHERE r.code = ? AND u.is_active = true
+                FOR UPDATE OF u
+                """, (rs, i) -> new RoleHolder(
+                rs.getObject("id", UUID.class),
+                rs.getObject("reception_id", UUID.class),
+                rs.getBoolean("station_valid")), roleCode);
     }
 
     @Override

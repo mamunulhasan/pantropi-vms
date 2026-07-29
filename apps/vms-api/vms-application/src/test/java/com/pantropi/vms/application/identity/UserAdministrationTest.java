@@ -7,7 +7,10 @@ import com.pantropi.vms.application.identity.port.UserAdministrationStore.NewUse
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.Page;
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.UserFilter;
 import com.pantropi.vms.application.identity.port.UserAdministrationStore.UserView;
+import com.pantropi.vms.application.identity.port.AdminDirectory;
+import com.pantropi.vms.application.identity.usecase.MasterAdminPolicy;
 import com.pantropi.vms.application.identity.usecase.UserAdministration;
+import com.pantropi.vms.application.shared.port.TransactionRunner;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +28,9 @@ class UserAdministrationTest {
     private final FakeStore store = new FakeStore();
     private final FakeSessions sessions = new FakeSessions();
     private final FakeAudit audit = new FakeAudit();
-    private final UserAdministration users = new UserAdministration(store, sessions, audit);
+    private final FakeAdmins admins = new FakeAdmins();
+    private final UserAdministration users = new UserAdministration(store, sessions, audit,
+            new MasterAdminPolicy(admins), new DirectTransactions());
     private final UUID actor = UUID.randomUUID();
 
     private NewUser valid() {
@@ -94,7 +99,77 @@ class UserAdministrationTest {
         assertThat(audit.actions).contains("user.deactivated", "user.sessions_revoked");
     }
 
+    @Test
+    @DisplayName("US-04.4.1: the last active Master Admin cannot be deactivated")
+    void lastMasterAdminIsProtected() {
+        UUID id = UUID.randomUUID();
+        store.existing = new UserView(id, "master", "m@ex.com", "M", "MASTER_ADMIN", null, null, true);
+        admins.holders = List.of(new AdminDirectory.RoleHolder(id, UUID.randomUUID(), true));
+
+        assertThatThrownBy(() -> users.deactivate(actor, id))
+                .isInstanceOf(MasterAdminPolicy.LastMasterAdmin.class);
+
+        // Nothing happened: no write, no session revocation, no audit claiming otherwise.
+        assertThat(store.activeSet).isNull();
+        assertThat(sessions.revokedUser).isNull();
+        assertThat(audit.actions).doesNotContain("user.deactivated");
+    }
+
+    @Test
+    @DisplayName("US-04.4.1: one of two Master Admins can be deactivated")
+    void oneOfTwoMasterAdminsMayGo() {
+        UUID id = UUID.randomUUID();
+        store.existing = new UserView(id, "master", "m@ex.com", "M", "MASTER_ADMIN", null, null, true);
+        admins.holders = List.of(new AdminDirectory.RoleHolder(id, UUID.randomUUID(), true),
+                new AdminDirectory.RoleHolder(UUID.randomUUID(), UUID.randomUUID(), true));
+
+        users.deactivate(actor, id);
+
+        assertThat(store.activeSet).isFalse();
+    }
+
+    @Test
+    @DisplayName("US-04.4.1: the guard runs inside the transaction that performs the write")
+    void guardRunsInsideTheTransaction() {
+        // Checking outside the transaction would let a concurrent change land between the two.
+        UUID id = UUID.randomUUID();
+        store.existing = new UserView(id, "u", "u@ex.com", "U", "TENANT", null, null, true);
+
+        users.deactivate(actor, id);
+
+        assertThat(admins.depthAtCheck).isEqualTo(1);
+    }
+
     // ---- fakes ----
+
+    /** Records the transaction depth at which the guard read, so the nesting can be asserted. */
+    private final class DirectTransactions implements TransactionRunner {
+        public <T> T call(java.util.function.Supplier<T> work) {
+            admins.depth++;
+            try {
+                return work.get();
+            } finally {
+                admins.depth--;
+            }
+        }
+    }
+
+    private static final class FakeAdmins implements AdminDirectory {
+        List<AdminDirectory.RoleHolder> holders = List.of();
+        int depth;
+        int depthAtCheck;
+
+        public java.util.List<RoleHolder> lockActiveHoldersOf(String roleCode) {
+            depthAtCheck = depth;
+            return holders;
+        }
+        public long countUsers() { return 0; }
+        public long countActiveUsersWithRole(String roleCode) { return holders.size(); }
+        public Optional<UUID> roleIdByCode(String roleCode) { return Optional.empty(); }
+        public boolean receptionIsCentral(UUID receptionId) { return true; }
+        public void insertUser(UUID id, String u, String h, UUID r, UUID rec, boolean a) {}
+    }
+
     private static final class FakeStore implements UserAdministrationStore {
         boolean usernameTaken, emailTaken; boolean roleKnown = true; boolean receptionOk = true;
         int inserted; String placeholder; UserView existing; Boolean activeSet;
