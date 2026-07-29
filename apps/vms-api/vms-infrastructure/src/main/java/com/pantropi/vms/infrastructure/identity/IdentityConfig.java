@@ -175,6 +175,19 @@ public class IdentityConfig {
                 store, issuer, audit, clock, Duration.ofMinutes(refreshTtlMinutes));
     }
 
+    // ---- US-03.1.1 roles, permissions and effective resolution ----
+
+    @Bean
+    com.pantropi.vms.application.identity.port.RoleGrantStore roleGrantStore(DataSource dataSource) {
+        return new JdbcRoleGrantStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.EffectivePermissions effectivePermissions(
+            com.pantropi.vms.application.identity.port.RoleGrantStore store) {
+        return new com.pantropi.vms.application.identity.usecase.EffectivePermissions(store);
+    }
+
     // ---- US-02.4.1 Master Admin authority & bootstrap ----
 
     @Bean

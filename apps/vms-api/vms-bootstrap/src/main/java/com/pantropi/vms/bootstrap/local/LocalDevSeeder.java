@@ -22,11 +22,15 @@ import java.util.logging.Logger;
  * anywhere else. Nothing here runs in staging or production: the profile guard, and the
  * {@code developmentOnly} dependency on the embedded database, both prevent it.
  *
- * <h2>Role grants</h2>
- * The grants applied here are a <em>development convenience</em> so each role can do something
- * observable. They are deliberately NOT a migration: the production role-to-permission matrix is
- * authorization policy that still needs client sign-off (discrepancy D-15, TODO-04). Migrations
- * V3/V5/V7 grant only what an SRS requirement names.
+ * <h2>No grants are applied here any more</h2>
+ * This class used to hand out a development-only grant matrix, because no migration granted much of
+ * anything and each role would otherwise have been unable to do anything observable. V9 replaced
+ * that: the real role-to-permission matrix now ships as a migration (US-03.1.1, T-03.1.1.2).
+ *
+ * <p>Keeping the dev grants alongside it would be worse than redundant. Two sources of truth that
+ * agree today drift tomorrow, and a developer exercising a role locally would be exercising
+ * permissions the deployed system does not give it — which is precisely the bug this seeder exists
+ * to help find.
  */
 @Component
 @Profile("local")
@@ -46,24 +50,6 @@ public class LocalDevSeeder implements ApplicationRunner {
             new DevUser("receptionist", "FLOOR_RECEPTIONIST", false, true),
             new DevUser("tenantuser",   "TENANT",             true,  false));
 
-    /**
-     * Development grant matrix, inferred from the seeded role descriptions so each role has
-     * something to exercise. Not authoritative — see the class note.
-     */
-    private static final List<String[]> DEV_GRANTS = List.of(
-            new String[]{"SYSTEM_ADMIN",       "masterdata.view"},
-            new String[]{"SYSTEM_ADMIN",       "masterdata.edit"},
-            new String[]{"SYSTEM_ADMIN",       "settings.manage"},
-            new String[]{"MASTER_ADMIN",       "masterdata.view"},
-            new String[]{"MASTER_ADMIN",       "visitor.register"},
-            new String[]{"MASTER_ADMIN",       "report.view"},
-            new String[]{"FM_ADMIN",           "visitor.approve"},
-            new String[]{"FM_ADMIN",           "masterdata.view"},
-            new String[]{"FM_ADMIN",           "report.view"},
-            new String[]{"FLOOR_RECEPTIONIST", "visitor.register"},
-            new String[]{"FLOOR_RECEPTIONIST", "masterdata.view"},
-            new String[]{"TENANT",             "masterdata.view"});
-
     private final JdbcTemplate jdbc;
     private final PasswordHasher passwordHasher;
 
@@ -75,7 +61,6 @@ public class LocalDevSeeder implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         seedMasterData();
-        seedGrants();
         seedUsers();
         announce();
     }
@@ -108,16 +93,6 @@ public class LocalDevSeeder implements ApplicationRunner {
                     INSERT INTO vms.hosts (id, tenant_id, full_name, email, is_active)
                     SELECT gen_random_uuid(), t.id, 'Alice Host', 'alice@acme.test', true
                     FROM vms.tenants t WHERE t.code = 'ACME'""");
-        }
-    }
-
-    private void seedGrants() {
-        for (String[] grant : DEV_GRANTS) {
-            jdbc.update("""
-                    INSERT INTO vms.role_permissions (role_id, permission_id)
-                    SELECT r.id, p.id FROM vms.roles r JOIN vms.permissions p ON p.code = ?
-                    WHERE r.code = ?
-                    ON CONFLICT (role_id, permission_id) DO NOTHING""", grant[1], grant[0]);
         }
     }
 

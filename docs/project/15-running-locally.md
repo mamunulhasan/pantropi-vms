@@ -48,11 +48,14 @@ Password123!local
 
 | Username | Role | Permissions |
 |---|---|---|
-| `sysadmin` | SYSTEM_ADMIN | `user.manage`, `masterdata.view/edit`, `settings.manage` |
-| `masteradmin` | MASTER_ADMIN | `visitor.approve`, `credential.issue`, `visitor.register`, `masterdata.view`, `report.view` |
-| `fmadmin` | FM_ADMIN | `visitor.approve`, `masterdata.view`, `report.view` |
+| `sysadmin` | SYSTEM_ADMIN | `user.manage`, `masterdata.view`, `masterdata.edit`, `settings.manage` |
+| `masteradmin` | MASTER_ADMIN | `visitor.approve`, `credential.issue` |
+| `fmadmin` | FM_ADMIN | `visitor.approve` |
 | `receptionist` | FLOOR_RECEPTIONIST | `visitor.register`, `masterdata.view` |
-| `tenantuser` | TENANT | `visitor.request`, `masterdata.view` |
+| `tenantuser` | TENANT | `visitor.request` |
+
+These come from `V9__role_permission_grants.sql` and nowhere else — the seeder no longer grants
+anything. If a role here surprises you, the migration is the place to argue with.
 
 Seeded master data: building **WGT** (Westgate Tower) → floor **L01** → central reception **RC01**,
 tenant **ACME** (Acme Corporation) with host *Alice Host*. `tenantuser` belongs to ACME.
@@ -78,6 +81,27 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests \
        "purpose":"Quarterly review",
        "visitors":[{"fullName":"Ada Lovelace","email":"ada@example.test"}]}'
 ```
+
+### Roles now hold what the matrix says (US-03.1.1)
+
+`V9__role_permission_grants.sql` is the authoritative role-to-permission matrix. The seeder no longer
+hands out development-only grants — two sources of truth that agree today drift tomorrow, and a
+developer exercising a role locally should be exercising what the deployed system actually gives it.
+
+| Role | Permissions |
+|---|---|
+| `SYSTEM_ADMIN` | `user.manage`, `masterdata.view`, `masterdata.edit`, `settings.manage` |
+| `MASTER_ADMIN` | `visitor.approve`, `credential.issue` |
+| `FM_ADMIN` | `visitor.approve` |
+| `FLOOR_RECEPTIONIST` | `visitor.register`, `masterdata.view` |
+| `TENANT` | `visitor.request` |
+
+`credential.override`, `report.view` and `report.export` are granted to **nobody**, pending TODO-04
+and TODO-16.
+
+One consequence worth knowing locally: `fmadmin` can no longer read master data. The role that can
+view but not edit is now `receptionist` — which is what the matrix says, and what the integration
+tests assert against.
 
 ### Seeing authorization work
 
@@ -193,8 +217,10 @@ curl -s -X DELETE http://localhost:8081/api/v1/admin/buildings/$ID \
   -H "Authorization: Bearer $SYSADMIN_TOKEN" -o /dev/null -w '%{http_code}\n'   # 405 — no such verb
 ```
 
-Reading needs `masterdata.view`, every mutation needs `masterdata.edit`. `fmadmin` has the first but
-not the second, so it can list buildings and gets **403** on a create.
+Reading needs `masterdata.view`, every mutation needs `masterdata.edit`. **`receptionist`** holds the
+first and not the second, so it can list buildings and gets **403** on a create. (`fmadmin` holds
+neither — under the real matrix it approves visitor requests and nothing else, so it gets 403 on
+both.)
 
 ### A deployment note about logging and personal data (US-04.3.1 AC-6)
 
