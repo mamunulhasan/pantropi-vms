@@ -7,7 +7,9 @@ import com.pantropi.vms.application.visitor.port.TenantDirectory;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
 import com.pantropi.vms.application.visitor.port.VisitorTypeDirectory;
 import com.pantropi.vms.application.shared.port.ClockPort;
+import com.pantropi.vms.application.visitor.usecase.AmendVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
+import com.pantropi.vms.application.visitor.usecase.CancelVisitorRequest;
 import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
 import com.pantropi.vms.application.visitor.port.VisitorRequestQueries;
 import com.pantropi.vms.application.visitor.usecase.MyVisitorRequests;
@@ -85,6 +87,23 @@ public class VisitorConfig {
                                                 DomainEventPublisher events, AuditTrail audit,
                                                 TransactionRunner tx, ClockPort clock) {
         return new ApproveVisitorRequest(requests, events, audit, tx, clock);
+    }
+
+    /** US-07.1.3 — the tenant's own control over a request it raised. */
+    @Bean
+    CancelVisitorRequest cancelVisitorRequest(VisitorRequestRepository requests,
+                                              DomainEventPublisher events, AuditTrail audit,
+                                              TransactionRunner tx, ClockPort clock) {
+        return new CancelVisitorRequest(requests, events, audit, tx, clock);
+    }
+
+    @Bean
+    AmendVisitorRequest amendVisitorRequest(VisitorRequestRepository requests,
+                                            TenantDirectory tenants,
+                                            VisitorTypeDirectory visitorTypes,
+                                            DomainEventPublisher events, AuditTrail audit,
+                                            TransactionRunner tx, ClockPort clock) {
+        return new AmendVisitorRequest(requests, tenants, visitorTypes, events, audit, tx, clock);
     }
 
     /** US-07.4.2 — the other half of the decision, with the reason as an aggregate invariant. */

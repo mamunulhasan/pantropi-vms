@@ -30,16 +30,29 @@ public final class VisitorRequest {
 
     private final UUID id;
     private final UUID tenantId;
-    private final UUID hostId;
     private final UUID requestedBy;
     private final VisitKind visitKind;
-    private final TimeWindow window;
-    private final String purpose;
     private final List<Visitor> visitors;
+
+    // Amendable while the request is still awaiting a decision (US-07.1.3 AC-1).
+    private UUID hostId;
+    private TimeWindow window;
+    private String purpose;
     private RequestStatus status;
     private UUID approvedBy;
     private String decisionReason;
     private Instant decidedAt;
+
+    /**
+     * Set when a cancellation withdrew an approval that had already been granted
+     * (US-07.1.3 AC-3).
+     *
+     * <p>Recorded on the aggregate rather than left for the caller to infer, because the fact it
+     * represents is consequential: an approved request may already have a credential, and that
+     * credential has to be revoked. A use case comparing statuses either side of the call would
+     * arrive at the same answer today and would have to be reimplemented by the next caller.
+     */
+    private boolean cancelledAfterApproval;
 
     private VisitorRequest(UUID id, UUID tenantId, UUID hostId, UUID requestedBy,
                            VisitKind visitKind, TimeWindow window, String purpose,
@@ -74,11 +87,7 @@ public final class VisitorRequest {
         if (visitors.size() > MAX_VISITORS) {
             throw new TooManyVisitors(visitors.size(), MAX_VISITORS);
         }
-        String cleanPurpose = purpose == null || purpose.isBlank() ? null : purpose.trim();
-        if (cleanPurpose != null && cleanPurpose.length() > MAX_PURPOSE) {
-            throw new IllegalArgumentException("The purpose must be at most " + MAX_PURPOSE
-                    + " characters");
-        }
+        String cleanPurpose = purpose == null ? null : cleanPurpose(purpose);
         return new VisitorRequest(UUID.randomUUID(), tenantId, hostId, requestedBy,
                 VisitKind.PRE_SCHEDULED, window, cleanPurpose, new ArrayList<>(visitors),
                 RequestStatus.SUBMITTED, null);
@@ -170,7 +179,63 @@ public final class VisitorRequest {
      */
     public void cancel(Instant now) {
         Objects.requireNonNull(now, "the deciding instant is required");
+        boolean wasApproved = this.status == RequestStatus.APPROVED;
         transitionTo(RequestStatus.CANCELLED, now);
+        // After the guard, so a refused cancellation cannot leave the flag set.
+        this.cancelledAfterApproval = wasApproved;
+    }
+
+    /**
+     * Amend a request that has not yet been decided (US-07.1.3, T-07.1.3.1, AC-1).
+     *
+     * <p>Every argument is optional: null means "leave this as it is", which is what makes a partial
+     * update expressible. The one thing that cannot be said this way is <em>clearing</em> the host,
+     * since a null host is indistinguishable from an absent one — removing a host is not supported by
+     * this story, and a caller that needs it should say so rather than discover the omission.
+     *
+     * <h2>Not a status change, so not the state machine's business</h2>
+     * {@link RequestTransitions} governs moves between statuses. An amendment does not move one; it
+     * changes what the request says while it stays where it is. The rule is the narrower
+     * {@link #requirePending} — the same guard that governs adding a visitor, and for the same
+     * reason: once someone has decided on a request, altering what they decided on would make the
+     * decision a record of something that no longer exists (AC-4).
+     *
+     * @throws RequestNotPending from any state but {@code SUBMITTED}
+     */
+    public void amend(UUID newHostId, TimeWindow newWindow, String newPurpose,
+                      List<Visitor> newVisitors) {
+        requirePending("amend");
+
+        // Validate everything before mutating anything, so a rejected amendment leaves the request
+        // exactly as it was rather than half-applied.
+        String cleanPurpose = newPurpose == null ? null : cleanPurpose(newPurpose);
+        if (newVisitors != null) {
+            if (newVisitors.isEmpty()) {
+                throw new NoVisitorsNamed();
+            }
+            if (newVisitors.size() > MAX_VISITORS) {
+                throw new TooManyVisitors(newVisitors.size(), MAX_VISITORS);
+            }
+        }
+
+        if (newHostId != null) {
+            this.hostId = newHostId;
+        }
+        if (newWindow != null) {
+            this.window = newWindow;
+        }
+        if (cleanPurpose != null) {
+            this.purpose = cleanPurpose;
+        }
+        if (newVisitors != null) {
+            this.visitors.clear();
+            this.visitors.addAll(newVisitors);
+        }
+    }
+
+    /** True when this cancellation withdrew an approval, so a credential may need revoking. */
+    public boolean cancelledAfterApproval() {
+        return cancelledAfterApproval;
     }
 
     /**
@@ -186,6 +251,16 @@ public final class VisitorRequest {
         }
         if (trimmed.length() > MAX_DECISION_REASON) {
             throw new DecisionReasonTooLong(MAX_DECISION_REASON);
+        }
+        return trimmed;
+    }
+
+    /** One purpose rule, shared by submission and amendment. Blank means absent. */
+    private static String cleanPurpose(String purpose) {
+        String trimmed = purpose.isBlank() ? null : purpose.trim();
+        if (trimmed != null && trimmed.length() > MAX_PURPOSE) {
+            throw new IllegalArgumentException("The purpose must be at most " + MAX_PURPOSE
+                    + " characters");
         }
         return trimmed;
     }

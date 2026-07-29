@@ -87,6 +87,22 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/approve \
   -d '{"note":"Cleared with building security"}'
 ```
 
+A tenant can amend its own request while it is still `submitted` — `PATCH` with only the fields
+it wants changed; anything absent is left alone. Once a decision has been taken the request is
+closed to amendment (**409**), because altering what somebody decided on would make their
+decision a record of something that no longer exists.
+
+Cancelling is legal from `submitted` **and** from `approved` — a plan changes after approval
+more often than before it, and the alternative is a visitor nobody expects arriving at the gate.
+Cancelling an approved request emits `CredentialRevocationRequested` to the outbox for EPIC-09.
+If an FM Admin approves at the same moment, exactly one of the two succeeds and the other gets
+**409**; the request is never both.
+
+```bash
+curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/cancel \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 Each visitor on a request may carry a name, email, phone, company and a `visitorTypeId` drawn
 from `vms.visitor_types`. Email and phone are normalised on the way in — trimmed, lower-cased,
 punctuation stripped from the number — so the same person entered twice is one person. An
@@ -366,6 +382,8 @@ invalidation is US-04.9.2 — see the Redis note in
 | GET | `/api/v1/visitor-requests/pending?page=&size=` — **max size 100**, clamped not refused | `visitor.approve` |
 | GET | `/api/v1/visitor-requests?status=&from=&to=&page=&size=` — own tenant only | `visitor.request` |
 | GET | `/api/v1/visitor-requests/{id}` — own tenant only; 404 for anyone else's | `visitor.request` |
+| PATCH | `/api/v1/visitor-requests/{id}` — partial edit, `submitted` only | `visitor.request` |
+| POST | `/api/v1/visitor-requests/{id}/cancel` — legal from `submitted` **and** `approved` | `visitor.request` |
 
 Anything else is denied by default (US-03.2.1).
 

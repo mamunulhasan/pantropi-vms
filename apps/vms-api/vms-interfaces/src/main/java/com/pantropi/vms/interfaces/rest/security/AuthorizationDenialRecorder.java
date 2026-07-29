@@ -57,7 +57,15 @@ public final class AuthorizationDenialRecorder {
 
     private void recordOrThrow(HttpServletRequest request, int status, String attemptedPermission,
                                UUID actorId) {
-        String outcome = status == 401 ? "unauthenticated" : "forbidden";
+        String outcome = switch (status) {
+            case 401 -> "unauthenticated";
+            // An object-level denial: the caller holds the permission but the resource is not
+            // theirs. It answers 404 rather than 403 so it cannot confirm the resource exists
+            // (US-07.1.3 AC-6), which is exactly why the trail has to be recorded here — the
+            // response deliberately says nothing.
+            case 404 -> "not_visible";
+            default -> "forbidden";
+        };
         String route = routeClass(request);
         String method = request.getMethod();
         String sourceIp = clientIp(request);

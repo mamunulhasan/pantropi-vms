@@ -4,7 +4,9 @@ import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
 import com.pantropi.vms.application.visitor.port.VisitorRequestQueries;
 import com.pantropi.vms.application.visitor.usecase.MyVisitorRequests;
 import com.pantropi.vms.application.shared.PageRequest;
+import com.pantropi.vms.application.visitor.usecase.AmendVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
+import com.pantropi.vms.application.visitor.usecase.CancelVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
 import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.RequestDecision;
@@ -13,6 +15,8 @@ import com.pantropi.vms.domain.visitor.RequestTransitions;
 import com.pantropi.vms.domain.visitor.Visitor;
 import com.pantropi.vms.domain.visitor.VisitorRequest;
 import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
+import com.pantropi.vms.interfaces.rest.security.AuthorizationDenialRecorder;
+import jakarta.servlet.http.HttpServletRequest;
 import com.pantropi.vms.interfaces.rest.security.RequiresPermission;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -49,17 +53,84 @@ public class VisitorRequestController {
     private final RejectVisitorRequest rejectVisitorRequest;
     private final PendingApprovals pendingApprovals;
     private final MyVisitorRequests myVisitorRequests;
+    private final AmendVisitorRequest amendVisitorRequest;
+    private final CancelVisitorRequest cancelVisitorRequest;
+    private final AuthorizationDenialRecorder denials;
 
     public VisitorRequestController(SubmitVisitorRequest submitVisitorRequest,
                                     ApproveVisitorRequest approveVisitorRequest,
                                     RejectVisitorRequest rejectVisitorRequest,
                                     PendingApprovals pendingApprovals,
-                                    MyVisitorRequests myVisitorRequests) {
+                                    MyVisitorRequests myVisitorRequests,
+                                    AmendVisitorRequest amendVisitorRequest,
+                                    CancelVisitorRequest cancelVisitorRequest,
+                                    AuthorizationDenialRecorder denials) {
         this.submitVisitorRequest = submitVisitorRequest;
         this.approveVisitorRequest = approveVisitorRequest;
         this.rejectVisitorRequest = rejectVisitorRequest;
         this.pendingApprovals = pendingApprovals;
         this.myVisitorRequests = myVisitorRequests;
+        this.amendVisitorRequest = amendVisitorRequest;
+        this.cancelVisitorRequest = cancelVisitorRequest;
+        this.denials = denials;
+    }
+
+    /**
+     * Amend a request still awaiting a decision (US-07.1.3, T-07.1.3.3) — FR-VMS-01 (SRS B1).
+     *
+     * <p>{@code PATCH}, and the body means it: an absent field is left alone rather than cleared.
+     * Under the class-level {@code visitor.request}, and object-level authorisation comes from the
+     * tenant-scoped repository read rather than from a check written here — another tenant's id is
+     * simply not found (AC-6).
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<DecisionResponse> amend(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal,
+            @PathVariable UUID id,
+            @RequestBody AmendRequest body) {
+
+        if (body == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        RequestDecision result = amendVisitorRequest.amend(
+                UUID.fromString(principal.userId()), id,
+                new AmendVisitorRequest.Amendment(body.hostId(), body.scheduledFrom(),
+                        body.scheduledTo(), body.purpose(),
+                        body.visitors() == null ? null : body.visitors().stream()
+                                .map(v -> new SubmitVisitorRequest.VisitorDetail(
+                                        v.fullName(), v.email(), v.phone(), v.company(),
+                                        v.visitorTypeId()))
+                                .toList()));
+
+        return ResponseEntity.ok(new DecisionResponse(result.requestId().toString(),
+                result.status(), result.decidedBy().toString(), result.decidedAt(), null));
+    }
+
+    /**
+     * Withdraw a request (US-07.1.3, T-07.1.3.3, AC-2/AC-3) — FR-VMS-01 (SRS B1).
+     *
+     * <p>Legal from {@code submitted} and from {@code approved}: a plan changes after approval more
+     * often than before it, and the alternative is a visitor nobody expects arriving at the gate.
+     * Cancelling an approved request signals credential revocation downstream.
+     */
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<DecisionResponse> cancel(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal,
+            @PathVariable UUID id) {
+
+        RequestDecision result = cancelVisitorRequest.cancel(
+                UUID.fromString(principal.userId()), id);
+
+        return ResponseEntity.ok(new DecisionResponse(result.requestId().toString(),
+                result.status(), result.decidedBy().toString(), result.decidedAt(), null));
+    }
+
+    /** Amending a decided request: 409 naming the state it is in (AC-4). */
+    @ExceptionHandler(VisitorRequest.RequestNotPending.class)
+    public ResponseEntity<DecisionError> onNotPending(VisitorRequest.RequestNotPending e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new DecisionError("already_decided", e.getMessage()));
     }
 
     /**
@@ -274,8 +345,26 @@ public class VisitorRequestController {
                 .body(new DecisionError("window_elapsed", e.getMessage()));
     }
 
+    /**
+     * Not there, or not the caller's (US-07.1.3 AC-6).
+     *
+     * <p>404 rather than 403, so the response cannot confirm that some id belongs to another
+     * tenant — and precisely because it says nothing, the attempt is recorded. Someone walking
+     * identifiers to find what else is in the building leaves a trail even though every answer they
+     * get is identical.
+     *
+     * <p>A mistyped id is recorded too. That is the honest consequence of refusing to distinguish
+     * the two cases: the server cannot tell them apart either, and choosing to audit only the
+     * cross-tenant ones would mean knowing which they were.
+     */
     @ExceptionHandler(RequestDecision.NotFound.class)
-    public ResponseEntity<Void> onNotFound() {
+    public ResponseEntity<Void> onNotFound(
+            HttpServletRequest request,
+            @RequestAttribute(name = AuthenticatedPrincipal.ATTRIBUTE, required = false)
+            AuthenticatedPrincipal principal) {
+
+        denials.record(request, 404, "visitor_request.object",
+                principal == null ? null : UUID.fromString(principal.userId()));
         return ResponseEntity.notFound().build();
     }
 
@@ -313,6 +402,15 @@ public class VisitorRequestController {
      */
     public record PendingPage(List<PendingRow> content, long totalElements, int page, int size,
                               int maxSize) {}
+
+    /**
+     * A partial edit. An absent field is left as it is — this is a {@code PATCH}, not a replacement.
+     *
+     * <p>No {@code tenantId}, {@code status} or {@code approvedBy}, exactly as on submission: a
+     * client must not be able to amend its way to an approval.
+     */
+    public record AmendRequest(UUID hostId, Instant scheduledFrom, Instant scheduledTo,
+                               String purpose, List<VisitorPayload> visitors) {}
 
     /** Optional note only — everything else about a decision is server-determined. */
     public record DecisionRequest(String note) {}

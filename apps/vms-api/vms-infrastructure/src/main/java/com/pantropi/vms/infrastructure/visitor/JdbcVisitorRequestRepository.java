@@ -51,6 +51,10 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
                 Timestamp.from(r.window().from()), Timestamp.from(r.window().to()),
                 r.status().dbValue(), r.purpose());
 
+        insertVisitors(r);
+    }
+
+    private void insertVisitors(VisitorRequest r) {
         for (Visitor v : r.visitors()) {
             jdbc.update("""
                     INSERT INTO vms.visitors
@@ -104,6 +108,42 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
             jdbc.update("UPDATE vms.visitors SET status = ?::vms.visitor_status WHERE id = ?",
                     v.status().dbValue(), v.id());
         }
+        return true;
+    }
+
+    /**
+     * Persists an amendment as a compare-and-set on the status (US-07.1.3, T-07.1.3.2).
+     *
+     * <p>Deliberately not a separate {@code version} column. The status <em>is</em> the version for
+     * every operation this aggregate has: approve, reject, cancel and amend are all only legal from
+     * a known state, so a caller whose expected state no longer holds is exactly the caller that
+     * should lose. A second counter would be a second thing to keep in step with the first, and
+     * conflicts it reported that the status did not would be ones nobody could explain. The reasoning
+     * is recorded in {@code V10}'s header.
+     */
+    @Override
+    public boolean saveAmendment(VisitorRequest r, RequestStatus expectedCurrent) {
+        int updated = jdbc.update("""
+                UPDATE vms.visitor_requests
+                   SET host_id        = ?,
+                       scheduled_from = ?,
+                       scheduled_to   = ?,
+                       purpose        = ?,
+                       updated_at     = now()
+                 WHERE id = ? AND status = ?::vms.request_status
+                """,
+                r.hostId(),
+                Timestamp.from(r.window().from()), Timestamp.from(r.window().to()),
+                r.purpose(), r.id(), expectedCurrent.dbValue());
+
+        if (updated == 0) {
+            return false;
+        }
+
+        // Wholesale replacement, inside the caller's transaction: the delete and the inserts commit
+        // together, so the request is never briefly a request with no visitors.
+        jdbc.update("DELETE FROM vms.visitors WHERE request_id = ?", r.id());
+        insertVisitors(r);
         return true;
     }
 

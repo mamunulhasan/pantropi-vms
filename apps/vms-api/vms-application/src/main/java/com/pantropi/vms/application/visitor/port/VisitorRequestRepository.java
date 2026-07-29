@@ -35,4 +35,21 @@ public interface VisitorRequestRepository {
      * @return true if this caller's decision was the one that landed
      */
     boolean saveDecision(VisitorRequest request, RequestStatus expectedPrevious);
+
+    /**
+     * Persists an amendment, but only if the request is still in the state it was amended from
+     * (US-07.1.3, T-07.1.3.2).
+     *
+     * <p>The same compare-and-set as {@link #saveDecision}, for the same reason: an FM Admin may be
+     * approving the request while the tenant edits it, and the amended content must not land on a
+     * request that has since been decided — the decision would then be a record of something that no
+     * longer exists.
+     *
+     * <p>Replaces the visitor rows wholesale rather than diffing them. A visitor has no
+     * tenant-visible identity to preserve across an edit, and matching old rows to new ones by name
+     * would silently merge two people who happen to share one.
+     *
+     * @return true if the amendment was the write that landed
+     */
+    boolean saveAmendment(VisitorRequest request, RequestStatus expectedCurrent);
 }
