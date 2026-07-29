@@ -188,6 +188,15 @@ public class IdentityConfig {
         return new com.pantropi.vms.application.identity.usecase.EffectivePermissions(store);
     }
 
+    @Bean
+    com.pantropi.vms.application.identity.usecase.RoleAdministration roleAdministration(
+            com.pantropi.vms.application.identity.port.RoleGrantStore store,
+            com.pantropi.vms.application.shared.port.TransactionRunner transactions,
+            com.pantropi.vms.application.identity.port.AuditTrail audit) {
+        return new com.pantropi.vms.application.identity.usecase.RoleAdministration(
+                store, transactions, audit);
+    }
+
     // ---- US-02.4.1 Master Admin authority & bootstrap ----
 
     @Bean

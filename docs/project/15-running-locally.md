@@ -103,6 +103,24 @@ One consequence worth knowing locally: `fmadmin` can no longer read master data.
 view but not edit is now `receptionist` — which is what the matrix says, and what the integration
 tests assert against.
 
+Grants can be adjusted at runtime (US-03.3.1), and the change applies to a **live session on its next
+request** — no re-login:
+
+```bash
+# read the role, note its version
+curl -s http://localhost:8081/api/v1/admin/roles/FM_ADMIN -H "Authorization: Bearer $SYSADMIN_TOKEN"
+
+# give it masterdata.view — the whole set is submitted, not a delta
+curl -s -X PUT http://localhost:8081/api/v1/admin/roles/FM_ADMIN/grants \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"version":"<from the read>","permissions":["visitor.approve","masterdata.view"]}'
+```
+
+Sending a stale `version` gets **409** with the current grants in the body, so you can see what the
+other administrator changed. Revoking the last `user.manage` gets **409** too — that one would lock
+everyone out of undoing it. And `credential.override` is refused with a message naming TODO-04,
+because the migration withholding it would be decorative if the API handed it out.
+
 ### Seeing authorization work
 
 ```bash
@@ -254,6 +272,8 @@ invalidation is US-04.9.2 — see the Redis note in
 | PUT | `/api/v1/admin/users/{id}` | `user.manage` |
 | POST | `/api/v1/admin/users/{id}/deactivate`, `/reactivate` | `user.manage` |
 | POST | `/api/v1/admin/users/{id}/unlock`, `/reset-password` | `user.manage` |
+| GET | `/api/v1/admin/roles`, `/roles/{code}` | `user.manage` |
+| PUT | `/api/v1/admin/roles/{code}/grants` | `user.manage` |
 | GET | `/api/v1/admin/settings`, `/settings/{key}` | `masterdata.view` |
 | PUT | `/api/v1/admin/settings/{key}` | `settings.manage` |
 | GET | `/api/v1/admin/buildings`, `/buildings/{id}` | `masterdata.view` |
