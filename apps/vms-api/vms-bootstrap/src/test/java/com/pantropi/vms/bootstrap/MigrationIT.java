@@ -77,7 +77,7 @@ class MigrationIT {
     @DisplayName("AC-1: baseline creates every table, enum, trigger and comment; history records V1+V2")
     void baselineCreatesFullSchema() throws Exception {
         MigrateResult result = flyway().migrate();
-        assertThat(result.migrationsExecuted).isEqualTo(10);
+        assertThat(result.migrationsExecuted).isEqualTo(11);
 
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             assertThat(query(s, """
@@ -112,9 +112,15 @@ class MigrationIT {
                     SELECT indexname FROM pg_indexes WHERE schemaname='vms'"""))
                     .contains("ux_credentials_active_per_visitor");
 
+            // In any order: query() collects into a HashSet, so an ordered assertion here was
+            // really asserting a hash order — it held for nine elements and stopped holding at
+            // eleven. What the test is about is which migrations ran, not the sequence, which
+            // Flyway's own version ordering already guarantees.
             assertThat(query(s, """
-                    SELECT version FROM vms.flyway_schema_history WHERE success AND version IS NOT NULL"""))
-                    .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+                    SELECT version FROM vms.flyway_schema_history
+                     WHERE success AND version IS NOT NULL"""))
+                    .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+                            "11");
         }
     }
 

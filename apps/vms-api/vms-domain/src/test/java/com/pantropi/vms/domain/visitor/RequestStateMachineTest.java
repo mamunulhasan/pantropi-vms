@@ -242,7 +242,7 @@ class RequestStateMachineTest {
                 new TimeWindow(Instant.parse("2030-01-01T09:00:00Z"),
                         Instant.parse("2030-01-01T11:00:00Z")),
                 "Quarterly review",
-                List.of(Visitor.named("Ada Lovelace", "ada@example.test", null, null),
-                        Visitor.named("Alan Turing", "alan@example.test", null, null)));
+                List.of(Visitor.named("Ada Lovelace", "ada@example.test", null, null, null),
+                        Visitor.named("Alan Turing", "alan@example.test", null, null, null)));
     }
 }

@@ -54,11 +54,14 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
         for (Visitor v : r.visitors()) {
             jdbc.update("""
                     INSERT INTO vms.visitors
-                        (id, request_id, full_name, email, phone, company,
+                        (id, request_id, visitor_type_id, full_name, email, phone, company,
                          appointment_from, appointment_to, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::vms.visitor_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::vms.visitor_status)
                     """,
-                    v.id(), r.id(), v.fullName(), v.email(), v.phone(), v.company(),
+                    v.id(), r.id(), v.visitorTypeId(), v.fullName(),
+                    // Value accessors: the domain holds these as redacting value objects, and the
+                    // database wants the normalised text (US-07.1.2 AC-1/AC-2).
+                    v.emailValue(), v.phoneValue(), v.company(),
                     Timestamp.from(r.window().from()), Timestamp.from(r.window().to()),
                     v.status().dbValue());
         }
@@ -138,11 +141,12 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
         Object[] row = rows.get(0);
 
         List<Visitor> visitors = jdbc.query("""
-                SELECT id, full_name, email, phone, company, status
+                SELECT id, full_name, email, phone, company, visitor_type_id, status
                 FROM vms.visitors WHERE request_id = ? ORDER BY created_at
                 """, (rs, i) -> Visitor.rehydrate(
                 rs.getObject("id", UUID.class), rs.getString("full_name"), rs.getString("email"),
                 rs.getString("phone"), rs.getString("company"),
+                rs.getObject("visitor_type_id", UUID.class),
                 VisitorStatus.fromDb(rs.getString("status"))), id);
 
         Timestamp decidedAt = (Timestamp) row[10];

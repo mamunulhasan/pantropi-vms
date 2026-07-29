@@ -37,13 +37,14 @@ class SubmitVisitorRequestTest {
     private final FakeTenants tenants = new FakeTenants(tenant, host);
     private final FakeEvents events = new FakeEvents();
     private final FakeAudit audit = new FakeAudit();
+    private final FakeVisitorTypes types = new FakeVisitorTypes();
     private final SubmitVisitorRequest useCase =
-            new SubmitVisitorRequest(repo, tenants, events, audit, direct());
+            new SubmitVisitorRequest(repo, tenants, events, audit, direct(), types);
 
     private SubmitVisitorRequest.Command command() {
         return new SubmitVisitorRequest.Command(host, from, to, "Quarterly review",
                 List.of(new SubmitVisitorRequest.VisitorDetail(
-                        "Ada Lovelace", "ada@example.test", "+880100000000", "Analytical Ltd")));
+                        "Ada Lovelace", "ada@example.test", "+880100000000", "Analytical Ltd", null)));
     }
 
     @Test
@@ -101,7 +102,7 @@ class SubmitVisitorRequestTest {
     void invalidWindowPersistsNothing() {
         SubmitVisitorRequest.Command bad = new SubmitVisitorRequest.Command(
                 host, to, from, null,
-                List.of(new SubmitVisitorRequest.VisitorDetail("Ada", null, null, null)));
+                List.of(new SubmitVisitorRequest.VisitorDetail("Ada", null, null, null, null)));
 
         assertThatThrownBy(() -> useCase.submit(submitter, bad))
                 .isInstanceOf(TimeWindow.InvalidTimeWindow.class);
@@ -115,7 +116,7 @@ class SubmitVisitorRequestTest {
     void foreignHostRefused() {
         SubmitVisitorRequest.Command foreign = new SubmitVisitorRequest.Command(
                 UUID.randomUUID(), from, to, null,
-                List.of(new SubmitVisitorRequest.VisitorDetail("Ada", null, null, null)));
+                List.of(new SubmitVisitorRequest.VisitorDetail("Ada", null, null, null, null)));
 
         assertThatThrownBy(() -> useCase.submit(submitter, foreign))
                 .isInstanceOf(SubmitVisitorRequest.HostNotInTenant.class);
@@ -125,7 +126,8 @@ class SubmitVisitorRequestTest {
     @Test
     @DisplayName("a submitter with no tenant cannot submit")
     void submitterWithoutTenantRefused() {
-        var orphan = new SubmitVisitorRequest(repo, new FakeTenants(null, host), events, audit, direct());
+        var orphan = new SubmitVisitorRequest(repo, new FakeTenants(null, host), events, audit, direct(),
+                types);
         assertThatThrownBy(() -> orphan.submit(submitter, command()))
                 .isInstanceOf(SubmitVisitorRequest.NoTenantForUser.class);
         assertThat(repo.saved).isNull();
@@ -135,10 +137,92 @@ class SubmitVisitorRequestTest {
     @DisplayName("persistence, audit and event all happen inside one transaction")
     void allWorkIsTransactional() {
         CountingRunner counting = new CountingRunner();
-        new SubmitVisitorRequest(repo, tenants, events, audit, counting).submit(submitter, command());
+        new SubmitVisitorRequest(repo, tenants, events, audit, counting, types)
+                .submit(submitter, command());
 
         assertThat(counting.calls).isEqualTo(1);
         assertThat(counting.workInsideTransaction).isTrue();
+    }
+
+    // ---- US-07.1.2: visitor type validation ----
+
+    @Test
+    @DisplayName("US-07.1.2 AC-1: the visitor type reaches the persisted visitor")
+    void visitorTypeIsCarriedThrough() {
+        UUID type = UUID.randomUUID();
+        useCase.submit(submitter, new SubmitVisitorRequest.Command(host, from, to, null,
+                List.of(new SubmitVisitorRequest.VisitorDetail("Ada", null, null, null, type))));
+
+        assertThat(repo.saved.visitors()).singleElement()
+                .extracting(Visitor::visitorTypeId).isEqualTo(type);
+    }
+
+    @Test
+    @DisplayName("US-07.1.2 AC-3: an unknown or retired visitor type refuses the whole submission")
+    void unusableVisitorTypeRefusesEverything() {
+        UUID retired = UUID.randomUUID();
+        types.retired.add(retired);
+
+        // Two visitors, and only the second one is unusable — the first must not be written either.
+        SubmitVisitorRequest.Command mixed = new SubmitVisitorRequest.Command(host, from, to, null,
+                List.of(new SubmitVisitorRequest.VisitorDetail("Ada", null, null, null, null),
+                        new SubmitVisitorRequest.VisitorDetail("Alan", null, null, null, retired)));
+
+        assertThatThrownBy(() -> useCase.submit(submitter, mixed))
+                .isInstanceOf(SubmitVisitorRequest.UnknownVisitorType.class);
+
+        assertThat(repo.saved).isNull();
+        assertThat(events.published).isEmpty();
+        assertThat(audit.actions).isEmpty();
+    }
+
+    @Test
+    @DisplayName("US-07.1.2 AC-3: unknown and retired are one answer, so neither can be probed for")
+    void unknownAndRetiredAreIndistinguishable() {
+        UUID retired = UUID.randomUUID();
+        types.retired.add(retired);
+        UUID neverExisted = UUID.randomUUID();
+        types.retired.add(neverExisted);
+
+        String forRetired = failureMessage(retired);
+        String forUnknown = failureMessage(neverExisted);
+
+        assertThat(forRetired).isEqualTo(forUnknown);
+    }
+
+    private String failureMessage(UUID type) {
+        try {
+            useCase.submit(submitter, new SubmitVisitorRequest.Command(host, from, to, null,
+                    List.of(new SubmitVisitorRequest.VisitorDetail("Ada", null, null, null,
+                            type))));
+            throw new AssertionError("expected a refusal");
+        } catch (SubmitVisitorRequest.UnknownVisitorType e) {
+            return e.getMessage();
+        }
+    }
+
+    @Test
+    @DisplayName("US-07.1.2 AC-2: the email reaching persistence is normalised")
+    void emailIsNormalisedBeforePersistence() {
+        useCase.submit(submitter, new SubmitVisitorRequest.Command(host, from, to, null,
+                List.of(new SubmitVisitorRequest.VisitorDetail("Ada", "  ADA@Example.TEST ",
+                        "+880 1712-345678", null, null))));
+
+        assertThat(repo.saved.visitors().get(0).emailValue()).isEqualTo("ada@example.test");
+        assertThat(repo.saved.visitors().get(0).phoneValue()).isEqualTo("+8801712345678");
+    }
+
+    @Test
+    @DisplayName("US-07.1.2 AC-4: a malformed email refuses the submission and writes nothing")
+    void malformedEmailWritesNothing() {
+        SubmitVisitorRequest.Command bad = new SubmitVisitorRequest.Command(host, from, to, null,
+                List.of(new SubmitVisitorRequest.VisitorDetail("Ada", "not-an-email", null, null,
+                        null)));
+
+        assertThatThrownBy(() -> useCase.submit(submitter, bad))
+                .isInstanceOf(Visitor.InvalidVisitorDetail.class)
+                .hasMessageNotContaining("not-an-email");
+        assertThat(repo.saved).isNull();
     }
 
     // ---- fakes ----
@@ -157,6 +241,13 @@ class SubmitVisitorRequestTest {
             workInsideTransaction = true;
             return result;
         }
+    }
+
+    /** Every type is selectable unless a test says otherwise. */
+    private static final class FakeVisitorTypes
+            implements com.pantropi.vms.application.visitor.port.VisitorTypeDirectory {
+        final java.util.Set<UUID> retired = new java.util.HashSet<>();
+        public boolean isSelectable(UUID id) { return id != null && !retired.contains(id); }
     }
 
     private static final class FakeRepo implements VisitorRequestRepository {

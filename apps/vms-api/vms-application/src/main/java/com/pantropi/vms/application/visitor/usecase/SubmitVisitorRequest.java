@@ -4,6 +4,7 @@ import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
 import com.pantropi.vms.application.visitor.port.TenantDirectory;
+import com.pantropi.vms.application.visitor.port.VisitorTypeDirectory;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
 import com.pantropi.vms.domain.visitor.TimeWindow;
 import com.pantropi.vms.domain.visitor.Visitor;
@@ -38,14 +39,17 @@ public final class SubmitVisitorRequest {
     private final DomainEventPublisher events;
     private final AuditTrail audit;
     private final TransactionRunner tx;
+    private final VisitorTypeDirectory visitorTypes;
 
     public SubmitVisitorRequest(VisitorRequestRepository requests, TenantDirectory tenants,
-                                DomainEventPublisher events, AuditTrail audit, TransactionRunner tx) {
+                                DomainEventPublisher events, AuditTrail audit, TransactionRunner tx,
+                                VisitorTypeDirectory visitorTypes) {
         this.requests = requests;
         this.tenants = tenants;
         this.events = events;
         this.audit = audit;
         this.tx = tx;
+        this.visitorTypes = visitorTypes;
     }
 
     /**
@@ -62,8 +66,19 @@ public final class SubmitVisitorRequest {
 
         // Domain invariants — an invalid window cannot be constructed (AC-4).
         TimeWindow window = new TimeWindow(command.scheduledFrom(), command.scheduledTo());
+        // AC-3: every visitor type is resolved before a single Visitor is built, so an unknown or
+        // retired one refuses the whole submission rather than half of it. Nothing has been written
+        // at this point either way — the transaction opens below.
+        for (VisitorDetail detail : command.visitors()) {
+            if (detail.visitorTypeId() != null
+                    && !visitorTypes.isSelectable(detail.visitorTypeId())) {
+                throw new UnknownVisitorType();
+            }
+        }
+
         List<Visitor> visitors = command.visitors().stream()
-                .map(v -> Visitor.named(v.fullName(), v.email(), v.phone(), v.company()))
+                .map(v -> Visitor.named(v.fullName(), v.email(), v.phone(), v.company(),
+                        v.visitorTypeId()))
                 .toList();
 
         VisitorRequest request = VisitorRequest.submit(
@@ -108,13 +123,30 @@ public final class SubmitVisitorRequest {
     public record Command(UUID hostId, Instant scheduledFrom, Instant scheduledTo, String purpose,
                           List<VisitorDetail> visitors) {}
 
-    public record VisitorDetail(String fullName, String email, String phone, String company) {}
+    /**
+     * @param visitorTypeId optional classification from {@code vms.visitor_types} (US-07.1.2 AC-1);
+     *                      an unknown or inactive one refuses the submission
+     */
+    public record VisitorDetail(String fullName, String email, String phone, String company,
+                                UUID visitorTypeId) {}
 
     // ---- failures ----
 
     public static final class NoTenantForUser extends IllegalStateException {
         public NoTenantForUser(UUID userId) {
             super("The submitting user " + userId + " is not linked to a tenant");
+        }
+    }
+
+    /**
+     * Names the field, not the value (US-07.1.2 AC-3).
+     *
+     * <p>Unknown and inactive are one failure deliberately: telling a tenant which of the two it was
+     * would confirm that some id they guessed corresponds to a real type.
+     */
+    public static final class UnknownVisitorType extends IllegalArgumentException {
+        public UnknownVisitorType() {
+            super("The visitor type is not a known active type");
         }
     }
 
