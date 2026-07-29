@@ -8,7 +8,10 @@ import com.pantropi.vms.application.masterdata.VisitorTypeDefinition;
 import com.pantropi.vms.domain.masterdata.PassType;
 import com.pantropi.vms.domain.masterdata.Floor;
 import com.pantropi.vms.domain.masterdata.VisitorType;
+import com.pantropi.vms.application.masterdata.port.HolidayCalendarStore;
 import com.pantropi.vms.application.masterdata.port.MasterDataStore;
+import com.pantropi.vms.application.masterdata.usecase.HolidayCalendar;
+import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.masterdata.port.SettingsStore;
 import com.pantropi.vms.application.masterdata.usecase.MasterDataAdministration;
 import com.pantropi.vms.domain.masterdata.Building;
@@ -107,5 +110,18 @@ public class MasterDataConfig {
     MasterDataAdministration<PassType> passTypeAdministration(MasterDataStore<PassType> store,
                                                               AuditTrail audit) {
         return new MasterDataAdministration<>(new PassTypeDefinition(), store, audit);
+    }
+
+    // ---- US-04.7.1 holiday calendar: its own port and use case, not the shared pattern ----
+
+    @Bean
+    HolidayCalendarStore holidayCalendarStore(DataSource dataSource) {
+        return new JdbcHolidayCalendarStore(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    HolidayCalendar holidayCalendar(HolidayCalendarStore store, TransactionRunner transactions,
+                                    AuditTrail audit) {
+        return new HolidayCalendar(store, transactions, audit);
     }
 }
