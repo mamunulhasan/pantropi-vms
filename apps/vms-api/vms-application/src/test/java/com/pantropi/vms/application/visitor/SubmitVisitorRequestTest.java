@@ -259,6 +259,11 @@ class SubmitVisitorRequestTest {
             saved = r;
             return true;
         }
+        public boolean saveAmendment(VisitorRequest r,
+                                     com.pantropi.vms.domain.visitor.RequestStatus expected) {
+            saved = r;
+            return true;
+        }
     }
 
     private static final class FakeTenants implements TenantDirectory {

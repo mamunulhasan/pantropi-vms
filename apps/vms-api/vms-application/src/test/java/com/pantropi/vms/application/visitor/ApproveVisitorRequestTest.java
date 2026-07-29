@@ -249,6 +249,12 @@ class ApproveVisitorRequestTest {
             savedInsideTransaction = true;
             return decisionLands;
         }
+        public boolean saveAmendment(VisitorRequest r, RequestStatus expected) {
+            saveCalls++;
+            expectedPrevious = expected;
+            savedInsideTransaction = true;
+            return decisionLands;
+        }
     }
 
     private static final class FakeEvents implements DomainEventPublisher {
