@@ -7,6 +7,8 @@ import com.pantropi.vms.application.visitor.port.TenantDirectory;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
+import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
+import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
 import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +32,18 @@ public class VisitorConfig {
     VisitorRequestRepository visitorRequestRepository(DataSource dataSource,
             com.pantropi.vms.application.identity.usecase.ScopePolicy scope) {
         return new JdbcVisitorRequestRepository(new JdbcTemplate(dataSource), scope);
+    }
+
+    /** US-07.3.1 — the queue read model, scoped through the same policy as every other read. */
+    @Bean
+    ApprovalQueueStore approvalQueueStore(DataSource dataSource,
+            com.pantropi.vms.application.identity.usecase.ScopePolicy scope) {
+        return new JdbcApprovalQueueStore(new JdbcTemplate(dataSource), scope);
+    }
+
+    @Bean
+    PendingApprovals pendingApprovals(ApprovalQueueStore queue) {
+        return new PendingApprovals(queue);
     }
 
     @Bean

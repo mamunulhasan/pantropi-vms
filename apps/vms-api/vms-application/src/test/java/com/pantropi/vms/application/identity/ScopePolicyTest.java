@@ -114,6 +114,44 @@ class ScopePolicyTest {
         assertThat(policy.filterFor(entity)).isNotInstanceOf(ScopeFilter.Unrestricted.class);
     }
 
+    // ---- US-07.3.1 AC-6 / T-07.3.1.2: the posture is swappable ----
+
+    @Test
+    @DisplayName("AC-6: under the restrictive posture an approver is confined to their own scope")
+    void restrictivePostureConfinesApprovers() {
+        // The swap AC-6 asks for: the same principal, the same entity, a different posture, and no
+        // change to any query-building code.
+        ScopePolicy restrictive = new ScopePolicy(context, ScopePolicy.Posture.OWN_SCOPE);
+        context.scope = new ScopeContext.Scope(USER, "FM_ADMIN", TENANT, null);
+
+        assertThat(policy.filterFor(ScopedEntity.VISITOR_REQUEST))
+                .isEqualTo(ScopeFilter.UNRESTRICTED);
+        assertThat(restrictive.filterFor(ScopedEntity.VISITOR_REQUEST))
+                .isNotInstanceOf(ScopeFilter.Unrestricted.class);
+    }
+
+    @Test
+    @DisplayName("AC-6: under the restrictive posture an approver with no scope column sees nothing")
+    void restrictivePostureDeniesAnUnscopedApprover() {
+        // An FM Admin normally has no tenant, so this is the common case under OWN_SCOPE, and the
+        // answer is deliberately nothing: an approver nobody has assigned a scope to has not been
+        // given anything to approve. Failing closed is the point of the posture existing.
+        ScopePolicy restrictive = new ScopePolicy(context, ScopePolicy.Posture.OWN_SCOPE);
+        context.scope = new ScopeContext.Scope(USER, "FM_ADMIN", null, null);
+
+        assertThat(restrictive.filterFor(ScopedEntity.VISITOR_REQUEST))
+                .isEqualTo(ScopeFilter.DENY_ALL);
+    }
+
+    @Test
+    @DisplayName("the default posture is building-wide, and it is readable for the startup log")
+    void defaultPostureIsBuildingWide() {
+        assertThat(new ScopePolicy(context).posture())
+                .isEqualTo(ScopePolicy.Posture.BUILDING_WIDE);
+        assertThat(new ScopePolicy(context, null).posture())
+                .isEqualTo(ScopePolicy.Posture.BUILDING_WIDE);
+    }
+
     private static final class FakeContext implements ScopeContext {
         Scope scope;
 

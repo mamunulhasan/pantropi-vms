@@ -1,6 +1,9 @@
 package com.pantropi.vms.interfaces.rest.visitor;
 
+import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
+import com.pantropi.vms.application.shared.PageRequest;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
+import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
 import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.RequestDecision;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
@@ -40,13 +43,46 @@ public class VisitorRequestController {
     private final SubmitVisitorRequest submitVisitorRequest;
     private final ApproveVisitorRequest approveVisitorRequest;
     private final RejectVisitorRequest rejectVisitorRequest;
+    private final PendingApprovals pendingApprovals;
 
     public VisitorRequestController(SubmitVisitorRequest submitVisitorRequest,
                                     ApproveVisitorRequest approveVisitorRequest,
-                                    RejectVisitorRequest rejectVisitorRequest) {
+                                    RejectVisitorRequest rejectVisitorRequest,
+                                    PendingApprovals pendingApprovals) {
         this.submitVisitorRequest = submitVisitorRequest;
         this.approveVisitorRequest = approveVisitorRequest;
         this.rejectVisitorRequest = rejectVisitorRequest;
+        this.pendingApprovals = pendingApprovals;
+    }
+
+    /**
+     * The approval queue (US-07.3.1, T-07.3.1.3) — FR-VMS-02 (SRS B1).
+     *
+     * <p>{@code GET /api/v1/visitor-requests/pending}, guarded by {@code visitor.approve}. AC-4 is
+     * explicit that the dashboard is never merely hidden from the navigation: a Tenant calling this
+     * directly gets 403 and an audited denial, exactly as for the decision endpoints.
+     *
+     * <p><strong>Maximum page size is {@value PageRequest#MAX_SIZE}.</strong> A larger request is
+     * clamped rather than refused, and the applied size comes back on the response so a caller can
+     * see what it actually got (AC-5).
+     *
+     * <p>The row shape carries no visitor contact detail — see {@link ApprovalQueueStore}; it is
+     * never selected, rather than selected and then dropped here.
+     */
+    @GetMapping("/pending")
+    @RequiresPermission("visitor.approve")
+    public PendingPage pending(@RequestParam(defaultValue = "0") int page,
+                               @RequestParam(defaultValue = "20") int size) {
+
+        ApprovalQueueStore.Page result = pendingApprovals.list(page, size);
+
+        return new PendingPage(
+                result.content().stream()
+                        .map(r -> new PendingRow(r.id().toString(), r.tenantName(), r.hostName(),
+                                r.scheduledFrom(), r.scheduledTo(), r.visitorCount(),
+                                r.submittedAt()))
+                        .toList(),
+                result.totalElements(), result.page(), result.size(), PageRequest.MAX_SIZE);
     }
 
     @PostMapping
@@ -163,6 +199,20 @@ public class VisitorRequestController {
     public ResponseEntity<DecisionError> onNoteTooLong(VisitorRequest.DecisionReasonTooLong e) {
         return ResponseEntity.badRequest().body(new DecisionError("invalid", e.getMessage()));
     }
+
+    /**
+     * One queue row. Counts and names an approver needs to recognise the request — deliberately no
+     * visitor email, phone or identity-document reference.
+     */
+    public record PendingRow(String id, String tenant, String host, Instant scheduledFrom,
+                             Instant scheduledTo, int visitorCount, Instant submittedAt) {}
+
+    /**
+     * @param size    the size actually applied, which may be less than the one asked for (AC-5)
+     * @param maxSize the server ceiling, so a client can stop asking for more than it can have
+     */
+    public record PendingPage(List<PendingRow> content, long totalElements, int page, int size,
+                              int maxSize) {}
 
     /** Optional note only — everything else about a decision is server-determined. */
     public record DecisionRequest(String note) {}

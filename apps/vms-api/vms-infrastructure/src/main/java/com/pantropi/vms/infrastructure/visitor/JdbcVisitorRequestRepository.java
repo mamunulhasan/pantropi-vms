@@ -124,10 +124,7 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
                        scheduled_from, scheduled_to, status, purpose,
                        decision_reason, decided_at
                 FROM vms.visitor_requests WHERE id = ?
-                """ + " AND " + clause.sql(),
-                // The separator sits outside the text block on purpose: a text block strips the
-                // trailing whitespace from every line, so "... AND """ + clause would concatenate
-                // to "ANDTRUE".
+                """ + clause.and(),
                 (rs, i) -> new Object[]{
                 rs.getObject("tenant_id", UUID.class), rs.getObject("host_id", UUID.class),
                 rs.getObject("requested_by", UUID.class), rs.getObject("approved_by", UUID.class),

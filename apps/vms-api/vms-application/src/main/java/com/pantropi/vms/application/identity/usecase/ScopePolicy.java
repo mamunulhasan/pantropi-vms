@@ -27,11 +27,45 @@ import java.util.Set;
  * does not recognise, and a principal whose scope cannot be determined, both get nothing.</strong>
  * Forgetting to register a new scoped type makes its queries return zero rows, not every row.
  *
- * <p>TODO-14 stays open. Changing the answer means changing this class and nothing else.
+ * <h2>The posture is configuration, not code (US-07.3.1 AC-6, T-07.3.1.2)</h2>
+ * US-07.3.1 asks that restricting an approver to a subset of tenants or floors later require no
+ * change to query-building code. It does not: every scoped query already takes its predicate from
+ * here, and which posture this class applies is a {@link Posture} chosen at wiring time. Answering
+ * TODO-14 in the restrictive direction is then a property, not a patch.
+ *
+ * <p>Deliberately <em>not</em> a second scoping interface, which T-07.3.1.2 phrases as an
+ * {@code ApprovalScopeStrategy}. A separate port for approval visibility would give isolation two
+ * homes, which is the exact thing ADR-0005 and {@code ScopingRulesTest} exist to prevent — and the
+ * queue would then be scoped by different rules from the detail read behind it.
+ *
+ * <p>TODO-14 stays open. Changing the answer means changing this class or its posture, and nothing
+ * else.
  *
  * <p>Pure orchestration over ports — no framework.
  */
 public final class ScopePolicy {
+
+    /**
+     * How much a building-wide role sees. Provisional pending TODO-14; recorded in ADR-0005.
+     */
+    public enum Posture {
+        /**
+         * The shipped default: MASTER_ADMIN, FM_ADMIN and SYSTEM_ADMIN see the whole building.
+         *
+         * <p>Approvers cannot decide requests they cannot see, and nothing in the SRS divides the
+         * building between them.
+         */
+        BUILDING_WIDE,
+
+        /**
+         * Every principal is confined to their own tenant or reception, approvers included.
+         *
+         * <p>What TODO-14 would mean if answered restrictively. An approver with neither column set
+         * sees nothing at all — under this posture that is the correct answer rather than a bug:
+         * an approver who has not been assigned a scope has not been given anything to approve.
+         */
+        OWN_SCOPE
+    }
 
     /**
      * Roles whose work spans the building rather than one tenant or floor.
@@ -48,9 +82,21 @@ public final class ScopePolicy {
     private static final String RECEPTIONIST_ROLE = "FLOOR_RECEPTIONIST";
 
     private final ScopeContext context;
+    private final Posture posture;
 
+    /** Wires the shipped default. */
     public ScopePolicy(ScopeContext context) {
+        this(context, Posture.BUILDING_WIDE);
+    }
+
+    public ScopePolicy(ScopeContext context, Posture posture) {
         this.context = context;
+        this.posture = posture == null ? Posture.BUILDING_WIDE : posture;
+    }
+
+    /** The active posture, so a deployment can report the isolation it is actually running. */
+    public Posture posture() {
+        return posture;
     }
 
     /**
@@ -76,12 +122,33 @@ public final class ScopePolicy {
         String role = scope.roleCode();
 
         if (BUILDING_WIDE_ROLES.contains(role)) {
-            return ScopeFilter.UNRESTRICTED;
+            return posture == Posture.BUILDING_WIDE
+                    ? ScopeFilter.UNRESTRICTED
+                    : confinedTo(scope);
         }
 
         return switch (entity) {
             case VISITOR_REQUEST, VISITOR, HOST, USER_LIST -> scopeOf(role, scope);
         };
+    }
+
+    /**
+     * A building-wide role under {@link Posture#OWN_SCOPE}: confined by whichever assignment it has.
+     *
+     * <p>An approver given a tenant sees that tenant; one given a reception sees that reception; one
+     * given neither sees nothing. The last case is the common one today — FM Admins are not
+     * tenant-assigned — and that is the honest answer under this posture rather than a bug: if
+     * approvers are to be restricted to a subset, somebody has to say which subset, and until they
+     * do there is no defensible set to show.
+     */
+    private static ScopeFilter confinedTo(ScopeContext.Scope scope) {
+        if (scope.tenantId() != null) {
+            return new ScopeFilter.OwnTenant(scope.tenantId());
+        }
+        if (scope.receptionId() != null) {
+            return new ScopeFilter.OwnReception(scope.receptionId());
+        }
+        return ScopeFilter.DENY_ALL;
     }
 
     /**
