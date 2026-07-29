@@ -1,6 +1,8 @@
 package com.pantropi.vms.infrastructure.visitor;
 
+import com.pantropi.vms.application.identity.usecase.ScopePolicy;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
+import com.pantropi.vms.domain.identity.ScopedEntity;
 import com.pantropi.vms.domain.visitor.RequestStatus;
 import com.pantropi.vms.domain.visitor.TimeWindow;
 import com.pantropi.vms.domain.visitor.VisitKind;
@@ -29,7 +31,10 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
 
     private final JdbcTemplate jdbc;
 
-    public JdbcVisitorRequestRepository(JdbcTemplate jdbc) {
+    private final ScopePolicy scope;
+
+    public JdbcVisitorRequestRepository(JdbcTemplate jdbc, ScopePolicy scope) {
+        this.scope = scope;
         this.jdbc = jdbc;
     }
 
@@ -59,18 +64,31 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
         }
     }
 
+    /**
+     * Reads one request, <strong>subject to the caller's scope</strong> (US-03.4.1 AC-2).
+     *
+     * <p>The predicate comes from {@link ScopePolicy}, never from a condition written here. A
+     * tenant asking for another tenant's request gets an empty result — the same answer as for a
+     * request that does not exist, so the id cannot be used to probe for what else is there.
+     */
     @Override
     public Optional<VisitorRequest> findById(UUID id) {
+        VisitorScopeSql.Clause clause = VisitorScopeSql.on(
+                scope.filterFor(ScopedEntity.VISITOR_REQUEST), "tenant_id", null);
+        List<Object> args = new java.util.ArrayList<>();
+        args.add(id);
+        args.addAll(clause.args());
+
         List<Object[]> rows = jdbc.query("""
                 SELECT tenant_id, host_id, requested_by, approved_by, visit_kind,
                        scheduled_from, scheduled_to, status, purpose
-                FROM vms.visitor_requests WHERE id = ?
-                """, (rs, i) -> new Object[]{
+                FROM vms.visitor_requests WHERE id = ? AND """ + clause.sql(),
+                (rs, i) -> new Object[]{
                 rs.getObject("tenant_id", UUID.class), rs.getObject("host_id", UUID.class),
                 rs.getObject("requested_by", UUID.class), rs.getObject("approved_by", UUID.class),
                 rs.getString("visit_kind"), rs.getTimestamp("scheduled_from"),
                 rs.getTimestamp("scheduled_to"), rs.getString("status"), rs.getString("purpose")},
-                id);
+                args.toArray());
         if (rows.isEmpty()) {
             return Optional.empty();
         }

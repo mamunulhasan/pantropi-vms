@@ -175,6 +175,24 @@ public class IdentityConfig {
                 store, issuer, audit, clock, Duration.ofMinutes(refreshTtlMinutes));
     }
 
+    // ---- US-03.4.1 tenant and floor scoping seam ----
+
+    /**
+     * One bean, two ports. {@link RequestScopeContext} implements both the read side and the
+     * lifecycle, and registering it once under its own type lets each injection point ask for the
+     * interface it needs — there is only one candidate for either, so nothing is ambiguous.
+     */
+    @Bean
+    RequestScopeContext requestScopeContext(DataSource dataSource) {
+        return new RequestScopeContext(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.identity.usecase.ScopePolicy scopePolicy(
+            com.pantropi.vms.application.identity.port.ScopeContext context) {
+        return new com.pantropi.vms.application.identity.usecase.ScopePolicy(context);
+    }
+
     // ---- US-03.1.1 roles, permissions and effective resolution ----
 
     @Bean

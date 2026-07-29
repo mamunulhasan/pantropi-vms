@@ -2,6 +2,7 @@ package com.pantropi.vms.interfaces.rest.security;
 
 import com.pantropi.vms.application.identity.port.AccessTokenIssuer;
 import com.pantropi.vms.application.identity.port.PermissionChecker;
+import com.pantropi.vms.application.identity.port.ScopeContextLifecycle;
 import com.pantropi.vms.application.identity.port.SessionStore;
 import com.pantropi.vms.interfaces.rest.error.ProblemDetails;
 import jakarta.servlet.http.HttpServletRequest;
@@ -55,14 +56,17 @@ public final class AuthorizationInterceptor implements HandlerInterceptor {
     private final SessionStore sessions;
     private final PermissionChecker permissions;
     private final AuthorizationDenialRecorder denials;
+    private final ScopeContextLifecycle scope;
 
     public AuthorizationInterceptor(AccessTokenIssuer tokens, SessionStore sessions,
                                     PermissionChecker permissions,
-                                    AuthorizationDenialRecorder denials) {
+                                    AuthorizationDenialRecorder denials,
+                                    ScopeContextLifecycle scope) {
         this.tokens = tokens;
         this.sessions = sessions;
         this.permissions = permissions;
         this.denials = denials;
+        this.scope = scope;
     }
 
     @Override
@@ -117,7 +121,24 @@ public final class AuthorizationInterceptor implements HandlerInterceptor {
         request.setAttribute(AuthenticatedPrincipal.ATTRIBUTE, new AuthenticatedPrincipal(
                 token.userId().toString(), token.username(), token.roleCode(),
                 token.sessionId().toString()));
+
+        // US-03.4.1 AC-1: the scope opens only for a request that got this far. A denied request
+        // never had a principal, so nothing downstream can read a scope it was not granted.
+        scope.begin(token.userId(), token.roleCode());
         return true;
+    }
+
+    /**
+     * Runs for every request that entered {@code preHandle}, including one whose handler threw.
+     *
+     * <p>Clearing here rather than after the handler is the whole point: servlet threads are pooled,
+     * and a scope left behind is inherited by the next request on that thread — one user's tenant
+     * isolation silently applied to another user's query, with every query still looking correct.
+     */
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
+                                Object handler, Exception ex) {
+        scope.clear();
     }
 
     private boolean deny(HttpServletRequest request, HttpServletResponse response, int status,

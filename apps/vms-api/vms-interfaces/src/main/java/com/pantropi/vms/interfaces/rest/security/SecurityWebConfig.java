@@ -3,6 +3,7 @@ package com.pantropi.vms.interfaces.rest.security;
 import com.pantropi.vms.application.identity.port.AccessTokenIssuer;
 import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.identity.port.PermissionChecker;
+import com.pantropi.vms.application.identity.port.ScopeContextLifecycle;
 import com.pantropi.vms.application.identity.port.SessionStore;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,11 +43,13 @@ public class SecurityWebConfig implements WebMvcConfigurer {
     private final PermissionChecker permissions;
     private final AuditTrail audit;
     private final MeterRegistry meters;
+    private final ScopeContextLifecycle scope;
     private final List<String> allowedOrigins;
     private final int denialAlertThreshold;
 
     public SecurityWebConfig(AccessTokenIssuer tokens, SessionStore sessions,
                              PermissionChecker permissions, AuditTrail audit, MeterRegistry meters,
+                             ScopeContextLifecycle scope,
                              @Value("${vms.security.cors.allowed-origins:http://localhost:3000}")
                              List<String> allowedOrigins,
                              @Value("${vms.security.denial-alert-threshold:10}")
@@ -56,6 +59,7 @@ public class SecurityWebConfig implements WebMvcConfigurer {
         this.permissions = permissions;
         this.audit = audit;
         this.meters = meters;
+        this.scope = scope;
         this.allowedOrigins = allowedOrigins;
         this.denialAlertThreshold = denialAlertThreshold;
     }
@@ -77,7 +81,7 @@ public class SecurityWebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new AuthorizationInterceptor(
-                        tokens, sessions, permissions, authorizationDenialRecorder()))
+                        tokens, sessions, permissions, authorizationDenialRecorder(), scope))
                 .addPathPatterns("/**");   // every route; PublicRoutes is the only way out
     }
 
