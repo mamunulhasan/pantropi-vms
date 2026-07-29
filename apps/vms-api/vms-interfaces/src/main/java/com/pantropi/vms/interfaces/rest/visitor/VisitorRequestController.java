@@ -228,9 +228,16 @@ public class VisitorRequestController {
         return ResponseEntity.badRequest().body(new DecisionError("invalid", field));
     }
 
-    /** AC-2: a filter we do not understand is refused, never quietly dropped. */
-    @ExceptionHandler(MyVisitorRequests.UnknownStatus.class)
-    public ResponseEntity<DecisionError> onUnknownStatus(MyVisitorRequests.UnknownStatus e) {
+    /**
+     * A filter we do not understand is refused, never quietly dropped (US-07.6.1 AC-2,
+     * T-07.3.2.2).
+     *
+     * <p>The message names what was expected but not what was sent, so a filter value cannot be
+     * reflected back into a response or an access log.
+     */
+    @ExceptionHandler({MyVisitorRequests.UnknownStatus.class, PendingApprovals.UnknownStatus.class,
+            PendingApprovals.InvalidDateRange.class, PendingApprovals.SearchTooLong.class})
+    public ResponseEntity<DecisionError> onInvalidFilter(RuntimeException e) {
         return ResponseEntity.badRequest().body(new DecisionError("invalid", e.getMessage()));
     }
 
@@ -247,13 +254,31 @@ public class VisitorRequestController {
      *
      * <p>The row shape carries no visitor contact detail — see {@link ApprovalQueueStore}; it is
      * never selected, rather than selected and then dropped here.
+     *
+     * <h2>Filters (US-07.3.2)</h2>
+     * {@code status}, {@code tenantId}, {@code from}/{@code to} over the visit window, and
+     * {@code search} over visitor and host names. All optional, all conjunctive, and all applied
+     * <em>after</em> the scope predicate — a filter narrows what the caller may already see and can
+     * never widen it (AC-5).
+     *
+     * <p>{@code status} defaults to {@code submitted}. A visitor name is searchable and is still
+     * never returned: the queue lists counts, not people.
      */
     @GetMapping("/pending")
     @RequiresPermission("visitor.approve")
-    public PendingPage pending(@RequestParam(defaultValue = "0") int page,
-                               @RequestParam(defaultValue = "20") int size) {
+    public PendingPage pending(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) UUID tenantId,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        ApprovalQueueStore.Page result = pendingApprovals.list(page, size);
+        ApprovalQueueStore.Page result =
+                pendingApprovals.list(status, tenantId, from, to, search, page, size);
 
         return new PendingPage(
                 result.content().stream()

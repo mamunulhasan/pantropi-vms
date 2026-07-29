@@ -1,6 +1,7 @@
 package com.pantropi.vms.application.visitor.port;
 
 import com.pantropi.vms.application.shared.PageRequest;
+import com.pantropi.vms.domain.visitor.RequestStatus;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,7 +30,23 @@ public interface ApprovalQueueStore {
      * <p>The implementation obtains its predicate from the scoping policy (AC-6) — it does not write
      * a tenant condition of its own.
      */
-    Page pending(PageRequest request);
+    Page pending(Filter filter);
+
+    /**
+     * What to narrow the queue by (US-07.3.2). Every field is optional; all supplied ones combine
+     * conjunctively (AC-1).
+     *
+     * <p><strong>The scope predicate is not here, and cannot be.</strong> It comes from the policy
+     * inside the adapter and is applied before any of this, so a filter can only ever narrow what
+     * the caller may already see (AC-5). A tenant id in this record selects <em>within</em> the
+     * caller's scope; it does not reach outside it.
+     *
+     * @param status   which status to list; {@code null} means the pending default — see
+     *                 {@link com.pantropi.vms.application.visitor.usecase.PendingApprovals}
+     * @param nameLike substring to match against visitor and host names, case-insensitively
+     */
+    record Filter(RequestStatus status, UUID tenantId, Instant visitFrom, Instant visitTo,
+                  String nameLike, PageRequest page) {}
 
     /**
      * One row of the queue. Counts and identifiers, plus the two names an approver needs to
