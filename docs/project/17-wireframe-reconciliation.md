@@ -197,8 +197,9 @@ Not a decision to make yet — there is nothing to build against until Universal
 finalises the contract, as the deck's own closing slide says.
 
 **Still open, and cheap when wanted:**
-- Hosts (§2.2) — the one gap that is neither a conflict nor blocked. It would unblock the host
-  field on three screens whenever it is prioritised.
+- ~~Hosts (§2.2)~~ — **done**: US-10.1.1 ships the directory (`/api/v1/hosts`). The remaining
+  work is on the portal side: the tenant submit form still says a host cannot be named, and the
+  picker is not wired yet.
 - ~~The tabbed master-data shell (§3.6)~~ — **done in UI-6.** Route group, so the URLs did not
   move; Buildings kept as a tab rather than dropped; the sidebar collapsed from ten entries to
   three.
