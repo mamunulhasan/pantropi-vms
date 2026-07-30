@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+/*
+ * Tailwind consumes the tokens; it does not define a palette of its own (US-06.1.1 AC-1).
+ *
+ * `@theme inline` maps Tailwind's theme keys onto the custom properties from tokens.css, so a
+ * utility like `bg-brand` or `text-danger` resolves to the token at runtime — a rebrand needs no
+ * rebuild of any component, and there is exactly one place a colour can come from.
+ *
+ * Do not add literal values here. New design decisions go into tokens.css, get a contrast pairing
+ * where they carry text, and are mapped below.
+ */
+@theme inline {
+  --color-brand: var(--color-brand);
+  --color-brand-contrast: var(--color-brand-contrast);
+  --color-brand-hover: var(--color-brand-hover);
+  --color-surface: var(--color-surface);
+  --color-surface-sunken: var(--color-surface-sunken);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-inverted: var(--color-text-inverted);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-danger: var(--color-danger);
+  --color-danger-contrast: var(--color-danger-contrast);
+  --color-danger-surface: var(--color-danger-surface);
+  --color-success: var(--color-success);
+  --color-success-contrast: var(--color-success-contrast);
+  --color-warning: var(--color-warning);
+  --color-warning-contrast: var(--color-warning-contrast);
+  --color-focus: var(--color-focus);
+
+  --font-sans: var(--font-family-sans);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}

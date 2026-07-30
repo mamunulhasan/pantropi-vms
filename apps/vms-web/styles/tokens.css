@@ -1,0 +1,92 @@
+/*
+ * Design tokens — the single source every component consumes (US-06.1.1, F-06.1).
+ *
+ * Rules of this file:
+ *   - Every colour, size, radius, shadow and duration used anywhere in the portal is named here.
+ *     Components never carry raw hex/px values (AC-1); Tailwind's theme maps onto these variables
+ *     in globals.css, so utility classes are token-backed too.
+ *   - A rebrand is an edit here plus the environment's brand config (AC-3) — no component changes.
+ *   - Every *-contrast token is the text colour certified against its base by
+ *     scripts/check-contrast.mjs, which fails the build below WCAG 2.1 AA (AC-4). If you add a
+ *     pairing, add it to the script's PAIRINGS list — an unchecked pairing is an unkept promise.
+ *
+ * The default palette is deliberately neutral (client branding for CPG/Westgate arrives as
+ * configuration, not as edits to component code). Dark mode is intentionally absent for now: one
+ * certified palette before two half-certified ones.
+ */
+
+:root {
+  /* ---- colour ---- */
+  --color-brand: #1e3a5f;            /* deep navy — header, primary actions */
+  --color-brand-contrast: #ffffff;
+  --color-brand-hover: #2c5282;
+
+  --color-surface: #ffffff;          /* page background */
+  --color-surface-sunken: #f4f6f8;   /* page-level wells, table stripes */
+  --color-surface-raised: #ffffff;   /* cards, dialogs (paired with shadow) */
+
+  --color-text: #1a202c;
+  --color-text-muted: #4a5568;       /* AA on surface — do not lighten without re-checking */
+  --color-text-inverted: #ffffff;
+
+  --color-border: #cbd5e0;
+  --color-border-strong: #718096;
+
+  --color-danger: #9b2c2c;           /* destructive actions, error text on surface */
+  --color-danger-contrast: #ffffff;
+  --color-danger-surface: #fff5f5;   /* error region backgrounds */
+
+  --color-success: #276749;
+  --color-success-contrast: #ffffff;
+  --color-warning: #975a16;          /* dark enough to be text on surface */
+  --color-warning-contrast: #ffffff;
+
+  --color-focus: #2b6cb0;            /* focus ring — always visible (F-06.4) */
+
+  /* ---- typography ---- */
+  --font-family-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.375rem;
+  --font-size-2xl: 1.75rem;
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+
+  /* ---- spacing (4px base scale) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  /* ---- radius ---- */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+
+  /* ---- elevation ---- */
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.12), 0 1px 2px rgb(0 0 0 / 0.24);
+  --shadow-overlay: 0 10px 25px rgb(0 0 0 / 0.25);
+
+  /* ---- motion ---- */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Focus visibility is a token concern, not a per-component one (F-06.4). */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}
