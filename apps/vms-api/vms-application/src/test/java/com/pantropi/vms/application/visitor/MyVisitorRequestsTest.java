@@ -179,6 +179,11 @@ class MyVisitorRequestsTest {
             return new Page(List.of(), 0, filter.page().page(), filter.page().size());
         }
 
+        public String listVersion(Filter filter) {
+            lastFilter = filter;
+            return "version-" + filter.status() + "-" + filter.page().page();
+        }
+
         public Optional<Detail> detail(UUID id) {
             return Optional.ofNullable(detail);
         }

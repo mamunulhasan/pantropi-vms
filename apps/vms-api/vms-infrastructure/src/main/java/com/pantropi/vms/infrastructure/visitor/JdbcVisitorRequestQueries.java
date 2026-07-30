@@ -56,19 +56,7 @@ public final class JdbcVisitorRequestQueries implements VisitorRequestQueries {
         StringBuilder where = new StringBuilder(clause.and());
         List<Object> args = new ArrayList<>(clause.args());
 
-        if (filter.status() != null) {
-            where.append(" AND r.status = ?::vms.request_status");
-            args.add(filter.status().dbValue());
-        }
-        if (filter.visitFrom() != null) {
-            where.append(" AND r.scheduled_from >= ?");
-            args.add(Timestamp.from(filter.visitFrom()));
-        }
-        if (filter.visitTo() != null) {
-            // Exclusive, so two adjacent ranges neither overlap nor leave a gap.
-            where.append(" AND r.scheduled_from < ?");
-            args.add(Timestamp.from(filter.visitTo()));
-        }
+        appendFilters(filter, where, args);
 
         Long total = jdbc.queryForObject(
                 "SELECT count(*) FROM vms.visitor_requests r WHERE TRUE" + where,
@@ -94,6 +82,59 @@ public final class JdbcVisitorRequestQueries implements VisitorRequestQueries {
 
         return new Page(content, total == null ? 0 : total, filter.page().page(),
                 filter.page().size());
+    }
+
+    /**
+     * The list validator (US-07.6.2, T-07.6.2.3): a count and a high-water mark over the scoped rows.
+     *
+     * <p>{@code updated_at} is what moves on every write this list reflects — a decision, an
+     * amendment, a cancellation all touch the request row (see {@code saveDecision} and
+     * {@code saveAmendment}), so a change any of them makes is a change here. {@code created_at} is
+     * folded in as well because a brand-new request in an empty list would otherwise leave the
+     * high-water mark null.
+     *
+     * <p>The scope predicate is included as a discriminator, so two tenants whose counts and
+     * timestamps coincide still get different validators.
+     */
+    @Override
+    public String listVersion(Filter filter) {
+        VisitorScopeSql.Clause clause = scopeClause();
+        StringBuilder where = new StringBuilder(clause.and());
+        List<Object> args = new ArrayList<>(clause.args());
+        appendFilters(filter, where, args);
+
+        String state = jdbc.queryForObject("""
+                SELECT count(*)::text || ':' || coalesce(
+                           max(greatest(r.updated_at, r.created_at))::text, '-')
+                  FROM vms.visitor_requests r
+                 WHERE TRUE""" + where, String.class, args.toArray());
+
+        // The scope and the filter both go into the token. Hashed rather than concatenated, so the
+        // validator cannot be read back as a description of what the caller is allowed to see.
+        return shortHash(clause.sql() + '|' + clause.args() + '|' + describe(filter) + '|' + state);
+    }
+
+    /** The filter as a stable string, so two different views never share a validator. */
+    private static String describe(Filter filter) {
+        return (filter.status() == null ? "-" : filter.status().dbValue())
+                + ',' + filter.visitFrom() + ',' + filter.visitTo()
+                + ',' + filter.page().page() + ',' + filter.page().size();
+    }
+
+    private static String shortHash(String input) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder out = new StringBuilder(16);
+            for (int i = 0; i < 8; i++) {
+                out.append(String.format("%02x", digest[i]));
+            }
+            return out.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            // SHA-256 is required of every JVM; if it is absent the platform is not one we can
+            // reason about, and a silently weaker validator would be worse than failing.
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
     }
 
     @Override
@@ -146,6 +187,28 @@ public final class JdbcVisitorRequestQueries implements VisitorRequestQueries {
         return Optional.of(new Detail(header.id(), header.status(), header.host(), header.purpose(),
                 header.scheduledFrom(), header.scheduledTo(), header.submittedAt(),
                 header.decidedBy(), header.decidedAt(), header.decisionReason(), visitors));
+    }
+
+    /**
+     * One filter assembly, shared by the list and its validator.
+     *
+     * <p>Written twice, the two would eventually disagree — and a validator that filters differently
+     * from the list it validates reports "unchanged" for a list that changed.
+     */
+    private static void appendFilters(Filter filter, StringBuilder where, List<Object> args) {
+        if (filter.status() != null) {
+            where.append(" AND r.status = ?::vms.request_status");
+            args.add(filter.status().dbValue());
+        }
+        if (filter.visitFrom() != null) {
+            where.append(" AND r.scheduled_from >= ?");
+            args.add(Timestamp.from(filter.visitFrom()));
+        }
+        if (filter.visitTo() != null) {
+            // Exclusive, so two adjacent ranges neither overlap nor leave a gap.
+            where.append(" AND r.scheduled_from < ?");
+            args.add(Timestamp.from(filter.visitTo()));
+        }
     }
 
     private VisitorScopeSql.Clause scopeClause() {

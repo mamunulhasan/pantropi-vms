@@ -32,6 +32,31 @@ public interface VisitorRequestQueries {
     Page list(Filter filter);
 
     /**
+     * A validator for the list this filter would return (US-07.6.2, T-07.6.2.3).
+     *
+     * <p>Cheap by construction: a count and a high-water timestamp over the same scoped rows, rather
+     * than the list itself with its joins and per-request visitor counts. A status view polling every
+     * few seconds asks this question far more often than it needs a new answer.
+     *
+     * <h2>It includes a discriminator for the caller's scope, and that is the security control</h2>
+     * Two tenants can hold the same number of requests last touched at the same instant. If the
+     * validator were only "count and timestamp", their lists would share a value, and an intermediary
+     * caching by URL could hand one tenant's body to the other on a 304. Folding the scope into the
+     * token makes that impossible rather than improbable — which is what T-07.6.2.3 asks to be
+     * asserted by a two-tenant test.
+     *
+     * <p>The filter is part of it too: two different filtered views of the same data are different
+     * representations and must not validate against each other.
+     *
+     * <h2>What it does not notice</h2>
+     * A host renamed in master data changes the rendered list without touching any request row, so a
+     * poll can serve a stale host name until that request next changes. Stated rather than hidden:
+     * covering it would mean joining the host table into the validator and paying for that on every
+     * poll, to catch something that happens approximately never on a status screen.
+     */
+    String listVersion(Filter filter);
+
+    /**
      * One request in full, or empty when it does not exist <em>or</em> is not the caller's (AC-4).
      *
      * <p>The two are one answer on purpose. A caller must not be able to tell a foreign id from a

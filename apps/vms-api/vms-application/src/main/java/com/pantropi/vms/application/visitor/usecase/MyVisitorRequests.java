@@ -43,8 +43,25 @@ public final class MyVisitorRequests {
      */
     public VisitorRequestQueries.Page list(String status, Instant visitFrom, Instant visitTo,
                                            int page, int size) {
-        return queries.list(new VisitorRequestQueries.Filter(
-                parseStatus(status), visitFrom, visitTo, new PageRequest(page, size)));
+        return queries.list(filter(status, visitFrom, visitTo, page, size));
+    }
+
+    /**
+     * The validator for what {@link #list} would return, without building it (US-07.6.2).
+     *
+     * <p>Separate from the list so a polling caller can ask "has this changed?" for the cost of a
+     * count, and only pay for the list when the answer is yes. Both take the same filter through the
+     * same method, so the question and the answer are always about the same rows.
+     */
+    public String listVersion(String status, Instant visitFrom, Instant visitTo, int page,
+                              int size) {
+        return queries.listVersion(filter(status, visitFrom, visitTo, page, size));
+    }
+
+    private VisitorRequestQueries.Filter filter(String status, Instant visitFrom, Instant visitTo,
+                                                int page, int size) {
+        return new VisitorRequestQueries.Filter(
+                parseStatus(status), visitFrom, visitTo, new PageRequest(page, size));
     }
 
     /**
