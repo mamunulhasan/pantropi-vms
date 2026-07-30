@@ -138,3 +138,36 @@ A unit test asserts this so the contradiction cannot silently return.
 
 Run the verify script after any GitHub settings change, and in CI once a pipeline exists. It is what
 turns "we configured protection" from a claim into a tested fact.
+
+## Required status checks on `develop` (DEV-02 closed)
+
+Eleven contexts are required, and the list is deliberately not "every check that exists":
+
+| Required | Why |
+|---|---|
+| `build`, `unit-tests`, `integration-tests`, `coverage` | the API pipeline (US-01.4.1) |
+| `architecture-fitness` | layer and ACS boundary rules (US-01.2.2) |
+| `frontend`, `accessibility` | the portal pipeline and the WCAG gate (UI-0, UI-5) |
+| `sast-codeql`, `dependency-review`, `secret-scan` | the security gates |
+| `commit-lint` | Conventional Commits with a story reference (US-01.1.2) |
+
+**A required context must report on *every* pull request.** GitHub waits for a check it has been
+told to expect; a check that never arrives is not "skipped", it is pending forever, and the branch
+becomes unmergeable. Two consequences follow, and both are load-bearing:
+
+- **`frontend.yml` dropped its pull-request path filter.** A path-filtered workflow does not run at
+  all for an unrelated pull request, so its jobs would never report. The cost is that both portal
+  jobs run on backend-only pull requests, about two minutes of runner time. The cheaper pattern —
+  a small `changes` job plus job-level `if:`, letting the jobs report `skipped` — works because
+  skipped checks satisfy protection, but that is a subtlety to bet the merge flow on. The blunt
+  version cannot deadlock.
+- **The `CodeQL` check is not required, but `sast-codeql` is.** The former is published by the
+  `github-advanced-security` app; the latter is our own workflow job, which runs the analysis. A
+  required check owned by another app deadlocks every pull request the day it stops being
+  published, and the analysis is already gated by the job we control.
+
+The post-merge `push` runs added for `frontend.yml` and `architecture-fitness.yml` are **not**
+required checks and keep their path filters where they have them. They are an alarm on the merge
+result, which protection cannot express: protection gates the pull request, and a merge of two
+individually-passing branches can still produce a broken tree.
+

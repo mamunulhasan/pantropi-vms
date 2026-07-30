@@ -28,11 +28,18 @@
 name: frontend
 
 on:
+  # No path filter on pull requests, deliberately. These two jobs are **required status checks**
+  # on develop, and GitHub only counts a check it actually receives: a path-filtered workflow
+  # simply does not run for an unrelated PR, so the check never reports and branch protection
+  # waits for it forever. A backend-only pull request would be unmergeable.
+  #
+  # The cost is that both jobs run on every pull request, including ones that touch no portal
+  # code — roughly two minutes of runner time. The alternative (a cheap `changes` job plus
+  # job-level `if:`, letting the jobs report "skipped") reclaims that, and relies on skipped
+  # checks satisfying protection. That is true today, but it is a subtlety to bet a merge queue
+  # on; this way is obvious and cannot deadlock.
   pull_request:
     branches: [develop, main]
-    paths:
-      - "apps/vms-web/**"
-      - ".github/workflows/frontend.yml"
   # Also on the merge itself. A pull-request run verifies the branch, not the result of
   # integrating it: merging two branches that each passed can still produce a tree that does not
   # compile, which is exactly what happened when the stacked VJ-1/VJ-2 branches merged and left
@@ -40,6 +47,8 @@ on:
   # ran — ci.yml and codeql.yml have verified backend merges on push since they were written, and
   # this workflow was the one that did not. The breakage stayed invisible until the next branch was
   # cut from develop.
+  # The post-merge run keeps its path filter: it is an alarm, not a required check, and there is
+  # nothing to verify on a merge that touched no portal file.
   push:
     branches: [develop]
     paths:
