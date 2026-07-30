@@ -38,13 +38,25 @@ export const SYSADMIN: MockProfile = {
   ],
 };
 
-/** A tenant user: signed in, and entitled to nothing in the admin console. */
+/**
+ * A tenant user: signed in, entitled to nothing in the admin console, and entitled to its own
+ * tenant's visit requests. `visitor.request` is the only permission the TENANT role holds.
+ */
 export const TENANT_USER: MockProfile = {
   userId: "22222222-2222-2222-2222-222222222222",
   username: "tenantuser",
   displayName: "Tara Tenant",
   role: "TENANT",
   permissions: ["visitor.request"],
+};
+
+/** Signed in and granted nothing at all — no area to enter. */
+export const NO_ACCESS_USER: MockProfile = {
+  userId: "33333333-3333-3333-3333-333333333333",
+  username: "nobody",
+  displayName: "Nadia Nobody",
+  role: "TENANT",
+  permissions: [],
 };
 
 const SESSION = {
@@ -88,6 +100,37 @@ const TENANT = {
   contactPhone: "+8801700000000",
   active: true,
 };
+
+/** One request, decided — so the detail screen renders its outcome panel. */
+const VISIT_REQUEST = {
+  id: "91111111-1111-1111-1111-111111111111",
+  status: "submitted",
+  host: null,
+  purpose: "Quarterly audit",
+  scheduledFrom: "2099-03-01T09:00:00Z",
+  scheduledTo: "2099-03-01T17:00:00Z",
+  submittedAt: "2099-02-01T10:00:00Z",
+  decidedBy: null,
+  decidedAt: null,
+  decisionReason: null,
+  visitors: [
+    { fullName: "Ada Lovelace", company: "Analytical Ltd", visitorType: "Contractor", status: "pending" },
+  ],
+};
+
+const VISIT_ROW = {
+  id: VISIT_REQUEST.id,
+  status: "submitted",
+  host: null,
+  scheduledFrom: VISIT_REQUEST.scheduledFrom,
+  scheduledTo: VISIT_REQUEST.scheduledTo,
+  visitorCount: 1,
+  submittedAt: VISIT_REQUEST.submittedAt,
+  decidedAt: null,
+  decisionReason: null,
+};
+
+export const VISIT_REQUEST_ID = VISIT_REQUEST.id;
 
 function page1<T>(items: T[]) {
   return { items, page: 0, size: 20, total: items.length };
@@ -157,7 +200,25 @@ const REQUIRED: { prefix: string; anyOf: string[] }[] = [
   { prefix: "/api/v1/admin/holidays", anyOf: ["masterdata.view"] },
   { prefix: "/api/v1/admin/users", anyOf: ["user.manage"] },
   { prefix: "/api/v1/admin/roles", anyOf: ["user.manage"] },
+  // The tenant journey: submit/track/amend/cancel all sit behind visitor.request; the FM queue
+  // behind visitor.approve. Mirrors VisitorRequestController's annotations.
+  { prefix: "/api/v1/visitor-requests/pending", anyOf: ["visitor.approve"] },
+  { prefix: "/api/v1/visitor-requests", anyOf: ["visitor.request"] },
 ];
+
+/**
+ * The CORS headers a cross-origin API response must carry for the portal to use it.
+ *
+ * `Access-Control-Expose-Headers` is the load-bearing one: the portal runs on :3000 and the API on
+ * :8081, and without it the browser hides `ETag` from page JavaScript — `response.headers.get`
+ * simply answers null. A stub that omitted it would make the conditional-GET test fail for a
+ * reason that has nothing to do with the code under test, and (worse) a stub that faked the header
+ * as readable would hide the real requirement. The live API exposes it; so does this.
+ */
+export const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "http://localhost:3000",
+  "Access-Control-Expose-Headers": "ETag, X-Correlation-Id",
+};
 
 export type ApiMock = {
   /** Every API path the browser asked for, in order — for asserting what a screen did NOT call. */
@@ -178,8 +239,13 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
     record.requests.push(path);
 
     const json = (body: unknown, status = 200) =>
-      route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-    const empty = (status: number) => route.fulfill({ status, body: "" });
+      route.fulfill({
+        status,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const empty = (status: number) =>
+      route.fulfill({ status, headers: { ...CORS_HEADERS }, body: "" });
 
     // ---- the BFF session routes (portal origin) ----
     if (path === "/api/session/login") {
@@ -284,6 +350,41 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
     }
     if (path === "/api/v1/admin/roles") return json(ROLES_OVERVIEW);
 
+    // ---- the tenant visitor journey ----
+    if (path === "/api/v1/visitor-requests" && request.method() === "POST") {
+      return json({ id: VISIT_REQUEST.id, status: "submitted" }, 201);
+    }
+    if (path === "/api/v1/visitor-requests") {
+      // The conditional GET: echo a validator so the client can send it back. A test drives the
+      // 304 path by asserting on the header, not by the stub second-guessing it.
+      return route.fulfill({
+        status: 200,
+        headers: {
+          ...CORS_HEADERS,
+          "Content-Type": "application/json",
+          ETag: 'W/"0123456789abcdef"',
+          "Cache-Control": "private, no-cache",
+          Vary: "Authorization",
+        },
+        body: JSON.stringify({
+          content: [VISIT_ROW],
+          totalElements: 1,
+          page: 0,
+          size: 20,
+          maxSize: 100,
+        }),
+      });
+    }
+    if (path.match(/^\/api\/v1\/visitor-requests\/[^/]+\/cancel$/)) {
+      return json({ id: VISIT_REQUEST.id, status: "cancelled" });
+    }
+    if (path.match(/^\/api\/v1\/visitor-requests\/[^/]+$/)) {
+      if (request.method() === "PATCH") {
+        return json({ id: VISIT_REQUEST.id, status: "submitted" });
+      }
+      return json(VISIT_REQUEST);
+    }
+
     // Anything unmapped is a test bug, not a 404 to be papered over.
     return json({ error: "unmocked", path }, 501);
   });
@@ -291,11 +392,16 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
   return record;
 }
 
-/** Sign in through the real login form, so the tested path is the one users take. */
-export async function signIn(page: Page): Promise<void> {
+/**
+ * Sign in through the real login form, so the tested path is the one users take.
+ *
+ * `landsOn` is where the root router sends this principal — /admin for an administrator, /visits
+ * for a tenant. Passing it makes the redirect itself part of what the test asserts.
+ */
+export async function signIn(page: Page, landsOn = "**/admin"): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Username").fill("sysadmin");
   await page.getByLabel("Password").fill("Password123!local");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL("**/admin");
+  await page.waitForURL(landsOn);
 }

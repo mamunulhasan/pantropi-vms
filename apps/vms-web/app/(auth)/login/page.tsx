@@ -3,7 +3,8 @@
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
-import { login } from "@/lib/auth-store";
+import { getSnapshot, login } from "@/lib/auth-store";
+import { homeFor } from "@/lib/nav";
 import { safeNextPath } from "@/lib/safe-next";
 
 /**
@@ -15,6 +16,10 @@ import { safeNextPath } from "@/lib/safe-next";
  *
  * The `?next=` restore goes through {@link safeNextPath}: it is attacker-writable, so only a
  * same-origin path is ever followed.
+ *
+ * With no `next=`, the landing page comes from {@link homeFor} — the principal's permissions decide
+ * it. A hardcoded "/admin" here worked only while the console was the only area; once the tenant
+ * screens shipped it walked every tenant into the no-access wall.
  */
 function LoginForm() {
   const router = useRouter();
@@ -37,7 +42,9 @@ function LoginForm() {
         return;
       }
       const next = safeNextPath(searchParams.get("next"));
-      router.replace(session.mustChangePassword ? "/change-password" : (next ?? "/admin"));
+      // login() loaded the profile into the store before returning; read the grants from there.
+      const home = homeFor(getSnapshot().me?.permissions) ?? "/";
+      router.replace(session.mustChangePassword ? "/change-password" : (next ?? home));
     } finally {
       setSubmitting(false);
     }

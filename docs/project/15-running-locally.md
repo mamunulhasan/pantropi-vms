@@ -65,6 +65,9 @@ npm run dev     # http://localhost:3000
 Checks mirror CI: `npm run lint`, `npm run typecheck`, `npm run check:tokens` (WCAG AA contrast
 over the design tokens), `npm test`, `npm run build`.
 
+Signing in routes by permission: an administrator lands on `/admin`, a tenant on `/visits`. An
+account whose grants open neither is told so rather than bounced between redirects.
+
 The accessibility gate is a second CI job and needs a browser plus a built server:
 
 ```bash
