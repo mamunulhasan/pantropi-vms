@@ -16,6 +16,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "cross-env NODE_OPTIONS=--experimental-require-module vitest run",
+    "e2e": "playwright test",
+    "e2e:report": "playwright show-report",
     "check:tokens": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
@@ -24,7 +26,9 @@
     "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

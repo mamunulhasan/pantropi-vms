@@ -74,6 +74,20 @@ Title must follow Conventional Commits and name the user story:
 - [ ] Audit events emitted for state changes
 - [ ] Dependency scan clean
 
+## Accessibility (if a screen changed)
+
+> The CI `accessibility` job fails on critical/serious axe violations. Automation catches at most
+> half of WCAG — the manual list is in
+> [docs/project/16-accessibility.md](../docs/project/16-accessibility.md).
+
+- [ ] `npm run e2e` passes locally (or N/A — no screen changed)
+- [ ] New or changed routes are covered by the scan list in `e2e/a11y.spec.ts`
+- [ ] Keyboard-only walk done: focus order, visible focus, dialog trap and restore
+- [ ] Screen-reader pass on the changed screen: labels, announced errors, table headers
+- [ ] 200% zoom and 320 px reflow checked
+- [ ] Colour is not the only carrier of meaning
+- [ ] Any axe suppression is narrowed to rule + element and carries a written reason
+
 ## Database
 
 - [ ] Migration is versioned, forward-only, and reversible or documented as irreversible
