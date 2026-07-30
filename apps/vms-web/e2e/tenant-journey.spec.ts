@@ -14,6 +14,8 @@
 import { expect, test } from "@playwright/test";
 import {
   CORS_HEADERS,
+  HOST_ID,
+  HOST_NAME,
   NO_ACCESS_USER,
   SYSADMIN,
   TENANT_USER,
@@ -83,6 +85,66 @@ test.describe("submitting a request", () => {
 
     await page.waitForURL(`**/visits/${VISIT_REQUEST_ID}`);
     await expect(page.getByRole("heading", { level: 1, name: "Visit request" })).toBeVisible();
+  });
+
+  test("the host selector offers the tenant's own directory and sends the choice", async ({ page }) => {
+    const posts: string[] = [];
+    await mockApi(page, TENANT_USER);
+    await page.route("**/api/v1/visitor-requests", async (route, request) => {
+      if (request.method() === "POST") {
+        posts.push(request.postData() ?? "");
+      }
+      await route.fallback();
+    });
+
+    await page.goto("/visits/new");
+    await page.getByRole("textbox", { name: "From" }).fill("2099-03-01T09:00");
+    await page.getByRole("textbox", { name: "To" }).fill("2099-03-01T17:00");
+    await page.getByRole("textbox", { name: "Full name" }).fill("Ada Lovelace");
+    await page.getByRole("combobox", { name: "Host" }).selectOption(HOST_ID);
+    await page.getByRole("button", { name: "Submit request" }).click();
+
+    await expect.poll(() => posts.length).toBe(1);
+    expect(JSON.parse(posts[0]).hostId).toBe(HOST_ID);
+    // The directory is scoped server-side; the form never sends a tenant to scope it by.
+    expect(JSON.parse(posts[0])).not.toHaveProperty("tenantId");
+  });
+
+  test("a request with no host named is still allowed", async ({ page }) => {
+    const posts: string[] = [];
+    await mockApi(page, TENANT_USER);
+    await page.route("**/api/v1/visitor-requests", async (route, request) => {
+      if (request.method() === "POST") {
+        posts.push(request.postData() ?? "");
+      }
+      await route.fallback();
+    });
+
+    await page.goto("/visits/new");
+    await expect(page.getByRole("option", { name: HOST_NAME })).toBeAttached();
+    await page.getByRole("textbox", { name: "From" }).fill("2099-03-01T09:00");
+    await page.getByRole("textbox", { name: "To" }).fill("2099-03-01T17:00");
+    await page.getByRole("textbox", { name: "Full name" }).fill("Ada Lovelace");
+    await page.getByRole("button", { name: "Submit request" }).click();
+
+    await expect.poll(() => posts.length).toBe(1);
+    expect(JSON.parse(posts[0]).hostId).toBeNull();
+  });
+
+  test("an empty directory explains itself rather than showing a bare control", async ({ page }) => {
+    await mockApi(page, TENANT_USER);
+    await page.route("**/api/v1/hosts*", (route) =>
+      route.fulfill({
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        body: JSON.stringify({ content: [], totalElements: 0, page: 0, size: 100, maxSize: 100 }),
+      }),
+    );
+
+    await page.goto("/visits/new");
+    await expect(page.getByText(/no hosts on file yet/i)).toBeVisible();
+    // Still submittable: the endpoint allows a request with no host.
+    await expect(page.getByRole("button", { name: "Submit request" })).toBeEnabled();
   });
 
   test("client-side checks name the offending visitor by position", async ({ page }) => {

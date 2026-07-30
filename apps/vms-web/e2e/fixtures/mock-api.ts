@@ -162,6 +162,18 @@ const PENDING_ROW = {
   submittedAt: VISIT_REQUEST.submittedAt,
 };
 
+/** One active host in the caller's own tenant — the directory is scoped server-side. */
+const HOST = {
+  id: "c1111111-1111-1111-1111-111111111111",
+  fullName: "Jia Tan",
+  email: "j.tan@acme.example",
+  phone: null,
+  active: true,
+};
+
+export const HOST_ID = HOST.id;
+export const HOST_NAME = HOST.fullName;
+
 export const VISIT_REQUEST_ID = VISIT_REQUEST.id;
 export const PRE_REGISTERED_VISITOR_ID = "a1111111-1111-1111-1111-111111111111";
 
@@ -241,6 +253,8 @@ const REQUIRED: { match: RegExp; anyOf: string[] }[] = [
   { match: /^\/api\/v1\/visitor-requests\/[^/]+$/, anyOf: ["visitor.request", "visitor.approve"] },
   { match: /^\/api\/v1\/visitor-requests$/, anyOf: ["visitor.request"] },
   { match: /^\/api\/v1\/pre-registrations/, anyOf: ["visitor.register"] },
+  // The host directory is a tenant maintaining its own people (US-10.1.1 AC-1).
+  { match: /^\/api\/v1\/hosts/, anyOf: ["visitor.request"] },
 ];
 
 /**
@@ -386,6 +400,17 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
       });
     }
     if (path === "/api/v1/admin/roles") return json(ROLES_OVERVIEW);
+
+    // ---- the tenant's host directory ----
+    if (path === "/api/v1/hosts") {
+      return json({
+        content: [HOST],
+        totalElements: 1,
+        page: 0,
+        size: 100,
+        maxSize: 100,
+      });
+    }
 
     // ---- the reception desk ----
     if (path === "/api/v1/pre-registrations" && request.method() === "POST") {
