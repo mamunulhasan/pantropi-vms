@@ -34,7 +34,8 @@ export const ADMIN_ENTRY: readonly Permission[] = [
  * roles). Adding an entry is: href, label, and the permission codes its screen's API needs.
  */
 export const ADMIN_NAV: readonly NavItem[] = [
-  { href: "/admin", label: "Overview", requires: ADMIN_ENTRY },
+  // One name for one thing: the label, the page's h1 and the browser tab all say Administration.
+  { href: "/admin", label: "Administration", requires: ADMIN_ENTRY },
   // Viewing settings needs masterdata.view (the controller's class-level guard); the edit
   // affordance inside the screen additionally needs settings.manage.
   { href: "/admin/settings", label: "Settings", requires: [PERMISSIONS.MASTERDATA_VIEW] },

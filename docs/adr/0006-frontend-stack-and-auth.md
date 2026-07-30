@@ -69,4 +69,27 @@ role-driven UI behaviour keeps its server-side denial test.
 - The BFF is three small route handlers; if the API ever standardises cookie-based auth, they
   collapse into configuration.
 - Deferred and tracked, not dropped: the token-literal lint rule (T-06.1.1.3), visual regression
-  baseline (T-06.2.1.3), and the client-tamper E2E (T-06.3.2.3, lands with the UI-5 a11y story).
+  baseline (T-06.2.1.3). The client-tamper E2E (T-06.3.2.3) landed with UI-5.
+
+## Amendment (UI-5): what the accessibility gate fails on
+
+The gate fails the build on **critical and serious** axe violations only. Moderate and minor
+findings are printed in the run output and do not fail.
+
+This is a deliberate line, not laziness. A gate that fires on every advisory finding — including
+ones nobody has triaged and some that are false in context — gets disabled or routinely
+overridden within a month, and a gate people switch off protects nobody. Critical and serious are
+the impacts that correspond to a user being *blocked*: an unlabelled control, an unreachable
+target, a trap. Those stop the build. The advisory tier is still visible, so a deliberate
+decision to raise the bar later is a one-line change in `e2e/a11y.spec.ts`.
+
+The scan runs against a **production build**, not the dev server: the dev overlay injects its own
+DOM, and a violation reported against markup that never ships is a false alarm that teaches
+people to ignore the gate.
+
+The API is **stubbed at the browser's network boundary**, so the suite needs no Java, no
+PostgreSQL and no seeded data. That is the correct seam: what is under test is the portal's
+markup and its client-side behaviour. It also bounds what the tamper check can claim — it proves
+the client reveals nothing and issues no request it should not, while server-side enforcement
+stays proven by `ApiAuthorizationIT` against a real database. Recorded here so nobody later reads
+the E2E suite as evidence of API authorization.

@@ -63,7 +63,20 @@ npm run dev     # http://localhost:3000
 ```
 
 Checks mirror CI: `npm run lint`, `npm run typecheck`, `npm run check:tokens` (WCAG AA contrast
-over the design tokens), `npm test`, `npm run build`. Branding comes from `NEXT_PUBLIC_BRAND_NAME` /
+over the design tokens), `npm test`, `npm run build`.
+
+The accessibility gate is a second CI job and needs a browser plus a built server:
+
+```bash
+cd apps/vms-web
+npx playwright install chromium   # first run only
+npm run build && npm run e2e
+```
+
+It drives a production build with the API stubbed at the browser's network boundary, so it needs
+neither the Java API nor PostgreSQL running. See
+[16-accessibility.md](16-accessibility.md) for what it covers, what it deliberately does not fail
+on, and the manual checklist that goes with it. Branding comes from `NEXT_PUBLIC_BRAND_NAME` /
 `NEXT_PUBLIC_BRAND_LOGO` at build time — see ADR-0006.
 
 ## Log in as any role
