@@ -118,6 +118,25 @@ public final class Visitor {
     }
 
     /**
+     * A corrected copy of this visitor: same identity, same status, new details (US-08.1.3 AC-1).
+     *
+     * <p>Package-private, like {@link #moveTo}: only the request aggregate may amend a visitor, and
+     * it does so by swapping this copy in. The identity is preserved on purpose — a credential
+     * references the visitor by id, and a "corrected" visitor with a new id would be a different
+     * person as far as everything downstream is concerned.
+     *
+     * <p>Validation is {@link #named}'s, so an amendment obeys exactly the rules a fresh entry does
+     * — a path with its own slightly different validation is how a rule ends up enforced on the way
+     * in and not on the way back in.
+     */
+    Visitor withDetails(String fullName, String email, String phone, String company,
+                        UUID visitorTypeId) {
+        Visitor validated = named(fullName, email, phone, company, visitorTypeId);
+        return new Visitor(this.id, validated.fullName, validated.email, validated.phone,
+                validated.company, validated.visitorTypeId, this.status);
+    }
+
+    /**
      * Move this visitor to the status the request-level cascade decided (US-07.5.1 AC-3).
      *
      * <p>Package-private, and deliberately the only mutator: a visitor's status is a consequence of

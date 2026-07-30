@@ -272,6 +272,15 @@ class CancelAndAmendUseCaseTest {
             expected = expectedCurrent;
             return writeLands;
         }
+
+        public Optional<VisitorRequest> findByVisitorId(UUID visitorId) {
+            return Optional.ofNullable(held);
+        }
+
+        public boolean savePreArrivalChange(VisitorRequest r, RequestStatus expectedCurrent) {
+            expected = expectedCurrent;
+            return writeLands;
+        }
     }
 
     private static final class FakeTenants implements TenantDirectory {

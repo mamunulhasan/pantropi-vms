@@ -52,14 +52,37 @@ final class VisitorScopeSql {
                     tenantColumn == null
                             ? new Clause("FALSE", List.of())
                             : new Clause(tenantColumn + " = ?", List.of((Object) own.tenantId()));
-            case ScopeFilter.OwnReception own ->
-                    // A table with no reception column cannot express this restriction, so it
-                    // cannot honour it — and a restriction that cannot be honoured must not be
-                    // quietly dropped.
-                    receptionColumn == null
-                            ? new Clause("FALSE", List.of())
-                            : new Clause(receptionColumn + " = ?",
-                                    List.of((Object) own.receptionId()));
+            case ScopeFilter.OwnReception own -> ownReception(own, tenantColumn, receptionColumn);
         };
+    }
+
+    /**
+     * A receptionist's scope, translated for the table at hand (US-08.1.3, ADR-0005).
+     *
+     * <p>On a table with a reception column, it is that column. The visitor tables have none — a
+     * request belongs to a tenant, not a desk — so there the restriction is expressed through what
+     * "own reception" means for visitor data: <strong>the tenants on the receptionist's own
+     * floor</strong>. That is ADR-0005's own-floor rule, and it is what lets a floor receptionist
+     * read and maintain the pre-registrations they created (US-08.1.3 AC-5) while a record filed
+     * against another floor's tenant stays invisible to them.
+     *
+     * <p>Until US-08.1.3 this arm answered {@code FALSE} for a missing reception column, which was
+     * correct while no receptionist-facing read existed: a restriction that cannot be expressed must
+     * not be dropped. It can be expressed after all — through the tenant — so now it is.
+     *
+     * <p>A table with neither column still answers {@code FALSE}.
+     */
+    private static Clause ownReception(ScopeFilter.OwnReception own, String tenantColumn,
+                                       String receptionColumn) {
+        if (receptionColumn != null) {
+            return new Clause(receptionColumn + " = ?", List.of((Object) own.receptionId()));
+        }
+        if (tenantColumn != null) {
+            return new Clause(tenantColumn + " IN (SELECT t.id FROM vms.tenants t"
+                    + " JOIN vms.receptions r ON r.floor_id = t.floor_id"
+                    + " WHERE r.id = ? AND t.is_active = true)",
+                    List.of((Object) own.receptionId()));
+        }
+        return new Clause("FALSE", List.of());
     }
 }

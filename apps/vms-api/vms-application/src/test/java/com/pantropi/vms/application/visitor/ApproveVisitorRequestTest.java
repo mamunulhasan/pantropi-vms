@@ -256,6 +256,14 @@ class ApproveVisitorRequestTest {
             savedInsideTransaction = true;
             return decisionLands;
         }
+
+        public Optional<VisitorRequest> findByVisitorId(UUID visitorId) {
+            return Optional.ofNullable(held);
+        }
+
+        public boolean savePreArrivalChange(VisitorRequest r, RequestStatus expected) {
+            return true;
+        }
     }
 
     private static final class FakeEvents implements DomainEventPublisher {
