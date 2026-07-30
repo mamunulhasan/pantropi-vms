@@ -40,6 +40,9 @@ import static org.assertj.core.api.Assertions.assertThat;
         })
 class ApiAuthorizationIT {
 
+    /** Must match the cors.allowed-origins property above. */
+    private static final String ALLOWED_ORIGIN = "https://portal.example.test";
+
     private static EmbeddedPostgres pg;
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -145,6 +148,52 @@ class ApiAuthorizationIT {
         assertThat(afterLogout.statusCode()).isEqualTo(401);
     }
 
+    // ---------------- CORS (the portal is a separate origin) ----------------
+
+    @Test
+    @DisplayName("preflight permits PATCH — the amend endpoints are unreachable from a browser without it")
+    void preflightAllowsPatch() throws Exception {
+        var res = preflight("/api/v1/visitor-requests/" + UUID.randomUUID(), "PATCH",
+                "authorization,content-type", ALLOWED_ORIGIN);
+
+        assertThat(res.statusCode()).isLessThan(300);
+        assertThat(header(res, "Access-Control-Allow-Methods")).contains("PATCH");
+        assertThat(header(res, "Access-Control-Allow-Origin")).isEqualTo(ALLOWED_ORIGIN);
+    }
+
+    @Test
+    @DisplayName("preflight permits If-None-Match — a conditional GET cannot be sent otherwise")
+    void preflightAllowsIfNoneMatch() throws Exception {
+        // If-None-Match is not CORS-safelisted, so without naming it the browser refuses to send
+        // the request at all and the whole revalidation mechanism is dead code (US-07.6.2).
+        var res = preflight("/api/v1/visitor-requests", "GET", "authorization,if-none-match",
+                ALLOWED_ORIGIN);
+
+        assertThat(res.statusCode()).isLessThan(300);
+        assertThat(header(res, "Access-Control-Allow-Headers").toLowerCase())
+                .contains("if-none-match");
+    }
+
+    @Test
+    @DisplayName("ETag is exposed, so page scripts can read the validator they must send back")
+    void etagIsExposedToScripts() throws Exception {
+        var res = preflight("/api/v1/visitor-requests", "GET", "authorization", ALLOWED_ORIGIN);
+
+        // ETag is not a safelisted response header: unexposed, the server would emit a validator
+        // no client could ever read.
+        assertThat(header(res, "Access-Control-Expose-Headers")).contains("ETag");
+    }
+
+    @Test
+    @DisplayName("the origin allowlist still refuses a foreign origin — no wildcard crept in")
+    void foreignOriginIsRefused() throws Exception {
+        var res = preflight("/api/v1/visitor-requests", "GET", "authorization",
+                "https://evil.example");
+
+        assertThat(res.statusCode()).isEqualTo(403);
+        assertThat(header(res, "Access-Control-Allow-Origin")).isEmpty();
+    }
+
     // ---------------- US-03.2.2 ----------------
 
     @Test
@@ -242,6 +291,22 @@ class ApiAuthorizationIT {
                 .POST(HttpRequest.BodyPublishers.ofString(body));
         if (bearer != null) b.header("Authorization", "Bearer " + bearer);
         return client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    /** A CORS preflight, exactly as a browser sends one: OPTIONS, no credentials. */
+    private HttpResponse<String> preflight(String path, String method, String requestHeaders,
+                                          String origin) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(base() + path))
+                .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
+                .header("Origin", origin)
+                .header("Access-Control-Request-Method", method)
+                .header("Access-Control-Request-Headers", requestHeaders)
+                .build();
+        return client.send(req, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static String header(HttpResponse<String> res, String name) {
+        return res.headers().firstValue(name).orElse("");
     }
 
     private HttpResponse<String> get(String path, String bearer) throws Exception {
