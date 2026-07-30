@@ -151,6 +151,21 @@ controller. `GET /api/v1/visitor-requests/{id}` adds the purpose, the guests by 
 rejected request — the reason and when it was decided, with the approver identified by display
 name only.
 
+The list is a **conditional GET**. It returns a weak `ETag`; send it back as `If-None-Match`
+and an unchanged list answers **304** with no body, which is what makes polling for status
+changes cheap. The validator folds in the caller's scope as well as the filter, so two tenants
+polling the same URL never share one — and the response is `Cache-Control: private` with
+`Vary: Authorization`, so no shared cache can serve one tenant's list to another.
+
+```bash
+curl -si "http://localhost:8081/api/v1/visitor-requests" \
+  -H "Authorization: Bearer $TOKEN" -H 'If-None-Match: W/"<etag>"'
+```
+
+> Two deviations worth knowing. There is **no Redis cache**, so an unchanged list still costs
+> one cheap count query rather than none. And a host renamed in master data does not touch any
+> request row, so a poll can show a stale host name until that request next changes.
+
 Another tenant's request is **404**, byte-identical to an id that never existed, so the endpoint
 cannot be used to find out what else is in the building. A tenant user with no tenant assigned
 sees nothing at all rather than everything.

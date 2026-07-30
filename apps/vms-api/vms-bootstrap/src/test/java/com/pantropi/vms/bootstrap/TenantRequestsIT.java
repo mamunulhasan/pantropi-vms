@@ -247,6 +247,113 @@ class TenantRequestsIT {
                 .isEqualTo(404);
     }
 
+    // ---- US-07.6.2: the conditional read ----
+
+    @Test
+    @DisplayName("US-07.6.2 T-07.6.2.3: an unchanged list answers 304 with no body")
+    void unchangedListIsNotModified() throws Exception {
+        submit("tenantuser", 1);
+        String bearer = token("tenantuser");
+
+        var first = get("/api/v1/visitor-requests?size=100", bearer);
+        assertThat(first.statusCode()).isEqualTo(200);
+        String etag = first.headers().firstValue("ETag").orElseThrow();
+        assertThat(etag).startsWith("W/\"");
+
+        var second = conditionalGet("/api/v1/visitor-requests?size=100", bearer, etag);
+
+        assertThat(second.statusCode()).isEqualTo(304);
+        assertThat(second.body()).isEmpty();
+        assertThat(second.headers().firstValue("ETag")).hasValue(etag);
+    }
+
+    @Test
+    @DisplayName("US-07.6.2 AC-1: a decision changes the validator, so the next poll gets the "
+            + "new status")
+    void decisionInvalidatesTheValidator() throws Exception {
+        String id = submit("tenantuser", 1);
+        String bearer = token("tenantuser");
+        String before = get("/api/v1/visitor-requests?size=100", bearer)
+                .headers().firstValue("ETag").orElseThrow();
+
+        post("/api/v1/visitor-requests/" + id + "/approve", null, token("fmadmin"));
+
+        // The poll that would have been a 304 is now a 200 carrying the decision.
+        var after = conditionalGet("/api/v1/visitor-requests?size=100", bearer, before);
+        assertThat(after.statusCode()).isEqualTo(200);
+        assertThat(after.body()).contains("\"status\":\"approved\"");
+        assertThat(after.headers().firstValue("ETag")).isPresent()
+                .isNotEqualTo(java.util.Optional.of(before));
+    }
+
+    @Test
+    @DisplayName("T-07.6.2.3: two tenants polling the same URL never share a validator, so one "
+            + "tenant's ETag can never produce a 304 for the other")
+    void noCrossTenantValidatorBleed() throws Exception {
+        // Deliberately symmetric state: one request each, submitted moments apart. Count and
+        // timestamp alone could coincide; the scope discriminator is what makes this impossible
+        // rather than unlikely.
+        submit("tenantuser", 1);
+        submit("tenantbuser", 1);
+
+        var mine = get("/api/v1/visitor-requests?size=100", token("tenantuser"));
+        var theirs = get("/api/v1/visitor-requests?size=100", token("tenantbuser"));
+        String myEtag = mine.headers().firstValue("ETag").orElseThrow();
+        String theirEtag = theirs.headers().firstValue("ETag").orElseThrow();
+
+        assertThat(myEtag).isNotEqualTo(theirEtag);
+
+        // Presenting the other tenant's validator must not be accepted as "yours is current".
+        var probe = conditionalGet("/api/v1/visitor-requests?size=100", token("tenantuser"),
+                theirEtag);
+        assertThat(probe.statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("T-07.6.2.3: the response forbids shared caching, so no intermediary can serve "
+            + "one tenant's list to another on the same URL")
+    void responseIsPrivate() throws Exception {
+        submit("tenantuser", 1);
+
+        var res = get("/api/v1/visitor-requests?size=100", token("tenantuser"));
+
+        assertThat(res.headers().firstValue("Cache-Control")).hasValueSatisfying(
+                value -> assertThat(value).contains("private"));
+        assertThat(res.headers().allValues("Vary")).anySatisfy(
+                value -> assertThat(value).contains("Authorization"));
+    }
+
+    @Test
+    @DisplayName("US-07.6.2 AC-2: two different filtered views never validate against each other")
+    void filtersHaveDistinctValidators() throws Exception {
+        submit("tenantuser", 1);
+        String bearer = token("tenantuser");
+
+        String unfiltered = get("/api/v1/visitor-requests?size=100", bearer)
+                .headers().firstValue("ETag").orElseThrow();
+        String filtered = get("/api/v1/visitor-requests?size=100&status=approved", bearer)
+                .headers().firstValue("ETag").orElseThrow();
+
+        assertThat(unfiltered).isNotEqualTo(filtered);
+        // ...and the filtered view's own validator does hold for itself.
+        assertThat(conditionalGet("/api/v1/visitor-requests?size=100&status=approved", bearer,
+                filtered).statusCode()).isEqualTo(304);
+    }
+
+    @Test
+    @DisplayName("US-07.6.2 AC-4: an expired or absent session gets 401 on the poll, not a 304")
+    void unauthenticatedPollIsRefused() throws Exception {
+        submit("tenantuser", 1);
+        String etag = get("/api/v1/visitor-requests?size=100", token("tenantuser"))
+                .headers().firstValue("ETag").orElseThrow();
+
+        // A client holding a valid ETag but no longer a valid session must be told to stop, not
+        // handed a cheap 304 that looks like success.
+        var res = conditionalGet("/api/v1/visitor-requests?size=100", null, etag);
+
+        assertThat(res.statusCode()).isEqualTo(401);
+    }
+
     // ---- AC-5, AC-6 ----
 
     @Test
@@ -340,6 +447,17 @@ class TenantRequestsIT {
                 null).body();
         int i = body.indexOf("\"accessToken\":\"") + 15;
         return body.substring(i, body.indexOf('"', i));
+    }
+
+    private HttpResponse<String> conditionalGet(String path, String bearer, String etag)
+            throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .header("If-None-Match", etag)
+                .GET();
+        if (bearer != null) {
+            b.header("Authorization", "Bearer " + bearer);
+        }
+        return client.send(b.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(String path, String bearer) throws Exception {

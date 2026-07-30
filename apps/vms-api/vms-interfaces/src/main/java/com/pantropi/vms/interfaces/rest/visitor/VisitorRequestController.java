@@ -22,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import com.pantropi.vms.interfaces.rest.security.RequiresPermission;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -168,12 +169,22 @@ public class VisitorRequestController {
      * parameter and builds no condition; the adapter takes the predicate from {@code ScopePolicy},
      * so the filters below narrow the tenant's own set and cannot widen it (AC-2).
      *
+     * <h2>Conditional (US-07.6.2, T-07.6.2.3)</h2>
+     * The response carries a weak {@code ETag}. A caller polling for status changes sends it back as
+     * {@code If-None-Match} and gets <strong>304</strong> while nothing has changed, which costs a
+     * count rather than the list with its joins and per-request visitor counts.
+     *
+     * <p>The validator folds in the caller's scope as well as the filter, so two tenants holding the
+     * same number of requests touched at the same instant still get different tokens — and the
+     * response is marked {@code private} so no shared cache can hand one tenant's body to another.
+     *
      * @param status optional; an unrecognised value is a 400 rather than an ignored filter
      * @param from   optional lower bound on the visit window, inclusive
      * @param to     optional upper bound on the visit window, exclusive
      */
     @GetMapping
-    public MyRequestsPage myRequests(
+    public ResponseEntity<MyRequestsPage> myRequests(
+            @RequestHeader(name = "If-None-Match", required = false) String ifNoneMatch,
             @RequestParam(required = false) String status,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
@@ -182,15 +193,49 @@ public class VisitorRequestController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
+        // The validator first: a count and a high-water mark, not the list. A status view polling
+        // every few seconds asks far more often than it needs a new answer (US-07.6.2 AC-1).
+        String etag = "W/\"" + myVisitorRequests.listVersion(status, from, to, page, size) + "\"";
+
+        if (etag.equals(ifNoneMatch)) {
+            // Nothing has changed for this caller, this filter, this page.
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).headers(cacheHeaders(etag))
+                    .build();
+        }
+
         VisitorRequestQueries.Page result = myVisitorRequests.list(status, from, to, page, size);
 
-        return new MyRequestsPage(
+        return ResponseEntity.ok().headers(cacheHeaders(etag)).body(new MyRequestsPage(
                 result.content().stream()
                         .map(r -> new MyRequestRow(r.id().toString(), r.status(), r.host(),
                                 r.scheduledFrom(), r.scheduledTo(), r.visitorCount(),
                                 r.submittedAt(), r.decidedAt(), r.decisionReason()))
                         .toList(),
-                result.totalElements(), result.page(), result.size(), PageRequest.MAX_SIZE);
+                result.totalElements(), result.page(), result.size(), PageRequest.MAX_SIZE));
+    }
+
+    /**
+     * Headers that make the conditional request safe to use (US-07.6.2, T-07.6.2.3).
+     *
+     * <p>{@code private} is not decoration. Two tenants poll the <em>same URL</em>, and a shared
+     * intermediary caching by URL alone would be free to hand one tenant's list to the other. The
+     * validator already carries a scope discriminator so the two never collide, but a cache that
+     * never stores the response cannot serve it to the wrong caller in the first place — two
+     * independent reasons, because this is the phase's primary isolation surface.
+     *
+     * <p>{@code Vary: Authorization} says the same thing in the other direction: the response depends
+     * on who asked, so it is not interchangeable between callers.
+     *
+     * <p>A <strong>weak</strong> validator ({@code W/}) because the claim is semantic equivalence,
+     * not byte equality — the body is regenerated per request and nothing promises identical bytes
+     * for equivalent state.
+     */
+    private static HttpHeaders cacheHeaders(String etag) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setETag(etag);
+        headers.setCacheControl("private, no-cache");
+        headers.setVary(List.of("Authorization"));
+        return headers;
     }
 
     /**
