@@ -77,7 +77,7 @@ function VisitorTypesScreen() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Visitor types</h1>
+      <h2 className="text-xl font-semibold text-text">Visitor types</h2>
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search visitor types">
           {canEdit && <Button onClick={() => setEditing("new")}>New visitor type</Button>}

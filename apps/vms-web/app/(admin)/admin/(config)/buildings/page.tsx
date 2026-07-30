@@ -87,7 +87,7 @@ function BuildingsScreen() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Buildings</h1>
+      <h2 className="text-xl font-semibold text-text">Buildings</h2>
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search buildings">
           {canEdit && <Button onClick={() => setEditing("new")}>New building</Button>}

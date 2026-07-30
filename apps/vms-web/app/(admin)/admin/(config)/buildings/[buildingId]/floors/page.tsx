@@ -125,7 +125,7 @@ function FloorsScreen() {
           {building ? `${building.code} — ${building.name}` : "…"}
         </span>
       </nav>
-      <h1 className="mt-2 text-xl font-semibold text-text">Floors</h1>
+      <h2 className="mt-2 text-xl font-semibold text-text">Floors</h2>
 
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search floors">

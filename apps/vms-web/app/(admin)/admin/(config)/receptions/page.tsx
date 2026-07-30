@@ -149,7 +149,7 @@ function ReceptionsScreen() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Receptions</h1>
+      <h2 className="text-xl font-semibold text-text">Receptions</h2>
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search receptions">
           {canEdit && <Button onClick={() => setEditing("new")}>New reception</Button>}

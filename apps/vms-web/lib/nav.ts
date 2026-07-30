@@ -30,23 +30,48 @@ export const ADMIN_ENTRY: readonly Permission[] = [
 ];
 
 /**
- * Destinations appear here as their screens ship (UI-4a/4b add settings, master data, users,
- * roles). Adding an entry is: href, label, and the permission codes its screen's API needs.
+ * The eight configuration tables, as tabs across one screen (wireframe 7a).
+ *
+ * They were ten separate left-nav destinations until UI-6. The deck is right that they belong
+ * together: an administrator setting a building up moves between floors, receptions and tenants in
+ * one sitting, and a nav entry per table made each of those a round trip through the sidebar.
+ *
+ * Order is the order the data depends on itself — a floor needs its building, a reception and a
+ * tenant need their floor — so working left to right is also working in the order that succeeds.
+ *
+ * Each tab still declares its own permission: a floor receptionist holding only `masterdata.view`
+ * sees the master-data tabs and not Users or Roles, exactly as when they were nav items.
  */
-export const ADMIN_NAV: readonly NavItem[] = [
-  // One name for one thing: the label, the page's h1 and the browser tab all say Administration.
-  { href: "/admin", label: "Administration", requires: ADMIN_ENTRY },
-  // Viewing settings needs masterdata.view (the controller's class-level guard); the edit
-  // affordance inside the screen additionally needs settings.manage.
-  { href: "/admin/settings", label: "Settings", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+export const CONFIG_TABS: readonly NavItem[] = [
   { href: "/admin/buildings", label: "Buildings", requires: [PERMISSIONS.MASTERDATA_VIEW] },
-  { href: "/admin/tenants", label: "Tenants", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/receptions", label: "Receptions", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+  { href: "/admin/tenants", label: "Tenants", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/visitor-types", label: "Visitor types", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/pass-types", label: "Pass types", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/holidays", label: "Holidays", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/users", label: "Users", requires: [PERMISSIONS.USER_MANAGE] },
   { href: "/admin/roles", label: "Roles", requires: [PERMISSIONS.USER_MANAGE] },
+];
+
+/**
+ * The sidebar is now three destinations, not ten: the console home, the tabbed configuration
+ * area, and settings. The tables did not move — their URLs are unchanged — they simply stopped
+ * each claiming a line in the sidebar.
+ *
+ * Configuration points at Buildings because that is the first tab and the root of the dependency
+ * chain; the tab bar takes over from there.
+ */
+export const ADMIN_NAV: readonly NavItem[] = [
+  // One name for one thing: the label, the page's h1 and the browser tab all say Administration.
+  { href: "/admin", label: "Administration", requires: ADMIN_ENTRY },
+  {
+    href: "/admin/buildings",
+    label: "Configuration",
+    requires: [PERMISSIONS.MASTERDATA_VIEW, PERMISSIONS.USER_MANAGE],
+  },
+  // Viewing settings needs masterdata.view (the controller's class-level guard); the edit
+  // affordance inside the screen additionally needs settings.manage.
+  { href: "/admin/settings", label: "Settings", requires: [PERMISSIONS.MASTERDATA_VIEW] },
 ];
 
 /**
