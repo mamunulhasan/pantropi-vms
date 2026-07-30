@@ -17,6 +17,11 @@
 # carries the client-tamper check (T-06.3.2.3). Separate job because it needs a browser download
 # and a built server, and because a red a11y gate should be readable without scrolling past lint.
 #
+# Both jobs run on pull requests **and on push to develop**, because those answer different
+# questions: a PR run says "this branch is sound", a push run says "the tree after merging it is".
+# A red push run marks the commit on develop and notifies whoever merged — which is the signal that
+# was missing when a merge first broke the frontend.
+#
 # The visual-regression baseline (T-06.2.1.3) and the token-literal lint rule (T-06.1.1.3) remain
 # deferred and are tracked in ADR-0006.
 
@@ -28,6 +33,24 @@ on:
     paths:
       - "apps/vms-web/**"
       - ".github/workflows/frontend.yml"
+  # Also on the merge itself. A pull-request run verifies the branch, not the result of
+  # integrating it: merging two branches that each passed can still produce a tree that does not
+  # compile, which is exactly what happened when the stacked VJ-1/VJ-2 branches merged and left
+  # develop with a duplicated declaration and a duplicated import. Nothing failed, because nothing
+  # ran — ci.yml and codeql.yml have verified backend merges on push since they were written, and
+  # this workflow was the one that did not. The breakage stayed invisible until the next branch was
+  # cut from develop.
+  push:
+    branches: [develop]
+    paths:
+      - "apps/vms-web/**"
+      - ".github/workflows/frontend.yml"
+
+# One run per ref. A newer merge supersedes an older one and includes its commits, so cancelling
+# the older run loses no coverage.
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   frontend:
