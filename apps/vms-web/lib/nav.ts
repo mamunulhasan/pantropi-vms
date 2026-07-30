@@ -39,8 +39,13 @@ export const ADMIN_NAV: readonly NavItem[] = [
   // affordance inside the screen additionally needs settings.manage.
   { href: "/admin/settings", label: "Settings", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/buildings", label: "Buildings", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+  { href: "/admin/tenants", label: "Tenants", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+  { href: "/admin/receptions", label: "Receptions", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/visitor-types", label: "Visitor types", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/pass-types", label: "Pass types", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+  { href: "/admin/holidays", label: "Holidays", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+  { href: "/admin/users", label: "Users", requires: [PERMISSIONS.USER_MANAGE] },
+  { href: "/admin/roles", label: "Roles", requires: [PERMISSIONS.USER_MANAGE] },
 ];
 
 /** The one filter the shell renders navigation through. */
