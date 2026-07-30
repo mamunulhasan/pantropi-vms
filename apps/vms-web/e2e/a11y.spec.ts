@@ -33,15 +33,17 @@ const BUILDING_ID = "b1111111-1111-1111-1111-111111111111";
 const ADMIN_ROUTES: { path: string; heading: string }[] = [
   { path: "/admin", heading: "Administration" },
   { path: "/admin/settings", heading: "Settings" },
-  { path: "/admin/buildings", heading: "Buildings" },
-  { path: `/admin/buildings/${BUILDING_ID}/floors`, heading: "Floors" },
-  { path: "/admin/tenants", heading: "Tenants" },
-  { path: "/admin/receptions", heading: "Receptions" },
-  { path: "/admin/visitor-types", heading: "Visitor types" },
-  { path: "/admin/pass-types", heading: "Pass types" },
-  { path: "/admin/holidays", heading: "Holiday calendar" },
-  { path: "/admin/users", heading: "Users" },
-  { path: "/admin/roles", heading: "Roles and permissions" },
+  // Every configuration table now sits inside the tabbed area, whose h1 is the area itself
+  // (UI-6). The table's own name is an h2 under it — asserted separately below.
+  { path: "/admin/buildings", heading: "Configuration" },
+  { path: `/admin/buildings/${BUILDING_ID}/floors`, heading: "Configuration" },
+  { path: "/admin/tenants", heading: "Configuration" },
+  { path: "/admin/receptions", heading: "Configuration" },
+  { path: "/admin/visitor-types", heading: "Configuration" },
+  { path: "/admin/pass-types", heading: "Configuration" },
+  { path: "/admin/holidays", heading: "Configuration" },
+  { path: "/admin/users", heading: "Configuration" },
+  { path: "/admin/roles", heading: "Configuration" },
 ];
 
 /** The tenant area (VJ-1) — scanned as its own principal, since its shell renders different nav. */

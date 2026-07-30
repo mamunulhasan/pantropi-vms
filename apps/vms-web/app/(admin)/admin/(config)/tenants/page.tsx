@@ -103,7 +103,7 @@ function TenantsScreen() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Tenants</h1>
+      <h2 className="text-xl font-semibold text-text">Tenants</h2>
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search tenants">
           {canEdit && <Button onClick={() => setEditing("new")}>New tenant</Button>}

@@ -11,14 +11,17 @@
  * link can never appear here that the nav withheld.
  */
 import Link from "next/link";
-import { ADMIN_NAV, visibleNavItems } from "@/lib/nav";
+import { ADMIN_NAV, CONFIG_TABS, visibleNavItems } from "@/lib/nav";
 import { useAuth } from "@/lib/use-auth";
 
 export default function AdminHome() {
   const auth = useAuth();
-  const destinations = visibleNavItems(ADMIN_NAV, auth.me?.permissions).filter(
-    (item) => item.href !== "/admin",
+  // The sidebar's own entries, minus this page, plus the configuration tables behind them — so
+  // the home still offers every screen directly, while the sidebar stays three lines long.
+  const sidebar = visibleNavItems(ADMIN_NAV, auth.me?.permissions).filter(
+    (item) => item.href !== "/admin" && item.href !== "/admin/buildings",
   );
+  const destinations = [...sidebar, ...visibleNavItems(CONFIG_TABS, auth.me?.permissions)];
 
   return (
     <div>

@@ -99,7 +99,7 @@ function PassTypesScreen() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Pass types</h1>
+      <h2 className="text-xl font-semibold text-text">Pass types</h2>
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search pass types">
           {canEdit && <Button onClick={() => setEditing("new")}>New pass type</Button>}

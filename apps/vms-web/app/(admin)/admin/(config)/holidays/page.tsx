@@ -64,7 +64,7 @@ export default function HolidaysPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Holiday calendar</h1>
+      <h2 className="text-xl font-semibold text-text">Holiday calendar</h2>
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
         <div>

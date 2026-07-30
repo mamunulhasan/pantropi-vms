@@ -69,10 +69,12 @@ test.describe("a principal with no admin permissions", () => {
     await mockApi(page, { ...TENANT_USER, permissions: ["user.manage"] });
     await page.goto("/admin/users");
 
-    await expect(page.getByRole("heading", { level: 1, name: "Users" })).toBeVisible();
+    // Since UI-6 the tabbed area owns the h1; the table's own name is the section heading.
+    await expect(page.getByRole("heading", { level: 1, name: "Configuration" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Users" })).toBeVisible();
     await expect(page.getByText("Jane Doe")).toBeVisible();
     await expect(page.getByRole("link", { name: "Users" })).toBeVisible();
-    // Still nothing it does not hold: master-data destinations stay absent.
+    // Still nothing it does not hold: the master-data tabs stay absent without masterdata.view.
     await expect(page.getByRole("link", { name: "Buildings" })).toHaveCount(0);
   });
 });
@@ -101,7 +103,8 @@ test.describe("after signing out (US-06.3.1 AC-4)", () => {
     await mockApi(page, SYSADMIN);
     await signIn(page);
     await page.goto("/admin/users");
-    await expect(page.getByRole("heading", { level: 1, name: "Users" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Users" })).toBeVisible();
+    await expect(page.getByText("Jane Doe")).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
@@ -109,6 +112,6 @@ test.describe("after signing out (US-06.3.1 AC-4)", () => {
     // A restored page must not render the console it was showing a moment ago.
     await page.goBack();
     await expect(page.getByText("Jane Doe")).toHaveCount(0);
-    await expect(page.getByRole("heading", { level: 1, name: "Users" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: "Users" })).toHaveCount(0);
   });
 });

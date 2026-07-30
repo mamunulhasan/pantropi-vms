@@ -164,7 +164,7 @@ not database-backed; the deck's admin-editable branding is a new requirement.
 **Adopt now (no new API):**
 1. FM Admin approvals — deck 2a + 2c — as **VJ-2**. Backend complete.
 2. Reception pre-registration — deck 3a, minus ID capture and the sync column — as **VJ-3**.
-3. Tabbed master-data shell — deck 7a — as a contained refactor of shipped screens.
+3. ~~Tabbed master-data shell — deck 7a~~ — **done in UI-6**.
 
 **Needs a small backend story first:**
 4. Hosts (§2.2) — unblocks the host field on the tenant form, the approval queue and the tenant editor.
@@ -199,5 +199,7 @@ finalises the contract, as the deck's own closing slide says.
 **Still open, and cheap when wanted:**
 - Hosts (§2.2) — the one gap that is neither a conflict nor blocked. It would unblock the host
   field on three screens whenever it is prioritised.
-- The tabbed master-data shell (§3.6) — a contained refactor of screens that already exist.
+- ~~The tabbed master-data shell (§3.6)~~ — **done in UI-6.** Route group, so the URLs did not
+  move; Buildings kept as a tab rather than dropped; the sidebar collapsed from ten entries to
+  three.
 - Which lettered layout wins for each screen — the deck itself leaves this open.

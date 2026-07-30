@@ -122,7 +122,7 @@ export default function RolesPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Roles and permissions</h1>
+      <h2 className="text-xl font-semibold text-text">Roles and permissions</h2>
       <p className="mt-1 text-sm text-text-muted">
         A change takes effect on each affected user&rsquo;s next request. Saving is per role and
         refuses to overwrite someone else&rsquo;s concurrent edit.
