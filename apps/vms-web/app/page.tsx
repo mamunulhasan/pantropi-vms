@@ -1,25 +1,37 @@
-import Link from "next/link";
-import { BrandMark } from "@/components/BrandMark";
+"use client";
 
-/*
- * Placeholder landing. UI-1 replaces this with a redirect: authenticated users go to their
- * role's home, everyone else to /login. It exists now so the scaffold renders something
- * token-styled end to end.
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { BrandMark } from "@/components/BrandMark";
+import { useAuth } from "@/lib/use-auth";
+
+/**
+ * The root is a router, not a page: a restored session goes to its home, everyone else to
+ * sign-in. The brief branded state below is what shows while the one resume attempt settles.
  */
 export default function Home() {
+  const auth = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (auth.resuming) {
+      return;
+    }
+    if (!auth.accessToken) {
+      router.replace("/login");
+    } else if (auth.mustChangePassword) {
+      router.replace("/change-password");
+    } else {
+      router.replace("/admin");
+    }
+  }, [auth.resuming, auth.accessToken, auth.mustChangePassword, router]);
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center gap-6 bg-surface-sunken p-8">
       <BrandMark />
-      <p className="text-text-muted max-w-md text-center">
-        Visitor management portal. Sign-in arrives with the next story; the design tokens,
-        branding and build pipeline land here first.
+      <p role="status" className="text-text-muted">
+        Loading…
       </p>
-      <Link
-        href="/login"
-        className="rounded-md bg-brand px-6 py-2 text-brand-contrast hover:bg-brand-hover"
-      >
-        Sign in
-      </Link>
     </main>
   );
 }
