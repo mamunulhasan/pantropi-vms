@@ -236,6 +236,13 @@ public class IdentityConfig {
     }
 
     @Bean
+    com.pantropi.vms.application.identity.usecase.CurrentUser currentUser(
+            com.pantropi.vms.application.identity.port.UserAdministrationStore users,
+            com.pantropi.vms.application.identity.usecase.EffectivePermissions permissions) {
+        return new com.pantropi.vms.application.identity.usecase.CurrentUser(users, permissions);
+    }
+
+    @Bean
     com.pantropi.vms.application.identity.usecase.RoleAdministration roleAdministration(
             com.pantropi.vms.application.identity.port.RoleGrantStore store,
             com.pantropi.vms.application.shared.port.TransactionRunner transactions,

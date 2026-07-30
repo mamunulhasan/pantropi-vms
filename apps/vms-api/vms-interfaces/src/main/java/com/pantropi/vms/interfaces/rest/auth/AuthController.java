@@ -2,6 +2,7 @@ package com.pantropi.vms.interfaces.rest.auth;
 
 import com.pantropi.vms.application.identity.usecase.AuthenticateUser;
 import com.pantropi.vms.application.identity.usecase.ChangePassword;
+import com.pantropi.vms.application.identity.usecase.CurrentUser;
 import com.pantropi.vms.application.identity.usecase.PasswordPolicy;
 import com.pantropi.vms.application.identity.usecase.SessionManager;
 import com.pantropi.vms.interfaces.rest.security.AuthenticatedPrincipal;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -22,7 +24,8 @@ import java.util.UUID;
  *       refresh pair.</li>
  *   <li>{@code POST /api/v1/auth/refresh} — single-use refresh rotation (AC-1).</li>
  *   <li>{@code POST /api/v1/auth/logout} — revoke the current session (AC-2). Protected.</li>
- *   <li>{@code GET  /api/v1/auth/me} — echo the authenticated principal. Protected.</li>
+ *   <li>{@code GET  /api/v1/auth/me} — the authenticated principal's profile: identity, display
+ *       name and the effective permission set (US-06.3.2). Protected.</li>
  *   <li>{@code POST /api/v1/auth/password} — change your own password (US-02.3.1). Protected.</li>
  * </ul>
  *
@@ -36,12 +39,14 @@ public class AuthController {
     private final AuthenticateUser authenticateUser;
     private final SessionManager sessions;
     private final ChangePassword changePassword;
+    private final CurrentUser currentUser;
 
     public AuthController(AuthenticateUser authenticateUser, SessionManager sessions,
-                          ChangePassword changePassword) {
+                          ChangePassword changePassword, CurrentUser currentUser) {
         this.authenticateUser = authenticateUser;
         this.sessions = sessions;
         this.changePassword = changePassword;
+        this.currentUser = currentUser;
     }
 
     @PostMapping("/login")
@@ -98,7 +103,10 @@ public class AuthController {
     @RequiresAuthentication
     @GetMapping("/me")
     public MeResponse me(@RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal) {
-        return new MeResponse(principal.userId(), principal.username(), principal.role());
+        CurrentUser.Profile p = currentUser.profile(
+                UUID.fromString(principal.userId()), principal.username(), principal.role());
+        return new MeResponse(principal.userId(), principal.username(), principal.role(),
+                p.displayName(), p.permissions());
     }
 
     @ExceptionHandler(AuthenticateUser.InvalidCredentials.class)
@@ -145,6 +153,11 @@ public class AuthController {
      */
     public record TokenResponse(String accessToken, String tokenType, Instant expiresAt,
                                 String refreshToken, boolean mustChangePassword) {}
-    public record MeResponse(String userId, String username, String role) {}
+    /**
+     * @param permissions sorted effective permission codes, resolved live (US-06.3.2) — the portal
+     *                    binds navigation to these, so they reflect the database, never the token
+     */
+    public record MeResponse(String userId, String username, String role, String displayName,
+                             List<String> permissions) {}
     public record ErrorResponse(String error, String message) {}
 }

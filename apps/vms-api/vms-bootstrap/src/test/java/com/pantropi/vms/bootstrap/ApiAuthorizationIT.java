@@ -81,6 +81,21 @@ class ApiAuthorizationIT {
     }
 
     @Test
+    @DisplayName("US-06.3.2: /auth/me delivers display name and the role's real migrated grants")
+    void meCarriesEffectivePermissions() throws Exception {
+        var admin = get("/api/v1/auth/me", accessToken("admin", "admin-password-1234"));
+        assertThat(admin.statusCode()).isEqualTo(200);
+        assertThat(admin.body()).contains("\"displayName\":\"admin\"");
+        // Against the real V1..V12 seed: SYSTEM_ADMIN's grant set, not a fixture's.
+        assertThat(admin.body()).contains("\"user.manage\"").contains("\"audit.view\"");
+
+        var tenant = get("/api/v1/auth/me", accessToken("tenant", "tenant-password-1234"));
+        assertThat(tenant.statusCode()).isEqualTo(200);
+        // The nav must be able to trust an absence as hard as a presence (US-06.3.2 AC-1).
+        assertThat(tenant.body()).contains("\"visitor.request\"").doesNotContain("\"user.manage\"");
+    }
+
+    @Test
     @DisplayName("AC-2/AC-5: a TENANT calling a user.manage route gets 403 and no work is performed")
     void tenantIsForbiddenAndNothingHappens() throws Exception {
         String tenant = accessToken("tenant", "tenant-password-1234");
