@@ -91,6 +91,9 @@ export function homeFor(permissions: readonly string[] | null | undefined): stri
   if (hasAny(permissions, FM_ENTRY)) {
     return "/approvals";
   }
+  if (hasAny(permissions, ADMIN_ENTRY)) {
+    return "/admin";
+  }
   if (hasAny(permissions, TENANT_ENTRY)) {
     return "/visits";
   }

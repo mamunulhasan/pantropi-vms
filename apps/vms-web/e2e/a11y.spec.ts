@@ -23,6 +23,7 @@ import {
   mockApi,
   signIn,
 } from "./fixtures/mock-api";
+import { SYSADMIN, TENANT_USER, VISIT_REQUEST_ID, mockApi, signIn } from "./fixtures/mock-api";
 
 const WCAG_21_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 

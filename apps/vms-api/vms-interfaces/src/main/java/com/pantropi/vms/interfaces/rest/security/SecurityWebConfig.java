@@ -85,13 +85,35 @@ public class SecurityWebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**");   // every route; PublicRoutes is the only way out
     }
 
+    /**
+     * CORS for the portal origins.
+     *
+     * <p>Three entries here are not decoration — omitting any one of them silently disables a
+     * shipped feature from a browser, while leaving it perfectly usable from curl:
+     *
+     * <ul>
+     *   <li><strong>{@code PATCH}</strong> — the amend endpoints for a visitor request (US-07.1.3)
+     *       and a pre-registration (US-08.1.3) are PATCH. Without it the preflight is refused and
+     *       neither can be called at all.</li>
+     *   <li><strong>{@code If-None-Match}</strong> — not a CORS-safelisted request header, so a
+     *       conditional GET cannot even be sent without naming it. That is the whole of
+     *       US-07.6.2's revalidation mechanism.</li>
+     *   <li><strong>{@code ETag}</strong> — not a safelisted <em>response</em> header, so page
+     *       JavaScript cannot read the validator it is supposed to send back. Exposing it is what
+     *       closes the loop; without it the server would emit an ETag no client could ever use.</li>
+     * </ul>
+     *
+     * <p>Preflight itself is allowed through the authorization interceptor deliberately (it carries
+     * no credentials by design); this configuration is what decides it.
+     */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
                 .allowedOrigins(allowedOrigins.toArray(new String[0]))  // never "*"
-                .allowedMethods("GET", "POST", "PUT", "DELETE")
-                .allowedHeaders("Authorization", "Content-Type", CorrelationIdFilter.HEADER)
-                .exposedHeaders(CorrelationIdFilter.HEADER)
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE")
+                .allowedHeaders("Authorization", "Content-Type", "If-None-Match",
+                        CorrelationIdFilter.HEADER)
+                .exposedHeaders("ETag", CorrelationIdFilter.HEADER)
                 .allowCredentials(false)   // bearer tokens, not cookies
                 .maxAge(1800);
     }

@@ -146,6 +146,24 @@ CSRF protection is deliberately absent and not required: the API is stateless, i
 cookie, and rejects any request without an `Authorization` header, so a browser cannot be induced to
 authenticate a cross-site request ambiently.
 
+### The CORS lists are part of the API contract
+
+Because the portal is a **separate origin**, an endpoint is only usable from a browser if the CORS
+configuration names what it needs. Three entries exist for specific shipped features, and dropping
+any of them disables that feature **from a browser only** — every server-side integration test keeps
+passing, and curl keeps working, which is exactly why the original omissions went unnoticed until
+the portal's tenant screens were mapped:
+
+| Entry | Without it |
+|---|---|
+| `PATCH` in `allowedMethods` | `PATCH /visitor-requests/{id}` (US-07.1.3) and `PATCH /pre-registrations/{visitorId}` (US-08.1.3) fail preflight — not callable at all |
+| `If-None-Match` in `allowedHeaders` | not CORS-safelisted, so a conditional GET cannot be *sent*; US-07.6.2's revalidation is dead code from the portal |
+| `ETag` in `exposedHeaders` | not a safelisted *response* header, so page JS cannot read the validator it must send back — the server emits an ETag no client can use |
+
+`ApiAuthorizationIT` pins all three with preflight assertions, plus a foreign origin still being
+refused. **Adding an endpoint with a new method or a new required/read header means adding it here
+and to those tests** — otherwise it ships working and unusable.
+
 ## Deviations
 
 | Deviation | Reason | Resolution |

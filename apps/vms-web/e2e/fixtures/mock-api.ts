@@ -228,6 +228,21 @@ const REQUIRED: { match: RegExp; anyOf: string[] }[] = [
   { match: /^\/api\/v1\/visitor-requests\/[^/]+$/, anyOf: ["visitor.request", "visitor.approve"] },
   { match: /^\/api\/v1\/visitor-requests$/, anyOf: ["visitor.request"] },
   { match: /^\/api\/v1\/pre-registrations/, anyOf: ["visitor.register"] },
+/** Which permission the real controller requires, by admin path prefix. */
+const REQUIRED: { prefix: string; anyOf: string[] }[] = [
+  { prefix: "/api/v1/admin/settings", anyOf: ["masterdata.view"] },
+  { prefix: "/api/v1/admin/buildings", anyOf: ["masterdata.view"] },
+  { prefix: "/api/v1/admin/tenants", anyOf: ["masterdata.view"] },
+  { prefix: "/api/v1/admin/receptions", anyOf: ["masterdata.view"] },
+  { prefix: "/api/v1/admin/visitor-types", anyOf: ["masterdata.view"] },
+  { prefix: "/api/v1/admin/pass-types", anyOf: ["masterdata.view"] },
+  { prefix: "/api/v1/admin/holidays", anyOf: ["masterdata.view"] },
+  { prefix: "/api/v1/admin/users", anyOf: ["user.manage"] },
+  { prefix: "/api/v1/admin/roles", anyOf: ["user.manage"] },
+  // The tenant journey: submit/track/amend/cancel all sit behind visitor.request; the FM queue
+  // behind visitor.approve. Mirrors VisitorRequestController's annotations.
+  { prefix: "/api/v1/visitor-requests/pending", anyOf: ["visitor.approve"] },
+  { prefix: "/api/v1/visitor-requests", anyOf: ["visitor.request"] },
 ];
 
 /**
