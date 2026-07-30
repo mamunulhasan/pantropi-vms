@@ -66,6 +66,39 @@ describe("login", () => {
   });
 });
 
+describe("profile parsing (US-06.3.2)", () => {
+  it("carries displayName and the permission list into the store", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL) => {
+      const path = String(url);
+      if (path.includes("/api/session/login")) return jsonResponse(SESSION);
+      if (path.includes("/api/v1/auth/me")) {
+        return jsonResponse({ ...ME, displayName: "Sydney Admin",
+          permissions: ["audit.view", "user.manage"] });
+      }
+      throw new Error(`unexpected fetch ${path}`);
+    }));
+
+    await login("sysadmin", "pw");
+
+    expect(getSnapshot().me?.displayName).toBe("Sydney Admin");
+    expect(getSnapshot().me?.permissions).toEqual(["audit.view", "user.manage"]);
+  });
+
+  it("fails closed on an older API payload: username as name, no permissions, no crash", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL) => {
+      const path = String(url);
+      if (path.includes("/api/session/login")) return jsonResponse(SESSION);
+      if (path.includes("/api/v1/auth/me")) return jsonResponse(ME); // no new fields
+      throw new Error(`unexpected fetch ${path}`);
+    }));
+
+    await login("sysadmin", "pw");
+
+    expect(getSnapshot().me?.displayName).toBe("sysadmin");
+    expect(getSnapshot().me?.permissions).toEqual([]);
+  });
+});
+
 describe("refresh single-flight (AC-6)", () => {
   it("collapses concurrent callers onto exactly one refresh request", async () => {
     let refreshCalls = 0;
