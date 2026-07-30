@@ -48,7 +48,7 @@ Password123!local
 
 | Username | Role | Permissions |
 |---|---|---|
-| `sysadmin` | SYSTEM_ADMIN | `user.manage`, `masterdata.view`, `masterdata.edit`, `settings.manage` |
+| `sysadmin` | SYSTEM_ADMIN | `user.manage`, `masterdata.view`, `masterdata.edit`, `settings.manage`, `audit.view` |
 | `masteradmin` | MASTER_ADMIN | `visitor.approve`, `credential.issue` |
 | `fmadmin` | FM_ADMIN | `visitor.approve` |
 | `receptionist` | FLOOR_RECEPTIONIST | `visitor.register`, `masterdata.view` |
@@ -86,6 +86,17 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/approve \
   -H "Authorization: Bearer $FM_TOKEN" -H 'Content-Type: application/json' \
   -d '{"note":"Cleared with building security"}'
 ```
+
+`GET /api/v1/visitor-requests/{id}` is the review read, and it is the one route in the system
+reachable by **either** of two permissions. A tenant opens it with `visitor.request` and sees
+only their own; an FM Admin opens it with `visitor.approve` and sees any request in the
+building. Same handler — the difference is the scoping policy at the query, not a branch in the
+controller. It returns each visitor's name, company and visitor type, and still no email, phone
+or document reference.
+
+> **Opening a request is itself audited.** This is the read that names people, so it writes a
+> `visitor_request.view` entry recording who looked and at what. The entry carries no state and
+> no personal data — it says access happened, and the request row still says the rest.
 
 Every decision on a request is recorded in `vms.audit_logs` and readable at
 `GET /api/v1/visitor-requests/{id}/history`, chronologically, under **`audit.view`** — which
@@ -409,7 +420,7 @@ invalidation is US-04.9.2 — see the Redis note in
 | POST | `/api/v1/visitor-requests/{id}/reject` — **required** `{"reason":"…"}`, ≤1000 chars | `visitor.approve` |
 | GET | `/api/v1/visitor-requests/pending?status=&tenantId=&from=&to=&search=&page=&size=` — **max size 100**, clamped not refused | `visitor.approve` |
 | GET | `/api/v1/visitor-requests?status=&from=&to=&page=&size=` — own tenant only | `visitor.request` |
-| GET | `/api/v1/visitor-requests/{id}` — own tenant only; 404 for anyone else's | `visitor.request` |
+| GET | `/api/v1/visitor-requests/{id}` — tenant sees its own; approver sees any. 404 otherwise | `visitor.request` **or** `visitor.approve` |
 | PATCH | `/api/v1/visitor-requests/{id}` — partial edit, `submitted` only | `visitor.request` |
 | POST | `/api/v1/visitor-requests/{id}/cancel` — legal from `submitted` **and** `approved` | `visitor.request` |
 | GET | `/api/v1/visitor-requests/{id}/history` — chronological decision trail | `audit.view` |

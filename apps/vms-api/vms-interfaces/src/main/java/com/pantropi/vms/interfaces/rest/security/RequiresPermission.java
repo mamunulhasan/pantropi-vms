@@ -21,6 +21,20 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RequiresPermission {
 
-    /** Permission code from {@code vms.permissions}, e.g. {@code user.manage}. */
-    String value();
+    /**
+     * Permission codes from {@code vms.permissions}, e.g. {@code user.manage}.
+     *
+     * <p>Holding <strong>any one</strong> of them satisfies the route (US-07.3.3, T-07.3.3.2).
+     * Some resources are legitimately reachable by two different authorities: a request detail is
+     * read by the tenant who raised it under {@code visitor.request} and by the FM Admin deciding it
+     * under {@code visitor.approve}, and neither is a subset of the other.
+     *
+     * <p>Any-of rather than all-of because that is what such a route means. A resource needing two
+     * permissions at once is a different shape, and if one ever appears it should say so explicitly
+     * rather than inheriting the meaning from here.
+     *
+     * <p>Declaring two codes does <em>not</em> mean the two callers see the same thing. What each
+     * may read is still decided by the scoping policy at the query — this only decides who may ask.
+     */
+    String[] value();
 }

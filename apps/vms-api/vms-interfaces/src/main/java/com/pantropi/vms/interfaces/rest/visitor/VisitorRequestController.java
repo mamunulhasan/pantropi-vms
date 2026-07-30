@@ -203,15 +203,50 @@ public class VisitorRequestController {
      * <p>The rejection reason is returned as a JSON string. It is stored exactly as the approver
      * typed it (US-07.4.2 AC-6); encoding it for display is the renderer's job, and the JSON
      * serialiser escapes it for this transport.
+     *
+     * <h2>Two callers, one resource (US-07.3.3, T-07.3.3.2)</h2>
+     * The tenant who raised the request reads it under {@code visitor.request}; the FM Admin
+     * deciding it reads it under {@code visitor.approve}. Either permission opens the route — and
+     * <em>what</em> each of them gets is still the scoping policy's decision at the query, so the
+     * approver sees any request in the building and the tenant sees only their own, from the same
+     * handler and with no branch here that could get it the wrong way round.
+     *
+     * <p>Reading this is audited (AC-2): it is the endpoint that names people.
+     *
+     * <h2>A GET that writes, and why that is not a CSRF hole here</h2>
+     * CodeQL flags this handler under {@code java/csrf-unprotected-request-type}, and the observation
+     * behind the flag is correct and worth keeping in view: a {@code GET} now has a side effect,
+     * because AC-2 requires the act of reading to be recorded.
+     *
+     * <p>It is not exploitable as CSRF in this API. Cross-site request forgery needs an
+     * <em>ambient</em> credential — one the victim's browser attaches by itself. This system has
+     * none: authentication is a bearer token read from the {@code Authorization} header
+     * ({@code AuthorizationInterceptor}), there is no cookie anywhere in the interfaces or
+     * infrastructure layers, and a browser will not add that header to a cross-origin request. A
+     * forged request therefore arrives unauthenticated and is refused before this method runs.
+     *
+     * <p>What the side effect can do at worst is add a row saying somebody looked — attributable to
+     * whoever's token was used, and only ever by someone who already holds one. That is the audit
+     * trail working, not being subverted.
+     *
+     * <p>If cookie-based sessions are ever introduced, this reasoning stops holding and this handler
+     * is one of the places that has to be revisited. That is the reason it is written down here
+     * rather than dismissed in a dashboard where the next reader will not find it.
      */
     @GetMapping("/{id}")
-    public MyRequestDetail myRequest(@PathVariable UUID id) {
-        VisitorRequestQueries.Detail d = myVisitorRequests.detail(id);
+    @RequiresPermission({"visitor.request", "visitor.approve"})
+    public MyRequestDetail myRequest(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal,
+            @PathVariable UUID id) {
+        VisitorRequestQueries.Detail d =
+                myVisitorRequests.detail(UUID.fromString(principal.userId()), id);
         return new MyRequestDetail(d.id().toString(), d.status(), d.host(), d.purpose(),
                 d.scheduledFrom(), d.scheduledTo(), d.submittedAt(), d.decidedBy(), d.decidedAt(),
                 d.decisionReason(),
                 d.visitors().stream()
-                        .map(v -> new VisitorLine(v.fullName(), v.status())).toList());
+                        .map(v -> new VisitorLine(v.fullName(), v.company(), v.visitorType(),
+                                v.status()))
+                        .toList());
     }
 
     /**
@@ -437,7 +472,8 @@ public class VisitorRequestController {
                                   String decidedBy, Instant decidedAt, String decisionReason,
                                   List<VisitorLine> visitors) {}
 
-    public record VisitorLine(String fullName, String status) {}
+    public record VisitorLine(String fullName, String company, String visitorType,
+                             String status) {}
 
     /**
      * One queue row. Counts and names an approver needs to recognise the request — deliberately no

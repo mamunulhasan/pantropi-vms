@@ -111,10 +111,11 @@ public final class AuthorizationInterceptor implements HandlerInterceptor {
             return deny(request, response, HttpServletResponse.SC_FORBIDDEN,
                     "<undeclared>", token.userId());
         }
-        if (declaration.kind() == Kind.PERMISSION
-                && !permissions.roleHasPermission(token.roleCode(), declaration.permission())) {
+        if (declaration.kind() == Kind.PERMISSION && !satisfies(declaration, token.roleCode())) {
+            // The denial records what was required, not which of several the caller lacked —
+            // a caller who holds none of them lacks all of them.
             return deny(request, response, HttpServletResponse.SC_FORBIDDEN,
-                    declaration.permission(), token.userId());
+                    String.join(" or ", declaration.permissions()), token.userId());
         }
 
         // AC-4: the principal comes only from the validated token — never from client input.
@@ -186,7 +187,17 @@ public final class AuthorizationInterceptor implements HandlerInterceptor {
         return new Declaration(Kind.NONE, null);
     }
 
+    /** Any one of the declared permissions is enough (US-07.3.3, T-07.3.3.2). */
+    private boolean satisfies(Declaration declaration, String roleCode) {
+        for (String required : declaration.permissions()) {
+            if (permissions.roleHasPermission(roleCode, required)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     enum Kind { NONE, AUTHENTICATED, PERMISSION }
 
-    record Declaration(Kind kind, String permission) {}
+    record Declaration(Kind kind, String[] permissions) {}
 }

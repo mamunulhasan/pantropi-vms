@@ -64,8 +64,18 @@ public interface VisitorRequestQueries {
                   Instant scheduledTo, Instant submittedAt, String decidedBy, Instant decidedAt,
                   String decisionReason, List<VisitorLine> visitors) {}
 
-    /** The tenant's own guests, by name and status — they supplied these people themselves. */
-    record VisitorLine(String fullName, String status) {}
+    /**
+     * One named guest (US-07.3.3 AC-1).
+     *
+     * <p>Name, company, classification and status. Deliberately still no email, phone or
+     * {@code id_document_ref}: an approver deciding whether to admit somebody needs to know who is
+     * coming and in what capacity, not how to contact them. TODO-13 keeps the document reference out
+     * of every endpoint in this phase.
+     *
+     * @param visitorType the type's display name, not its id — a reviewer reads "Contractor", and
+     *                    handing out the id would invite a client to resolve it against master data
+     */
+    record VisitorLine(String fullName, String company, String visitorType, String status) {}
 
     record Page(List<Summary> content, long totalElements, int page, int size) {}
 }
