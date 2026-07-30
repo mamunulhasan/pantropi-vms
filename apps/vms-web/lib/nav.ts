@@ -49,6 +49,36 @@ export const ADMIN_NAV: readonly NavItem[] = [
   { href: "/admin/roles", label: "Roles", requires: [PERMISSIONS.USER_MANAGE] },
 ];
 
+/**
+ * What justifies entering the tenant area: `visitor.request`, the only permission the TENANT role
+ * holds. Every screen behind it reads and writes the caller's *own* tenant's requests, and the API
+ * scopes those queries itself (US-03.4.1) — this only decides whether to render the area.
+ */
+export const TENANT_ENTRY: readonly Permission[] = [PERMISSIONS.VISITOR_REQUEST];
+
+export const TENANT_NAV: readonly NavItem[] = [
+  { href: "/visits", label: "My visit requests", requires: TENANT_ENTRY },
+  { href: "/visits/new", label: "New request", requires: TENANT_ENTRY },
+];
+
+/**
+ * Where a signed-in principal belongs, from its permissions alone. Null when its grants open no
+ * area at all.
+ *
+ * Both the front door and the post-sign-in redirect read this, so they cannot disagree — the bug
+ * this replaces was a hardcoded "/admin" in each, which sent a tenant straight into the
+ * no-access wall the moment a second area existed.
+ */
+export function homeFor(permissions: readonly string[] | null | undefined): string | null {
+  if (hasAny(permissions, ADMIN_ENTRY)) {
+    return "/admin";
+  }
+  if (hasAny(permissions, TENANT_ENTRY)) {
+    return "/visits";
+  }
+  return null;
+}
+
 /** The one filter the shell renders navigation through. */
 export function visibleNavItems(
   items: readonly NavItem[],

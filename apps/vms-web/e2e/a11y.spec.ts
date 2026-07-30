@@ -15,7 +15,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { SYSADMIN, mockApi, signIn } from "./fixtures/mock-api";
+import { SYSADMIN, TENANT_USER, VISIT_REQUEST_ID, mockApi, signIn } from "./fixtures/mock-api";
 
 const WCAG_21_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -34,6 +34,13 @@ const ADMIN_ROUTES: { path: string; heading: string }[] = [
   { path: "/admin/holidays", heading: "Holiday calendar" },
   { path: "/admin/users", heading: "Users" },
   { path: "/admin/roles", heading: "Roles and permissions" },
+];
+
+/** The tenant area (VJ-1) — scanned as its own principal, since its shell renders different nav. */
+const TENANT_ROUTES: { path: string; heading: string }[] = [
+  { path: "/visits", heading: "My visit requests" },
+  { path: "/visits/new", heading: "New visit request" },
+  { path: `/visits/${VISIT_REQUEST_ID}`, heading: "Visit request" },
 ];
 
 async function scan(page: Page, label: string) {
@@ -74,6 +81,9 @@ test.describe("unauthenticated routes", () => {
 
   test("login page announces a failure through a live region", async ({ page }) => {
     // The neutral failure message must reach a screen reader, not only the sighted user.
+    await mockApi(page);
+    // After mockApi, so this narrower handler is the one that answers: Playwright consults the
+    // most recently registered route first.
     await page.route("**/api/session/login", (route) =>
       route.fulfill({
         status: 401,
@@ -81,13 +91,15 @@ test.describe("unauthenticated routes", () => {
         body: JSON.stringify({ error: "sign_in_failed" }),
       }),
     );
-    await mockApi(page);
     await page.goto("/login");
     await page.getByLabel("Username").fill("sysadmin");
     await page.getByLabel("Password").fill("wrong-password");
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page.getByRole("alert")).toBeVisible();
+    // Not a bare getByRole("alert"): Next renders its own route announcer with that role, and
+    // matching it instead would have let this pass while sign-in quietly succeeded.
+    await expect(page.locator('p[role="alert"]')).toContainText("Sign-in failed");
+    await expect(page).toHaveURL(/\/login/);
     await scan(page, "/login (failed sign-in)");
   });
 });
@@ -96,6 +108,15 @@ test.describe("authenticated routes", () => {
   for (const route of ADMIN_ROUTES) {
     test(`${route.path} has no critical or serious violations`, async ({ page }) => {
       await mockApi(page, SYSADMIN);
+      await page.goto(route.path);
+      await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
+      await scan(page, route.path);
+    });
+  }
+
+  for (const route of TENANT_ROUTES) {
+    test(`${route.path} has no critical or serious violations`, async ({ page }) => {
+      await mockApi(page, TENANT_USER);
       await page.goto(route.path);
       await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
       await scan(page, route.path);
@@ -152,6 +173,17 @@ test.describe("landmarks, headings and keyboard entry", () => {
       expect(await page.locator("h1").count(), `h1 count on ${route.path}`).toBe(1);
       await expect(page.getByRole("main")).toBeVisible();
       await expect(page.getByRole("navigation", { name: "Administration" })).toBeVisible();
+    }
+  });
+
+  test("every tenant route has one h1, a main and a navigation landmark", async ({ page }) => {
+    await mockApi(page, TENANT_USER);
+    for (const route of TENANT_ROUTES) {
+      await page.goto(route.path);
+      await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
+      expect(await page.locator("h1").count(), `h1 count on ${route.path}`).toBe(1);
+      await expect(page.getByRole("main")).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Visits" })).toBeVisible();
     }
   });
 
