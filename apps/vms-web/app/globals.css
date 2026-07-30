@@ -23,6 +23,7 @@
   --color-text-inverted: var(--color-text-inverted);
   --color-border: var(--color-border);
   --color-border-strong: var(--color-border-strong);
+  --color-scrim: var(--color-scrim);
   --color-danger: var(--color-danger);
   --color-danger-contrast: var(--color-danger-contrast);
   --color-danger-surface: var(--color-danger-surface);
