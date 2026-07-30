@@ -15,6 +15,14 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import {
+  FM_USER,
+  SYSADMIN,
+  TENANT_USER,
+  VISIT_REQUEST_ID,
+  mockApi,
+  signIn,
+} from "./fixtures/mock-api";
 import { SYSADMIN, TENANT_USER, VISIT_REQUEST_ID, mockApi, signIn } from "./fixtures/mock-api";
 
 const WCAG_21_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -123,6 +131,13 @@ test.describe("authenticated routes", () => {
     });
   }
 
+  test("/approvals has no critical or serious violations", async ({ page }) => {
+    await mockApi(page, FM_USER);
+    await page.goto("/approvals");
+    await expect(page.getByRole("heading", { level: 1, name: "Approvals" })).toBeVisible();
+    await scan(page, "/approvals");
+  });
+
   test("change-password has no critical or serious violations", async ({ page }) => {
     await mockApi(page, SYSADMIN);
     await page.goto("/change-password");
@@ -151,6 +166,15 @@ test.describe("dialogs", () => {
     // The record must be named in the prompt, not just "are you sure".
     await expect(page.getByRole("dialog")).toContainText("Westgate Tower");
     await scan(page, "/admin/buildings (confirm dialog open)");
+  });
+
+  test("the approval review drawer is labelled and clean while open", async ({ page }) => {
+    await mockApi(page, FM_USER);
+    await page.goto("/approvals");
+    await page.getByRole("button", { name: "Review" }).first().click();
+
+    await expect(page.getByRole("dialog", { name: "Review visitor request" })).toBeVisible();
+    await scan(page, "/approvals (review drawer open)");
   });
 
   test("the settings edit dialog is labelled and clean while open", async ({ page }) => {

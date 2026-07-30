@@ -62,6 +62,18 @@ export const TENANT_NAV: readonly NavItem[] = [
 ];
 
 /**
+ * What justifies entering the facilities-management area: `visitor.approve`, held by FM_ADMIN and
+ * MASTER_ADMIN. Its own route group rather than a corner of the admin console — the backlog's
+ * group list predates the approval screens, and FM_ADMIN holds none of the admin permissions, so
+ * the console's shell would refuse it entry (recorded in ADR-0006).
+ */
+export const FM_ENTRY: readonly Permission[] = [PERMISSIONS.VISITOR_APPROVE];
+
+export const FM_NAV: readonly NavItem[] = [
+  { href: "/approvals", label: "Approvals", requires: FM_ENTRY },
+];
+
+/**
  * Where a signed-in principal belongs, from its permissions alone. Null when its grants open no
  * area at all.
  *
@@ -70,6 +82,15 @@ export const TENANT_NAV: readonly NavItem[] = [
  * no-access wall the moment a second area existed.
  */
 export function homeFor(permissions: readonly string[] | null | undefined): string | null {
+  // Order is most-specific-first among the areas a role actually works in. VJ-3 inserts the
+  // reception desk (`visitor.register`) ahead of the console, so a floor receptionist — who holds
+  // masterdata.view to read floors and tenants — lands at their desk rather than in admin.
+  if (hasAny(permissions, ADMIN_ENTRY)) {
+    return "/admin";
+  }
+  if (hasAny(permissions, FM_ENTRY)) {
+    return "/approvals";
+  }
   if (hasAny(permissions, ADMIN_ENTRY)) {
     return "/admin";
   }
