@@ -212,6 +212,26 @@ public class VisitorRequestController {
      * handler and with no branch here that could get it the wrong way round.
      *
      * <p>Reading this is audited (AC-2): it is the endpoint that names people.
+     *
+     * <h2>A GET that writes, and why that is not a CSRF hole here</h2>
+     * CodeQL flags this handler under {@code java/csrf-unprotected-request-type}, and the observation
+     * behind the flag is correct and worth keeping in view: a {@code GET} now has a side effect,
+     * because AC-2 requires the act of reading to be recorded.
+     *
+     * <p>It is not exploitable as CSRF in this API. Cross-site request forgery needs an
+     * <em>ambient</em> credential — one the victim's browser attaches by itself. This system has
+     * none: authentication is a bearer token read from the {@code Authorization} header
+     * ({@code AuthorizationInterceptor}), there is no cookie anywhere in the interfaces or
+     * infrastructure layers, and a browser will not add that header to a cross-origin request. A
+     * forged request therefore arrives unauthenticated and is refused before this method runs.
+     *
+     * <p>What the side effect can do at worst is add a row saying somebody looked — attributable to
+     * whoever's token was used, and only ever by someone who already holds one. That is the audit
+     * trail working, not being subverted.
+     *
+     * <p>If cookie-based sessions are ever introduced, this reasoning stops holding and this handler
+     * is one of the places that has to be revisited. That is the reason it is written down here
+     * rather than dismissed in a dashboard where the next reader will not find it.
      */
     @GetMapping("/{id}")
     @RequiresPermission({"visitor.request", "visitor.approve"})
