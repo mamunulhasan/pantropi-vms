@@ -35,6 +35,12 @@ export const ADMIN_ENTRY: readonly Permission[] = [
  */
 export const ADMIN_NAV: readonly NavItem[] = [
   { href: "/admin", label: "Overview", requires: ADMIN_ENTRY },
+  // Viewing settings needs masterdata.view (the controller's class-level guard); the edit
+  // affordance inside the screen additionally needs settings.manage.
+  { href: "/admin/settings", label: "Settings", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+  { href: "/admin/buildings", label: "Buildings", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+  { href: "/admin/visitor-types", label: "Visitor types", requires: [PERMISSIONS.MASTERDATA_VIEW] },
+  { href: "/admin/pass-types", label: "Pass types", requires: [PERMISSIONS.MASTERDATA_VIEW] },
 ];
 
 /** The one filter the shell renders navigation through. */
