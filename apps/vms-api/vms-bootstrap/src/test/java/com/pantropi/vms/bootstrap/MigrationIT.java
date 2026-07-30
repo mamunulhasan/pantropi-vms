@@ -77,7 +77,7 @@ class MigrationIT {
     @DisplayName("AC-1: baseline creates every table, enum, trigger and comment; history records V1+V2")
     void baselineCreatesFullSchema() throws Exception {
         MigrateResult result = flyway().migrate();
-        assertThat(result.migrationsExecuted).isEqualTo(13);
+        assertThat(result.migrationsExecuted).isEqualTo(14);
 
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             assertThat(query(s, """
@@ -129,7 +129,7 @@ class MigrationIT {
                     SELECT version FROM vms.flyway_schema_history
                      WHERE success AND version IS NOT NULL"""))
                     .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                            "11", "12", "13");
+                            "11", "12", "13", "14");
         }
     }
 
@@ -160,7 +160,7 @@ class MigrationIT {
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.permissions")).isEqualTo("12");
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.visitor_types")).isEqualTo("4");
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.pass_types")).isEqualTo("3");
-        assertThat(scalar(s, "SELECT count(*)::text FROM vms.system_settings")).isEqualTo("4");
+        assertThat(scalar(s, "SELECT count(*)::text FROM vms.system_settings")).isEqualTo("5");
         // V9 states the whole matrix (US-03.1.1, T-03.1.1.2), completing the lift of D-15.
         // RoleGrantMatrixIT asserts it role by role; this only pins the total so a stray grant
         // added elsewhere is noticed here too.
