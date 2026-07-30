@@ -71,6 +71,20 @@ role-driven UI behaviour keeps its server-side denial test.
 - Deferred and tracked, not dropped: the token-literal lint rule (T-06.1.1.3), visual regression
   baseline (T-06.2.1.3). The client-tamper E2E (T-06.3.2.3) landed with UI-5.
 
+## Amendment (VJ-2): an `(fm)` route group, beyond the backlog's list
+
+The backlog names five route groups — `(auth) (admin) (tenant) (reception) (display)` — and no home
+for the FM approval screens, which it predates. `FM_ADMIN` holds `visitor.approve` and nothing
+else, so the admin console's shell refuses it entry; putting approvals under `(admin)` would mean
+widening that shell's entry permissions until the console admitted a role that can do nothing in it.
+
+`(fm)` is therefore added as a sixth group, entered on `visitor.approve`. Every group shares one
+`AppShell`, so a new group is a registry entry and a layout file, not new session or guard logic.
+
+Recorded as a deviation so the backlog's list is not later read as exhaustive. The wireframe deck
+independently treats FM Admin as its own area with its own landing page, which is the same
+conclusion from the design side.
+
 ## Amendment (UI-5): what the accessibility gate fails on
 
 The gate fails the build on **critical and serious** axe violations only. Moderate and minor

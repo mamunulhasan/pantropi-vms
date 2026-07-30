@@ -50,6 +50,15 @@ export const TENANT_USER: MockProfile = {
   permissions: ["visitor.request"],
 };
 
+/** An approver: FM_ADMIN holds visitor.approve and nothing else. */
+export const FM_USER: MockProfile = {
+  userId: "44444444-4444-4444-4444-444444444444",
+  username: "fmadmin",
+  displayName: "Fiona Manager",
+  role: "FM_ADMIN",
+  permissions: ["visitor.approve"],
+};
+
 /** Signed in and granted nothing at all — no area to enter. */
 export const NO_ACCESS_USER: MockProfile = {
   userId: "33333333-3333-3333-3333-333333333333",
@@ -130,6 +139,17 @@ const VISIT_ROW = {
   decisionReason: null,
 };
 
+/** The queue row carries a count and no visitor names — exactly as the store selects it. */
+const PENDING_ROW = {
+  id: VISIT_REQUEST.id,
+  tenant: "Acme Corporation",
+  host: null,
+  scheduledFrom: VISIT_REQUEST.scheduledFrom,
+  scheduledTo: VISIT_REQUEST.scheduledTo,
+  visitorCount: 1,
+  submittedAt: VISIT_REQUEST.submittedAt,
+};
+
 export const VISIT_REQUEST_ID = VISIT_REQUEST.id;
 
 function page1<T>(items: T[]) {
@@ -189,21 +209,25 @@ const ROLES_OVERVIEW = {
   ],
 };
 
-/** Which permission the real controller requires, by admin path prefix. */
-const REQUIRED: { prefix: string; anyOf: string[] }[] = [
-  { prefix: "/api/v1/admin/settings", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/buildings", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/tenants", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/receptions", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/visitor-types", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/pass-types", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/holidays", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/users", anyOf: ["user.manage"] },
-  { prefix: "/api/v1/admin/roles", anyOf: ["user.manage"] },
-  // The tenant journey: submit/track/amend/cancel all sit behind visitor.request; the FM queue
-  // behind visitor.approve. Mirrors VisitorRequestController's annotations.
-  { prefix: "/api/v1/visitor-requests/pending", anyOf: ["visitor.approve"] },
-  { prefix: "/api/v1/visitor-requests", anyOf: ["visitor.request"] },
+/**
+ * What the real controller requires, mirroring its annotations. Matched in order, first hit wins,
+ * so the specific visitor-request routes must precede the general one.
+ *
+ * The detail read is the one that catches people out: it declares **either** `visitor.request` or
+ * `visitor.approve`, because a tenant reads their own request and an approver reads any. A stub
+ * that demanded only the former would 403 the approval drawer and the test would "prove" a bug
+ * that does not exist.
+ */
+const REQUIRED: { match: RegExp; anyOf: string[] }[] = [
+  { match: /^\/api\/v1\/admin\/(settings|buildings|tenants|receptions|visitor-types|pass-types|holidays)/, anyOf: ["masterdata.view"] },
+  { match: /^\/api\/v1\/admin\/(users|roles)/, anyOf: ["user.manage"] },
+  { match: /^\/api\/v1\/visitor-requests\/pending$/, anyOf: ["visitor.approve"] },
+  { match: /^\/api\/v1\/visitor-requests\/[^/]+\/(approve|reject)$/, anyOf: ["visitor.approve"] },
+  { match: /^\/api\/v1\/visitor-requests\/[^/]+\/history$/, anyOf: ["audit.view"] },
+  // Either permission opens the detail read (VisitorRequestController's any-of annotation).
+  { match: /^\/api\/v1\/visitor-requests\/[^/]+$/, anyOf: ["visitor.request", "visitor.approve"] },
+  { match: /^\/api\/v1\/visitor-requests$/, anyOf: ["visitor.request"] },
+  { match: /^\/api\/v1\/pre-registrations/, anyOf: ["visitor.register"] },
 ];
 
 /**
@@ -269,7 +293,7 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
     }
 
     // ---- deny-by-default, like the real interceptor ----
-    const guard = REQUIRED.find((r) => path.startsWith(r.prefix));
+    const guard = REQUIRED.find((r) => r.match.test(path));
     if (guard && !guard.anyOf.some((code) => profile.permissions.includes(code))) {
       record.forbidden.push(path);
       return json(
@@ -349,6 +373,26 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
       });
     }
     if (path === "/api/v1/admin/roles") return json(ROLES_OVERVIEW);
+
+    // ---- the FM approval queue ----
+    if (path === "/api/v1/visitor-requests/pending") {
+      return json({
+        content: [PENDING_ROW],
+        totalElements: 1,
+        page: 0,
+        size: 20,
+        maxSize: 100,
+      });
+    }
+    if (path.match(/^\/api\/v1\/visitor-requests\/[^/]+\/(approve|reject)$/)) {
+      return json({
+        id: VISIT_REQUEST.id,
+        status: path.endsWith("approve") ? "approved" : "rejected",
+        decidedBy: FM_USER.userId,
+        decidedAt: "2099-02-02T10:00:00Z",
+        note: null,
+      });
+    }
 
     // ---- the tenant visitor journey ----
     if (path === "/api/v1/visitor-requests" && request.method() === "POST") {
