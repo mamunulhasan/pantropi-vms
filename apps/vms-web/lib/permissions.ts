@@ -26,6 +26,18 @@ export const PERMISSIONS = {
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 /**
+ * Catalogued but grantable to nobody (mirrors `Permissions.UNBACKED`): the schema seeds them,
+ * no requirement defines their use, and the API refuses to grant them while TODO-04/TODO-16
+ * stay open. The grant matrix renders them disabled rather than hiding them — they are real
+ * capabilities awaiting a decision, not clutter.
+ */
+export const UNBACKED_PERMISSIONS: readonly Permission[] = [
+  PERMISSIONS.CREDENTIAL_OVERRIDE,
+  PERMISSIONS.REPORT_VIEW,
+  PERMISSIONS.REPORT_EXPORT,
+];
+
+/**
  * Any-of check, matching the server's `@RequiresPermission` semantics — holding any one of the
  * required codes suffices.
  *
