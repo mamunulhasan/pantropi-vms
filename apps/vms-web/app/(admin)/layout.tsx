@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AccessDenied } from "@/components/AccessDenied";
+import { ToastProvider } from "@/components/ui/Toast";
 import { BrandMark } from "@/components/BrandMark";
 import { getSnapshot, logout } from "@/lib/auth-store";
 import { ADMIN_ENTRY, ADMIN_NAV, visibleNavItems } from "@/lib/nav";
@@ -80,6 +81,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const deniedEntry = auth.me !== null && !hasAny(auth.me.permissions, ADMIN_ENTRY);
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-surface-sunken">
       <a
         href="#main-content"
@@ -128,5 +130,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         )}
       </div>
     </div>
+    </ToastProvider>
   );
 }
