@@ -1,0 +1,53 @@
+# frontend — the portal's lint, type, token and build gates.
+#
+# UI-0 (F-06.1, ADR-0006) — runs on every PR that touches apps/vms-web. Four jobs' worth of
+# checking in one job, because they share an install and none takes long:
+#
+#   lint         ESLint (Next.js config)
+#   typecheck    tsc --noEmit — the typed token accessor makes an unknown token a compile error
+#   check:tokens WCAG 2.1 AA contrast over every declared text pairing in styles/tokens.css
+#                (US-06.1.1 AC-4); fails naming the tokens and the ratio
+#   build        next build — the artefact the portal image will ship
+#
+# The a11y scan (F-06.4) joins as its own job in story UI-5; the visual-regression baseline
+# (T-06.2.1.3) and the token-literal lint rule (T-06.1.1.3) are deferred and tracked in ADR-0006.
+
+name: frontend
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "apps/vms-web/**"
+      - ".github/workflows/frontend.yml"
+
+jobs:
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/vms-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/vms-web/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/vms-web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Token contrast (WCAG 2.1 AA)
+        run: npm run check:tokens
+
+      - name: Build
+        run: npm run build

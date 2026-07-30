@@ -38,6 +38,34 @@ persists across restarts and you can inspect it with pgAdmin or psql:
 psql -h localhost -U postgres -d vms -c "SELECT * FROM vms.visitor_requests"
 ```
 
+## Run the portal (frontend)
+
+The Next.js portal lives in `apps/vms-web` and talks to the API at `http://localhost:8081`
+(CORS already allows `http://localhost:3000`).
+
+**Node 20.18.0 is required** (`.nvmrc`, enforced by `engines`). It is installed under nvm-windows
+on this machine but not active by default:
+
+```bash
+nvm use 20.18.0
+```
+
+> If `npm -v` fails with `Cannot find module '@npmcli/config'`: the nvm-managed Node 20 shipped a
+> partially-extracted npm. Fix by replacing `%APPDATA%\nvm\v20.18.0\node_modules\npm` with the
+> extracted contents of the official npm tarball
+> (`https://registry.npmjs.org/npm/-/npm-10.8.2.tgz`). This was done once on the original dev
+> machine; the broken copy is kept beside it as `npm.broken-partial`.
+
+```bash
+cd apps/vms-web
+npm ci          # first time
+npm run dev     # http://localhost:3000
+```
+
+Checks mirror CI: `npm run lint`, `npm run typecheck`, `npm run check:tokens` (WCAG AA contrast
+over the design tokens), `npm run build`. Branding comes from `NEXT_PUBLIC_BRAND_NAME` /
+`NEXT_PUBLIC_BRAND_LOGO` at build time — see ADR-0006.
+
 ## Log in as any role
 
 Every account uses the same development password:
