@@ -239,7 +239,11 @@ class PreRegisterVisitorTest {
         assertThat(events.published.get(0).payload())
                 .contains(RECEPTION.toString()).contains(TENANT_A.toString())
                 .doesNotContain("Ada Lovelace").doesNotContain("ada@example.test")
-                .doesNotContain("880");
+                // The phone in full, and its national part — never a 3-digit fragment like "880":
+                // the payload is mostly random UUIDs and timestamps, and a short digit run turns up
+                // in them by chance, which made this assertion fail at random rather than on a leak.
+                .doesNotContain(PHONE)
+                .doesNotContain(PHONE.substring(4));
     }
 
     @Test
@@ -291,6 +295,9 @@ class PreRegisterVisitorTest {
                 .hasMessageNotContaining("not-an-email");
     }
 
+    /** The visitor's phone, named so leak assertions can reference the value rather than a fragment. */
+    private static final String PHONE = "+8801712345678";
+
     // ---- helpers ----
 
     private PreRegisterVisitor.Command command(UUID tenantId) {
@@ -302,7 +309,7 @@ class PreRegisterVisitorTest {
     }
 
     private PreRegisterVisitor.Command commandAt(Instant from, UUID tenantId) {
-        return new PreRegisterVisitor.Command("Ada Lovelace", "ada@example.test", "+8801712345678",
+        return new PreRegisterVisitor.Command("Ada Lovelace", "ada@example.test", PHONE,
                 "Analytical Ltd", null, HOST, tenantId, "Site inspection",
                 from, from.plus(2, ChronoUnit.HOURS));
     }
