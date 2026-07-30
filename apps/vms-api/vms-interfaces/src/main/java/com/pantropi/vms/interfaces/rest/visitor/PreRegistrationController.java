@@ -1,6 +1,8 @@
 package com.pantropi.vms.interfaces.rest.visitor;
 
+import com.pantropi.vms.application.visitor.usecase.MaintainPreRegistration;
 import com.pantropi.vms.application.visitor.usecase.PreRegisterVisitor;
+import com.pantropi.vms.application.visitor.usecase.RequestDecision;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
 import com.pantropi.vms.domain.visitor.TimeWindow;
 import com.pantropi.vms.domain.visitor.Visitor;
@@ -13,6 +15,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,12 +47,96 @@ import java.util.UUID;
 public class PreRegistrationController {
 
     private final PreRegisterVisitor preRegisterVisitor;
+    private final MaintainPreRegistration maintainPreRegistration;
     private final AuthorizationDenialRecorder denials;
 
     public PreRegistrationController(PreRegisterVisitor preRegisterVisitor,
+                                     MaintainPreRegistration maintainPreRegistration,
                                      AuthorizationDenialRecorder denials) {
         this.preRegisterVisitor = preRegisterVisitor;
+        this.maintainPreRegistration = maintainPreRegistration;
         this.denials = denials;
+    }
+
+    /**
+     * Correct a pre-registration before arrival (US-08.1.3, T-08.1.3.2, AC-1).
+     *
+     * <p>{@code PATCH}: an absent field is left alone. Which records a receptionist may touch is the
+     * scope seam's answer — {@code OwnReception} over visitor data means the tenants on their own
+     * floor (ADR-0005) — so another floor's record is simply not found (AC-5).
+     */
+    @PatchMapping("/{visitorId}")
+    public ResponseEntity<MaintainedResponse> amend(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal,
+            @PathVariable UUID visitorId,
+            @RequestBody AmendPreRegistrationRequest body) {
+
+        if (body == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        MaintainPreRegistration.Outcome outcome = maintainPreRegistration.amend(
+                UUID.fromString(principal.userId()), visitorId,
+                new MaintainPreRegistration.Amendment(body.fullName(), body.email(), body.phone(),
+                        body.company(), body.visitorTypeId(), body.appointmentFrom(),
+                        body.appointmentTo()));
+
+        return ResponseEntity.ok(new MaintainedResponse(outcome.requestId().toString(),
+                outcome.visitorId().toString(), outcome.requestStatus(),
+                outcome.requestCancelled(), outcome.revocationRequested()));
+    }
+
+    /**
+     * Withdraw a pre-registered visitor (US-08.1.3, T-08.1.3.2, AC-2/AC-3).
+     *
+     * <p>Cancelling the last active visitor cancels the request with them; cancelling a visitor who
+     * already holds a live credential raises the revocation signal in the same transaction, so a
+     * withdrawn visitor does not keep a working pass.
+     */
+    @PostMapping("/{visitorId}/cancel")
+    public ResponseEntity<MaintainedResponse> cancel(
+            @RequestAttribute(AuthenticatedPrincipal.ATTRIBUTE) AuthenticatedPrincipal principal,
+            @PathVariable UUID visitorId) {
+
+        MaintainPreRegistration.Outcome outcome = maintainPreRegistration.cancel(
+                UUID.fromString(principal.userId()), visitorId);
+
+        return ResponseEntity.ok(new MaintainedResponse(outcome.requestId().toString(),
+                outcome.visitorId().toString(), outcome.requestStatus(),
+                outcome.requestCancelled(), outcome.revocationRequested()));
+    }
+
+    /**
+     * Not there, or another floor's (AC-5). One 404 for both, and the attempt is recorded — the
+     * response deliberately says nothing, which is exactly why the trail has to.
+     */
+    @ExceptionHandler(RequestDecision.NotFound.class)
+    public ResponseEntity<Void> onNotFound(HttpServletRequest request,
+            @RequestAttribute(name = AuthenticatedPrincipal.ATTRIBUTE, required = false)
+            AuthenticatedPrincipal principal) {
+
+        denials.record(request, HttpStatus.NOT_FOUND.value(), "visitor.register.object",
+                principal == null ? null : UUID.fromString(principal.userId()));
+        return ResponseEntity.notFound().build();
+    }
+
+    /**
+     * AC-4: checked in, inside, or already settled — the pre-arrival workflow may not touch them.
+     * 409 naming the state, so a stale desk view learns what actually happened.
+     */
+    @ExceptionHandler(com.pantropi.vms.domain.visitor.VisitorRequest.VisitorNotEditable.class)
+    public ResponseEntity<Problem> onNotEditable(
+            com.pantropi.vms.domain.visitor.VisitorRequest.VisitorNotEditable e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new Problem("visitor_not_editable", e.getMessage()));
+    }
+
+    /** A decision landed while the desk was editing: 409, look again. */
+    @ExceptionHandler({RequestDecision.DecidedElsewhere.class,
+            com.pantropi.vms.domain.visitor.VisitorRequest.RequestNotPending.class})
+    public ResponseEntity<Problem> onConflict(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new Problem("conflict", e.getMessage()));
     }
 
     @PostMapping
@@ -170,6 +258,17 @@ public class PreRegistrationController {
 
     public record RegisteredResponse(String requestId, String visitorId, String tenantId,
                                      String receptionId) {}
+
+    /** A partial edit: absent means "leave alone". No tenant, floor, status or host — ever. */
+    public record AmendPreRegistrationRequest(String fullName, String email, String phone,
+                                              String company, UUID visitorTypeId,
+                                              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                                              Instant appointmentFrom,
+                                              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                                              Instant appointmentTo) {}
+
+    public record MaintainedResponse(String requestId, String visitorId, String requestStatus,
+                                     boolean requestCancelled, boolean revocationRequested) {}
 
     public record Problem(String error, String detail) {}
 }

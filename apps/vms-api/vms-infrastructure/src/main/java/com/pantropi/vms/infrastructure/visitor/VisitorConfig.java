@@ -17,6 +17,8 @@ import com.pantropi.vms.application.visitor.usecase.MyVisitorRequests;
 import com.pantropi.vms.application.visitor.port.ReceptionScope;
 import com.pantropi.vms.application.visitor.port.RegistrationPolicy;
 import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
+import com.pantropi.vms.application.visitor.port.IssuedCredentials;
+import com.pantropi.vms.application.visitor.usecase.MaintainPreRegistration;
 import com.pantropi.vms.application.visitor.usecase.PreRegisterVisitor;
 import com.pantropi.vms.application.visitor.usecase.RequestHistory;
 import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
@@ -114,6 +116,17 @@ public class VisitorConfig {
                                           AuditTrail audit, TransactionRunner tx, ClockPort clock) {
         return new PreRegisterVisitor(requests, receptions, tenants, visitorTypes, policy, events,
                 audit, tx, clock);
+    }
+
+    /** US-08.1.3 — the desk's control over a pre-registration before the visitor arrives. */
+    @Bean
+    MaintainPreRegistration maintainPreRegistration(VisitorRequestRepository requests,
+                                                    VisitorTypeDirectory visitorTypes,
+                                                    IssuedCredentials credentials,
+                                                    DomainEventPublisher events, AuditTrail audit,
+                                                    TransactionRunner tx, ClockPort clock) {
+        return new MaintainPreRegistration(requests, visitorTypes, credentials, events, audit, tx,
+                clock);
     }
 
     /** US-07.1.3 — the tenant's own control over a request it raised. */

@@ -148,6 +148,70 @@ public final class JdbcVisitorRequestRepository implements VisitorRequestReposit
     }
 
     /**
+     * Resolves the visitor to their request, then loads it through the scoped read (US-08.1.3).
+     *
+     * <p>The id-to-request hop is unscoped on purpose — it discloses nothing, because the loaded
+     * aggregate comes from {@link #findById}, which applies the caller's scope and answers empty for
+     * anything that is not theirs. One lookup path, one scope seam.
+     */
+    @Override
+    public Optional<VisitorRequest> findByVisitorId(UUID visitorId) {
+        List<UUID> requestIds = jdbc.query(
+                "SELECT request_id FROM vms.visitors WHERE id = ?",
+                (rs, i) -> rs.getObject("request_id", UUID.class), visitorId);
+        if (requestIds.isEmpty()) {
+            return Optional.empty();
+        }
+        return findById(requestIds.get(0));
+    }
+
+    /**
+     * Persists a pre-arrival change as a compare-and-set on the request status (US-08.1.3).
+     *
+     * <p>Visitor rows are updated in place. {@code vms.credentials.visitor_id} is
+     * {@code ON DELETE CASCADE}, so the delete-and-reinsert that {@code saveAmendment} uses would
+     * silently destroy a credential row here — the very record AC-3 reads to know a revocation is
+     * owed. An UPDATE keeps it.
+     */
+    @Override
+    public boolean savePreArrivalChange(VisitorRequest r, RequestStatus expectedCurrent) {
+        int updated = jdbc.update("""
+                UPDATE vms.visitor_requests
+                   SET status         = ?::vms.request_status,
+                       scheduled_from = ?,
+                       scheduled_to   = ?,
+                       purpose        = ?,
+                       decided_at     = ?,
+                       updated_at     = now()
+                 WHERE id = ? AND status = ?::vms.request_status
+                """,
+                r.status().dbValue(),
+                Timestamp.from(r.window().from()), Timestamp.from(r.window().to()),
+                r.purpose(),
+                r.decidedAt() == null ? null : Timestamp.from(r.decidedAt()),
+                r.id(), expectedCurrent.dbValue());
+
+        if (updated == 0) {
+            return false;
+        }
+
+        for (Visitor v : r.visitors()) {
+            jdbc.update("""
+                    UPDATE vms.visitors
+                       SET full_name = ?, email = ?, phone = ?, company = ?,
+                           visitor_type_id = ?, status = ?::vms.visitor_status,
+                           appointment_from = ?, appointment_to = ?, updated_at = now()
+                     WHERE id = ?
+                    """,
+                    v.fullName(), v.emailValue(), v.phoneValue(), v.company(),
+                    v.visitorTypeId(), v.status().dbValue(),
+                    Timestamp.from(r.window().from()), Timestamp.from(r.window().to()),
+                    v.id());
+        }
+        return true;
+    }
+
+    /**
      * Reads one request, <strong>subject to the caller's scope</strong> (US-03.4.1 AC-2).
      *
      * <p>The predicate comes from {@link ScopePolicy}, never from a condition written here. A

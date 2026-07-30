@@ -238,6 +238,96 @@ public final class VisitorRequest {
         return cancelledAfterApproval;
     }
 
+    // ---- pre-arrival maintenance (US-08.1.3) ----
+
+    /**
+     * Correct one visitor's details before they arrive (US-08.1.3, T-08.1.3.1, AC-1).
+     *
+     * <p>Legal only while that visitor is {@code PENDING} or {@code APPROVED}. A visitor already
+     * checked in or inside is not editable from the pre-arrival workflow (AC-4) — the entry record
+     * must describe the person who actually walked in, not a later correction of them — and a
+     * terminal visitor is a settled fact.
+     *
+     * <p>The visitor keeps their id and status; only the details change. Validation is the same as
+     * for a fresh entry.
+     */
+    public void amendVisitor(UUID visitorId, String fullName, String email, String phone,
+                             String company, UUID visitorTypeId) {
+        int index = indexOfEditable(visitorId, "amend");
+        visitors.set(index, visitors.get(index)
+                .withDetails(fullName, email, phone, company, visitorTypeId));
+    }
+
+    /**
+     * Withdraw one visitor before they arrive (US-08.1.3, T-08.1.3.1, AC-2).
+     *
+     * <p>Cancels that visitor alone. When they were the last active one and the request itself is
+     * still {@code SUBMITTED} or {@code APPROVED}, the request follows — a request with nobody left
+     * to admit is not awaiting anything. Cancelling one of several leaves the request and the other
+     * visitors exactly as they were.
+     *
+     * @return true when the parent request was cancelled with this visitor;
+     *         {@link #cancelledAfterApproval()} then says whether that withdrew an approval
+     */
+    public boolean cancelVisitor(UUID visitorId, Instant now) {
+        Objects.requireNonNull(now, "the deciding instant is required");
+        int index = indexOfEditable(visitorId, "cancel");
+        visitors.get(index).moveTo(VisitorStatus.CANCELLED);
+
+        boolean anyoneLeft = visitors.stream()
+                .anyMatch(v -> !VisitorCascade.isTerminal(v.status()));
+        if (!anyoneLeft
+                && (status == RequestStatus.SUBMITTED || status == RequestStatus.APPROVED)) {
+            // Through the ordinary cancellation, so the state machine, the revocation flag and the
+            // cascade all apply — the cascade finds only terminal visitors and moves nothing.
+            cancel(now);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Move the visit window before arrival (US-08.1.3, AC-1).
+     *
+     * <p>Legal from {@code SUBMITTED} <em>and</em> {@code APPROVED} — deliberately wider than
+     * {@link #amend}, which closes at the decision. AC-1 permits it because the alternative for a
+     * meeting that slipped an hour is cancel-and-recreate, which throws away the approval for a
+     * change the approver would wave through. The reschedule is audited by the caller, so the wider
+     * window is a recorded fact rather than a quiet one.
+     *
+     * <p>Refused once anyone on the request has checked in or is inside: a visit under way has
+     * happened at the time it happened.
+     */
+    public void reschedule(TimeWindow newWindow) {
+        Objects.requireNonNull(newWindow, "the new window is required");
+        if (status != RequestStatus.SUBMITTED && status != RequestStatus.APPROVED) {
+            throw new RequestNotPending("reschedule", status);
+        }
+        for (Visitor visitor : visitors) {
+            if (visitor.status() == VisitorStatus.CHECKED_IN
+                    || visitor.status() == VisitorStatus.INSIDE) {
+                throw new VisitorNotEditable(visitor.id(), visitor.status());
+            }
+        }
+        this.window = newWindow;
+    }
+
+    /** The visitor, located and confirmed editable — or the reason they are not. */
+    private int indexOfEditable(UUID visitorId, String action) {
+        Objects.requireNonNull(visitorId, "visitorId is required");
+        for (int i = 0; i < visitors.size(); i++) {
+            Visitor candidate = visitors.get(i);
+            if (candidate.id().equals(visitorId)) {
+                VisitorStatus current = candidate.status();
+                if (current != VisitorStatus.PENDING && current != VisitorStatus.APPROVED) {
+                    throw new VisitorNotEditable(visitorId, current);
+                }
+                return i;
+            }
+        }
+        throw new VisitorNotFoundInRequest(visitorId);
+    }
+
     /**
      * Trims a decision reason, mapping blank to absent.
      *
@@ -395,6 +485,29 @@ public final class VisitorRequest {
             super("The visit window ended at " + windowEnd + ", before " + now
                     + "; approving it would issue a credential that is already expired");
             this.windowEnd = windowEnd;
+        }
+    }
+
+    /**
+     * The visitor is in a state the pre-arrival workflow may not touch (US-08.1.3 AC-4).
+     *
+     * <p>Names the state, so the 409 it becomes can say why — a stale reception view acting on
+     * somebody who checked in a minute ago needs to learn that, not merely that it failed.
+     */
+    public static final class VisitorNotEditable extends IllegalStateException {
+        public final VisitorStatus status;
+
+        public VisitorNotEditable(UUID visitorId, VisitorStatus status) {
+            super("Visitor " + visitorId + " is " + status.name().toLowerCase()
+                    + " and cannot be changed from the pre-arrival workflow");
+            this.status = status;
+        }
+    }
+
+    /** The id names nobody on this request. */
+    public static final class VisitorNotFoundInRequest extends IllegalArgumentException {
+        public VisitorNotFoundInRequest(UUID visitorId) {
+            super("No visitor " + visitorId + " on this request");
         }
     }
 

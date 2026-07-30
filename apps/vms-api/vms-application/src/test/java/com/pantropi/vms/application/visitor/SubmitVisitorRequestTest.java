@@ -264,6 +264,15 @@ class SubmitVisitorRequestTest {
             saved = r;
             return true;
         }
+        public Optional<VisitorRequest> findByVisitorId(UUID visitorId) {
+            return Optional.ofNullable(saved);
+        }
+
+        public boolean savePreArrivalChange(VisitorRequest r,
+                                            com.pantropi.vms.domain.visitor.RequestStatus expected) {
+            saved = r;
+            return true;
+        }
     }
 
     private static final class FakeTenants implements TenantDirectory {

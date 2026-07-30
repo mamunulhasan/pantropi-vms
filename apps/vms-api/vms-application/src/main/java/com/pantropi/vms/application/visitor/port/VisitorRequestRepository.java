@@ -52,4 +52,27 @@ public interface VisitorRequestRepository {
      * @return true if the amendment was the write that landed
      */
     boolean saveAmendment(VisitorRequest request, RequestStatus expectedCurrent);
+
+    /**
+     * The request one of whose visitors this is, subject to the caller's scope (US-08.1.3).
+     *
+     * <p>Empty for an unknown visitor and for one outside the caller's scope alike — for a floor
+     * receptionist that scope is the tenants on their own floor (ADR-0005), so another floor's
+     * pre-registration is indistinguishable from one that never existed (AC-5).
+     */
+    Optional<VisitorRequest> findByVisitorId(UUID visitorId);
+
+    /**
+     * Persists a pre-arrival change — amended details, a new window, a visitor-level cancellation —
+     * against the request state it was made from (US-08.1.3, T-08.1.3.2).
+     *
+     * <p>The same compare-and-set as {@link #saveDecision}: a receptionist editing while an FM Admin
+     * decides must produce one winner, and the loser's audit and outbox writes roll back with it.
+     *
+     * <p>Visitor rows are updated <strong>in place</strong>, never deleted and re-inserted.
+     * {@code vms.credentials.visitor_id} is {@code ON DELETE CASCADE}, so a delete-and-reinsert of
+     * the same visitor id would silently destroy the credential row — precisely the record AC-3
+     * needs intact to know a revocation is owed.
+     */
+    boolean savePreArrivalChange(VisitorRequest request, RequestStatus expectedCurrent);
 }

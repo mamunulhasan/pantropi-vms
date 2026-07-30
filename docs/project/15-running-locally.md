@@ -140,6 +140,14 @@ tenant it is derived; if it hosts several the body must name one, and naming a t
 floor is **403** and audited. See **TODO-20** — the SRS chain assumes one tenant per floor and
 the schema does not.
 
+Before the visitor arrives, the desk can correct or withdraw the record. `PATCH` with only the
+fields to change; the visitor keeps their id. Cancelling the last active visitor cancels the
+request with them, and cancelling a visitor who already holds a live credential emits
+`CredentialRevocationRequested` in the same transaction. A visitor already `checked_in` or
+`inside` is **409** — the entry record must describe who actually walked in. Records are
+**floor-scoped**: any receptionist on the desk's floor may maintain them, and another floor's
+record is a **404** indistinguishable from a missing one, with the attempt audited.
+
 An appointment starting more than `pre_registration.past_grace_minutes` (default **60**) ago is
 **422** — the rule catches a mistyped date, not a receptionist typing somebody in as they walk up.
 
@@ -449,6 +457,8 @@ invalidation is US-04.9.2 — see the Redis note in
 | DELETE | `/api/v1/admin/holidays/{id}` — *the only delete in master data* | `masterdata.edit` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
 | POST | `/api/v1/pre-registrations` — floor reception desk entry | `visitor.register` |
+| PATCH | `/api/v1/pre-registrations/{visitorId}` — correct details/window before arrival | `visitor.register` |
+| POST | `/api/v1/pre-registrations/{visitorId}/cancel` — withdraw; revokes a live credential | `visitor.register` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 | POST | `/api/v1/visitor-requests/{id}/approve` — optional `{"note":"…"}` | `visitor.approve` |
 | POST | `/api/v1/visitor-requests/{id}/reject` — **required** `{"reason":"…"}`, ≤1000 chars | `visitor.approve` |

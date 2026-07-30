@@ -113,6 +113,24 @@ they are not tenant-scoped. That is the honest answer rather than an oversight: 
 be restricted to a subset, someone has to say which subset, and until TODO-14 is answered there is no
 defensible set to show. It fails closed, which is the direction this ADR has chosen throughout.
 
+## Amendment (US-08.1.3): what "own reception" means for visitor data
+
+Until US-08.1.3, `OwnReception` on a table without a reception column translated to `FALSE` — a
+restriction that cannot be expressed must not be dropped. That was correct while no
+receptionist-facing read existed, and it silently made every visitor-table read answer nothing for a
+floor receptionist.
+
+US-08.1.3 gives receptionists their first reads, and the restriction turns out to be expressible
+after all: a receptionist's scope over visitor data is **the tenants on their own floor** —
+`tenant_id IN (tenants whose floor_id is the reception's floor)`. That is this ADR's own-floor rule,
+now implemented rather than approximated by denial.
+
+The translation lives in `VisitorScopeSql`, not in the policy: the policy still answers
+`OwnReception`, and what that means per table stays the adapter's concern. Blast radius is
+deliberately small — the only routes a receptionist can reach are the pre-registration ones
+(`visitor.register`); every other visitor route requires a permission they do not hold, so the
+boundary check ends the request before the predicate is consulted.
+
 ## Status of TODO-14
 
 **Still open.** This ADR does not close it. It records that the mechanism is in place, that the
