@@ -49,7 +49,10 @@ public final class SettingsCatalogue {
             new Entry("notification.whatsapp.enabled", Type.BOOLEAN, "false",
                     "WhatsApp disabled until Business API approval (TODO-05)", false),
             new Entry("acs.retry.max_attempts", Type.INTEGER, "5",
-                    "Max outbound ACS retry attempts before dead-letter", false));
+                    "Max outbound ACS retry attempts before dead-letter", false),
+            new Entry("pre_registration.past_grace_minutes", Type.INTEGER, "60",
+                    "How far into the past a pre-registered appointment may start before it is "
+                            + "treated as a mistyped date (US-08.1.1 AC-5)", false));
 
     /** What a redacted value reads as. Fixed, so it can never be mistaken for a real value. */
     public static final String REDACTED = "********";

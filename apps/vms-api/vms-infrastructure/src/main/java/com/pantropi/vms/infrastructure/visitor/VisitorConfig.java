@@ -14,7 +14,10 @@ import com.pantropi.vms.application.visitor.usecase.CancelVisitorRequest;
 import com.pantropi.vms.application.visitor.port.ApprovalQueueStore;
 import com.pantropi.vms.application.visitor.port.VisitorRequestQueries;
 import com.pantropi.vms.application.visitor.usecase.MyVisitorRequests;
+import com.pantropi.vms.application.visitor.port.ReceptionScope;
+import com.pantropi.vms.application.visitor.port.RegistrationPolicy;
 import com.pantropi.vms.application.visitor.usecase.PendingApprovals;
+import com.pantropi.vms.application.visitor.usecase.PreRegisterVisitor;
 import com.pantropi.vms.application.visitor.usecase.RequestHistory;
 import com.pantropi.vms.application.visitor.usecase.RejectVisitorRequest;
 import com.pantropi.vms.application.visitor.usecase.SubmitVisitorRequest;
@@ -100,6 +103,17 @@ public class VisitorConfig {
     @Bean
     RequestHistory requestHistory(DecisionTrail trail) {
         return new RequestHistory(trail);
+    }
+
+    /** US-08.1.1 — the second input path: a floor receptionist registers a visitor at the desk. */
+    @Bean
+    PreRegisterVisitor preRegisterVisitor(VisitorRequestRepository requests,
+                                          ReceptionScope receptions, TenantDirectory tenants,
+                                          VisitorTypeDirectory visitorTypes,
+                                          RegistrationPolicy policy, DomainEventPublisher events,
+                                          AuditTrail audit, TransactionRunner tx, ClockPort clock) {
+        return new PreRegisterVisitor(requests, receptions, tenants, visitorTypes, policy, events,
+                audit, tx, clock);
     }
 
     /** US-07.1.3 — the tenant's own control over a request it raised. */

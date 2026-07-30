@@ -182,14 +182,53 @@ the receptionist records, or either? Determines whether we build an approval flo
 
 ---
 
+### TODO-20 🟠 Which tenant is a pre-registration for, on a floor with several? — *interim rule in force*
+**Feature:** F-08.1 (EPIC-08), US-08.1.1 AC-2
+
+US-08.1.1 AC-2 describes the tenant as derived server-side through
+`users.reception_id → receptions.floor_id → tenant association`, and says it is **"never from the
+submitted payload"**. That chain only identifies one tenant if a floor hosts exactly one.
+
+**It does not.** `vms.tenants.floor_id` is a nullable foreign key with a *non-unique* index
+(`idx_tenants_floor`), so a floor hosts as many tenants as it hosts — normally several in a
+commercial tower. Westgate Tower with up to 120 floor reception users (NFR-SCL-01) is not a
+one-tenant-per-floor building.
+
+So AC-2 as written cannot be implemented for the common case. Three ways out:
+
+| Option | Consequence |
+|---|---|
+| Pick the first tenant on the floor | **Rejected.** Silently files a visit against the wrong company. Nothing downstream would notice, and it surfaces at an incident review. |
+| Refuse when the floor has several | Faithful to the AC's wording and fails closed, but makes the feature unusable wherever a floor is shared — which is most of them. |
+| **Let the receptionist name a tenant, validated against their own floor** | In force. Preserves what AC-2 protects and keeps the feature usable. |
+
+**Interim rule shipped in US-08.1.1:**
+
+- Exactly one active tenant on the floor → **derived**, exactly as AC-2 describes.
+- Several → the caller must name one, and it is checked against the floor they are stationed on. A
+  tenant off that floor is **403** and audited (AC-6).
+- None → refused; there is nothing to file the visit against.
+
+This deviates from AC-2's literal wording while preserving the property that wording protects: the
+tenant is server-authoritative, and a receptionist cannot reach past their own floor. A named tenant
+is a *selection from* what the station allows, never an assertion the server accepts. The audit entry
+records `tenantDerived: true|false`, so a reader can always tell which happened.
+
+**What we need from the client:** on a shared floor, should the receptionist choose the tenant, or
+should something else disambiguate — a reception point dedicated per tenant, a default tenant per
+reception, or the host determining it? If the answer is "the receptionist must not choose", the
+change is confined to one method (`PreRegisterVisitor.resolveTenant`).
+
+---
+
 ## Summary
 
 | Severity | Count | Effect |
 |---|---|---|
 | 🔴 Blocking | 4 | TODO-01, TODO-02, TODO-03, TODO-19 |
-| 🟠 Material | 12 | Must resolve before affected stories close |
+| 🟠 Material | 13 | Must resolve before affected stories close |
 | 🟡 Minor | 3 | Clarify during sprint planning |
-| **Total** | **19** | |
+| **Total** | **20** | |
 
 **Bottom line for the client:** TODO-01 and TODO-02 gate the majority of the system. Requirements
 analysis and project scaffolding can proceed now; sustained implementation cannot start until at

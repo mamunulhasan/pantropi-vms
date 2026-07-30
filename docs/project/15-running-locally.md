@@ -130,6 +130,24 @@ curl -s -X POST http://localhost:8081/api/v1/visitor-requests/<id>/cancel \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+There is a **second way in**. A floor receptionist posts to `/api/v1/pre-registrations` under
+`visitor.register`, and it produces the same request-and-visitor pair a tenant's own submission
+does — so it lands in the FM Admin's queue and follows the same approval path.
+
+The tenant is resolved from the receptionist's own station, never asserted by the body:
+`users.reception_id` → `receptions.floor_id` → the tenants on that floor. If the floor hosts one
+tenant it is derived; if it hosts several the body must name one, and naming a tenant on another
+floor is **403** and audited. See **TODO-20** — the SRS chain assumes one tenant per floor and
+the schema does not.
+
+An appointment starting more than `pre_registration.past_grace_minutes` (default **60**) ago is
+**422** — the rule catches a mistyped date, not a receptionist typing somebody in as they walk up.
+
+```bash
+curl -s -X POST http://localhost:8081/api/v1/pre-registrations \n  -H "Authorization: Bearer $RECEPTION_TOKEN" -H 'Content-Type: application/json' \n  -d '{"fullName":"Ada Lovelace","company":"Analytical Ltd",
+       "appointmentFrom":"2030-06-01T09:00:00Z","appointmentTo":"2030-06-01T11:00:00Z"}'
+```
+
 Each visitor on a request may carry a name, email, phone, company and a `visitorTypeId` drawn
 from `vms.visitor_types`. Email and phone are normalised on the way in — trimmed, lower-cased,
 punctuation stripped from the number — so the same person entered twice is one person. An
@@ -430,6 +448,7 @@ invalidation is US-04.9.2 — see the Redis note in
 | POST | `/api/v1/admin/holidays/import` | `masterdata.edit` |
 | DELETE | `/api/v1/admin/holidays/{id}` — *the only delete in master data* | `masterdata.edit` |
 | POST | `/api/v1/admin/users/import`, `/import/preview` | `user.manage` |
+| POST | `/api/v1/pre-registrations` — floor reception desk entry | `visitor.register` |
 | POST | `/api/v1/visitor-requests` | `visitor.request` |
 | POST | `/api/v1/visitor-requests/{id}/approve` — optional `{"note":"…"}` | `visitor.approve` |
 | POST | `/api/v1/visitor-requests/{id}/reject` — **required** `{"reason":"…"}`, ≤1000 chars | `visitor.approve` |

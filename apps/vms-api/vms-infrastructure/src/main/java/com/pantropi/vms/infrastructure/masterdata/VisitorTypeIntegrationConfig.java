@@ -18,6 +18,8 @@ import javax.sql.DataSource;
  * <em>submit a visitor request</em> — the feature flag for managing visitor types would silently
  * become a flag for classifying visitors, which is not a coupling anyone would expect to find.
  *
+ * <p>The same reasoning covers the reception and settings answers added for US-08.1.1.
+ *
  * <p>So it is gated on the visitor wiring's own switch instead, and builds its own store rather than
  * depending on a bean that may not exist. The class it delegates to still lives in this package: the
  * context that owns {@code vms.visitor_types} is the one that reads it.
@@ -30,5 +32,18 @@ public class VisitorTypeIntegrationConfig {
     VisitorTypeDirectory visitorTypeDirectory(DataSource dataSource) {
         return new MasterDataVisitorTypeDirectory(
                 new JdbcVisitorTypeStore(new JdbcTemplate(dataSource)));
+    }
+
+    /** US-08.1.1 — where a receptionist is stationed, answered by the context that owns it. */
+    @Bean
+    com.pantropi.vms.application.visitor.port.ReceptionScope receptionScope(DataSource dataSource) {
+        return new MasterDataReceptionScope(new JdbcTemplate(dataSource));
+    }
+
+    /** US-08.1.1 AC-5 — the appointment grace period, from vms.system_settings. */
+    @Bean
+    com.pantropi.vms.application.visitor.port.RegistrationPolicy registrationPolicy(
+            DataSource dataSource) {
+        return new SettingsRegistrationPolicy(new JdbcSettingsStore(new JdbcTemplate(dataSource)));
     }
 }
