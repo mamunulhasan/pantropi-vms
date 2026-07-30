@@ -16,6 +16,13 @@ export type Me = {
   userId: string;
   username: string;
   role: string;
+  displayName: string;
+  /**
+   * Sorted effective permission codes, resolved live by the API (US-06.3.2). The nav renders
+   * from these; they are usability data, not an authorization decision — every call the nav
+   * leads to is enforced server-side.
+   */
+  permissions: readonly string[];
 };
 
 export type AuthState = {
@@ -71,8 +78,21 @@ async function loadMe(accessToken: string): Promise<Me | null> {
   if (!res.ok) {
     return null;
   }
-  const body = (await res.json()) as { userId: string; username: string; role: string };
-  return { userId: body.userId, username: body.username, role: body.role };
+  const body = (await res.json()) as {
+    userId: string;
+    username: string;
+    role: string;
+    displayName?: string;
+    permissions?: string[];
+  };
+  // Fail closed on a payload from an older API: no permission list means no nav, not a crash.
+  return {
+    userId: body.userId,
+    username: body.username,
+    role: body.role,
+    displayName: body.displayName ?? body.username,
+    permissions: body.permissions ?? [],
+  };
 }
 
 /**

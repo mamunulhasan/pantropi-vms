@@ -3,8 +3,11 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { BrandMark } from "@/components/BrandMark";
 import { getSnapshot, logout } from "@/lib/auth-store";
+import { ADMIN_ENTRY, ADMIN_NAV, visibleNavItems } from "@/lib/nav";
+import { hasAny } from "@/lib/permissions";
 import { useAuth } from "@/lib/use-auth";
 
 /**
@@ -71,6 +74,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     router.replace("/login");
   }
 
+  // A signed-in principal whose permissions cover none of the admin area gets the explicit
+  // no-access state (AC-4/AC-5) — with the header kept, so signing out remains reachable.
+  // An empty permission list lands here too: absence of authority is stated, never an empty shell.
+  const deniedEntry = auth.me !== null && !hasAny(auth.me.permissions, ADMIN_ENTRY);
+
   return (
     <div className="min-h-screen bg-surface-sunken">
       <a
@@ -83,7 +91,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <header className="flex items-center justify-between border-b border-border bg-brand px-6 py-3 text-brand-contrast">
         <BrandMark className="text-brand-contrast" />
         <div className="flex items-center gap-4 text-sm">
-          <span aria-label="Signed in as">{auth.me?.username ?? "…"}</span>
+          <span aria-label="Signed in as">{auth.me?.displayName ?? auth.me?.username ?? "…"}</span>
           <button
             type="button"
             onClick={onLogout}
@@ -95,20 +103,29 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       </header>
 
       <div className="flex">
-        {/* Static entries for now; US-06.3.2 (next story) binds this region to permissions. */}
+        {/* Unheld destinations are absent, never disabled (US-06.3.2 AC-1). */}
         <nav aria-label="Administration" className="w-56 shrink-0 border-r border-border bg-surface p-4">
           <ul className="space-y-1 text-sm">
-            <li>
-              <Link href="/admin" className="block rounded-md px-3 py-2 hover:bg-surface-sunken">
-                Overview
-              </Link>
-            </li>
+            {visibleNavItems(ADMIN_NAV, auth.me?.permissions).map((item) => (
+              <li key={item.href}>
+                <Link href={item.href} className="block rounded-md px-3 py-2 hover:bg-surface-sunken">
+                  {item.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
 
-        <main id="main-content" className="min-h-screen flex-1 bg-surface p-8">
-          {children}
-        </main>
+        {deniedEntry ? (
+          <AccessDenied
+            username={auth.me?.username}
+            description="Your account doesn't have access to the administration area."
+          />
+        ) : (
+          <main id="main-content" className="min-h-screen flex-1 bg-surface p-8">
+            {children}
+          </main>
+        )}
       </div>
     </div>
   );
