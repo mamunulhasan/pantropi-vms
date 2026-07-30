@@ -170,12 +170,34 @@ not database-backed; the deck's admin-editable branding is a new requirement.
 4. Hosts (§2.2) — unblocks the host field on the tenant form, the approval queue and the tenant editor.
 5. Landing-page counts (§3.2) — or derive the two that existing list endpoints already return.
 
-**Needs client decisions before anything is built:**
-- ID/NRIC capture (§3.4) — data-protection sign-off, TODO-13.
-- The permission matrix differences (§3.5) — particularly whether reporting is in phase 1 at all.
-- "Keep me signed in" and self-service password reset (§3.1) — both security decisions.
-- Credential choice on the tenant request (§3.3) — API change or UI removal.
+**Deferred — not to be built (owner decision, 31 Jul 2026):**
+
+Every item where the deck contradicts a shipped decision stays as it is. The deck does not
+override the SRS/TDD, and none of these will be implemented on the strength of a wireframe:
+
+| Deck element | Stays as | Because |
+|---|---|---|
+| ID/NRIC capture (§3.4) | not captured | TODO-13 keeps document identifiers off the API by design |
+| `report.view` for five roles (§3.5) | granted to nobody | `Permissions.UNBACKED`, TODO-16 — the API refuses the grant |
+| "+ Add role" (§3.5) | no endpoint | TODO-01 leaves FR-USR-02 undefined |
+| "Reconcile cards" permission (§3.5) | does not exist | no reconciliation feature to guard |
+| Submit request for floor/central (§3.5) | `visitor.register` | pre-registering is a different action with its own audit trail |
+| "Keep me signed in" (§3.1) | absent | changes refresh-token lifetime — a security decision |
+| "Forgot password?" (§3.1) | absent | needs a self-service reset and an email channel, neither built |
+| Building photograph on sign-in (§3.1) | brand mark only | new requirement, not in the SRS |
+| Credential picker on the tenant form (§3.3) | absent | no such field on the submit API |
+| Floor from machine identity (§3.4) | from the user's assignment | machine-bound identity is weaker and unrequested |
+| Floor→central "sync" column (§3.4) | absent | presumes a replication architecture we do not have |
+
+If any of these is genuinely wanted, it re-enters through the backlog as a story with a
+requirement behind it — which is the same rule every other feature followed.
 
 **Blocked on the ACS contract:** screens 06, 07, 08 and every on-site/checked-out state (§2.1).
+Not a decision to make yet — there is nothing to build against until Universal Automations
+finalises the contract, as the deck's own closing slide says.
 
-**Still open in the deck itself:** which lettered layout wins for each screen.
+**Still open, and cheap when wanted:**
+- Hosts (§2.2) — the one gap that is neither a conflict nor blocked. It would unblock the host
+  field on three screens whenever it is prioritised.
+- The tabbed master-data shell (§3.6) — a contained refactor of screens that already exist.
+- Which lettered layout wins for each screen — the deck itself leaves this open.
