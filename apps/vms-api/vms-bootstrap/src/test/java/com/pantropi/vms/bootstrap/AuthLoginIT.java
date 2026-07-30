@@ -95,6 +95,10 @@ class AuthLoginIT {
         assertThat(me.statusCode()).isEqualTo(200);
         assertThat(me.body()).contains("\"username\":\"alice\"");
         assertThat(me.body()).contains("\"role\":\"MASTER_ADMIN\"");
+        // US-06.3.2: the profile delivers the display name and the effective permission set in the
+        // same round trip — the portal's navigation boots from this payload.
+        assertThat(me.body()).contains("\"displayName\":\"Alice Wonderland\"");
+        assertThat(me.body()).contains("\"permissions\":[\"masterdata.view\"]");
     }
 
     @Test
@@ -156,8 +160,19 @@ class AuthLoginIT {
                     CREATE TABLE vms.users (
                         id uuid PRIMARY KEY, username text UNIQUE NOT NULL, password_hash text NOT NULL,
                         role_id uuid NOT NULL REFERENCES vms.roles(id), is_active boolean NOT NULL,
+                        email text, full_name text, reception_id uuid, tenant_id uuid,
                         password_changed_at timestamptz NOT NULL DEFAULT now(),
                         must_change_password boolean NOT NULL DEFAULT false)""");
+            // /auth/me resolves permissions live (US-06.3.2); empty tables mean "no grants",
+            // which is a legitimate fail-closed answer, not a broken fixture.
+            s.execute("""
+                    CREATE TABLE vms.permissions (
+                        id uuid PRIMARY KEY, code text UNIQUE NOT NULL)""");
+            s.execute("""
+                    CREATE TABLE vms.role_permissions (
+                        role_id uuid NOT NULL REFERENCES vms.roles(id),
+                        permission_id uuid NOT NULL REFERENCES vms.permissions(id),
+                        PRIMARY KEY (role_id, permission_id))""");
             s.execute("""
                     CREATE TABLE vms.login_attempts (
                         username text PRIMARY KEY, failed_count integer NOT NULL DEFAULT 0,
@@ -180,10 +195,14 @@ class AuthLoginIT {
             UUID roleId = UUID.randomUUID();
             s.execute("INSERT INTO vms.roles (id, code, name) VALUES ('" + roleId
                     + "', 'MASTER_ADMIN', 'Master Admin')");
-            s.execute("INSERT INTO vms.users (id, username, password_hash, role_id, is_active) VALUES ('"
-                    + UUID.randomUUID() + "', 'alice', '" + hash + "', '" + roleId + "', true)");
+            s.execute("INSERT INTO vms.users (id, username, password_hash, role_id, is_active, full_name) VALUES ('"
+                    + UUID.randomUUID() + "', 'alice', '" + hash + "', '" + roleId + "', true, 'Alice Wonderland')");
             s.execute("INSERT INTO vms.users (id, username, password_hash, role_id, is_active) VALUES ('"
                     + UUID.randomUUID() + "', 'bob-inactive', '" + hash + "', '" + roleId + "', false)");
+            UUID permId = UUID.randomUUID();
+            s.execute("INSERT INTO vms.permissions (id, code) VALUES ('" + permId + "', 'masterdata.view')");
+            s.execute("INSERT INTO vms.role_permissions (role_id, permission_id) VALUES ('"
+                    + roleId + "', '" + permId + "')");
         }
     }
 }
