@@ -5,12 +5,27 @@
 # type outside the integration boundary cannot merge — this is the mechanical
 # enforcement of NFR-MNT-01, CON-01 and CON-02 (SRS B1), and the standing
 # mitigation for the unpublished ACS contract (TODO-02, ADR-0002).
+#
+# It also runs on the merge into `develop`, for the same reason the frontend
+# workflow does: a pull-request run says the branch is sound, not that the tree
+# after merging it is. Two branches that each respect the boundaries can still
+# integrate into one that does not — one adds a caller, the other adds the
+# forbidden dependency, and neither PR sees both. Layer rules are precisely the
+# kind of invariant that breaks on integration rather than in isolation.
 
 name: architecture-fitness
 
 on:
   pull_request:
     branches: [develop, main]
+  push:
+    branches: [develop]
+
+# One run per ref. A newer merge includes the older one's commits, so cancelling
+# the superseded run loses no coverage.
+concurrency:
+  group: architecture-fitness-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   architecture-fitness:
