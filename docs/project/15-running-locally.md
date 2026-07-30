@@ -63,7 +63,7 @@ npm run dev     # http://localhost:3000
 ```
 
 Checks mirror CI: `npm run lint`, `npm run typecheck`, `npm run check:tokens` (WCAG AA contrast
-over the design tokens), `npm run build`. Branding comes from `NEXT_PUBLIC_BRAND_NAME` /
+over the design tokens), `npm test`, `npm run build`. Branding comes from `NEXT_PUBLIC_BRAND_NAME` /
 `NEXT_PUBLIC_BRAND_LOGO` at build time — see ADR-0006.
 
 ## Log in as any role

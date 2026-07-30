@@ -7,6 +7,8 @@
 #   typecheck    tsc --noEmit — the typed token accessor makes an unknown token a compile error
 #   check:tokens WCAG 2.1 AA contrast over every declared text pairing in styles/tokens.css
 #                (US-06.1.1 AC-4); fails naming the tokens and the ratio
+#   test         Vitest — the auth store's ACs (single-flight refresh, memory-only session,
+#                logout ordering) and the next= redirect validator
 #   build        next build — the artefact the portal image will ship
 #
 # The a11y scan (F-06.4) joins as its own job in story UI-5; the visual-regression baseline
@@ -48,6 +50,9 @@ jobs:
 
       - name: Token contrast (WCAG 2.1 AA)
         run: npm run check:tokens
+
+      - name: Tests
+        run: npm test
 
       - name: Build
         run: npm run build
