@@ -76,8 +76,7 @@ describe("homeFor with the FM area", () => {
     expect(homeFor(undefined)).toBeNull();
   });
 
-  it("a floor receptionist lands in the console until VJ-3 ships the desk", () => {
-    // masterdata.view is what puts them there; visitor.register has no area yet.
-    expect(homeFor(["visitor.register", "masterdata.view"])).toBe("/admin");
-  });
+  // A floor receptionist used to land in the console here, on the strength of masterdata.view.
+  // VJ-3 gave visitor.register an area of its own and moved that case ahead of the console;
+  // reception-api.test.ts owns the assertion now.
 });
