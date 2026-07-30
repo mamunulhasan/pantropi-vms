@@ -24,8 +24,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class MyVisitorRequestsTest {
 
+    private static final UUID ACTOR = UUID.randomUUID();
+
     private final RecordingQueries queries = new RecordingQueries();
-    private final MyVisitorRequests useCase = new MyVisitorRequests(queries);
+    private final RecordingAudit audit = new RecordingAudit();
+    private final MyVisitorRequests useCase = new MyVisitorRequests(queries, audit);
 
     @ParameterizedTest
     @EnumSource(RequestStatus.class)
@@ -90,7 +93,7 @@ class MyVisitorRequestsTest {
     void detailNotFound() {
         // The store returns empty for both cases, and this use case cannot tell them apart either.
         // That is the property: there is no branch here that could answer them differently.
-        assertThatThrownBy(() -> useCase.detail(UUID.randomUUID()))
+        assertThatThrownBy(() -> useCase.detail(UUID.randomUUID(), UUID.randomUUID()))
                 .isInstanceOf(RequestDecision.NotFound.class);
     }
 
@@ -102,14 +105,69 @@ class MyVisitorRequestsTest {
                 Instant.parse("2030-06-01T09:00:00Z"), Instant.parse("2030-06-01T11:00:00Z"),
                 Instant.parse("2030-05-01T09:00:00Z"), "Frances Manager",
                 Instant.parse("2030-05-02T09:00:00Z"), "Host is on leave",
-                List.of(new VisitorRequestQueries.VisitorLine("Ada Lovelace", "cancelled")));
+                List.of(new VisitorRequestQueries.VisitorLine("Ada Lovelace", "Analytical Ltd", "Guest",
+                        "cancelled")));
 
-        var detail = useCase.detail(id);
+        var detail = useCase.detail(ACTOR, id);
 
         assertThat(detail.decisionReason()).isEqualTo("Host is on leave");
         assertThat(detail.decidedBy()).isEqualTo("Frances Manager");
         assertThat(detail.visitors()).singleElement()
                 .satisfies(v -> assertThat(v.fullName()).isEqualTo("Ada Lovelace"));
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("US-07.3.3 AC-2: reading the detail is itself audited, with "
+            + "no personal data in the entry")
+    void detailReadIsAudited() {
+        UUID id = UUID.randomUUID();
+        queries.detail = new VisitorRequestQueries.Detail(id, "approved", "Host A", "Review",
+                Instant.parse("2030-06-01T09:00:00Z"), Instant.parse("2030-06-01T11:00:00Z"),
+                Instant.parse("2030-05-01T09:00:00Z"), "Frances Manager", null, null,
+                List.of(new VisitorRequestQueries.VisitorLine("Ada Lovelace", "Analytical Ltd",
+                        "Guest", "approved")));
+
+        useCase.detail(ACTOR, id);
+
+        assertThat(audit.entries).singleElement().satisfies(e -> {
+            assertThat(e.action()).isEqualTo("visitor_request.view");
+            assertThat(e.actor()).isEqualTo(ACTOR);
+            assertThat(e.entityId()).isEqualTo(id.toString());
+            // T-07.3.3.1: null, so the row's after_state is null. The entry says personal data was
+            // accessed; it does not carry any, and JdbcAuditTrail would otherwise wrap whatever is
+            // passed here into after_state.
+            assertThat(e.detail()).isNull();
+        });
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("a request that is not found is not audited as a view")
+    void notFoundIsNotAView() {
+        assertThatThrownBy(() -> useCase.detail(ACTOR, UUID.randomUUID()))
+                .isInstanceOf(RequestDecision.NotFound.class);
+        assertThat(audit.entries).isEmpty();
+    }
+
+    private static final class RecordingAudit
+            implements com.pantropi.vms.application.identity.port.AuditTrail {
+        record Entry(UUID actor, String action, String entityType, String entityId, String detail) {}
+
+        final List<Entry> entries = new java.util.ArrayList<>();
+
+        public void record(UUID actor, String action, String entityType, String entityId,
+                           String detail) {
+            entries.add(new Entry(actor, action, entityType, entityId, detail));
+        }
+
+        public void recordChange(UUID actor, String action, String entityType, String entityId,
+                                 String before, String after) {
+            throw new AssertionError("a read changes nothing; it must use record()");
+        }
+
+        public void recordSecurityDenial(UUID actor, String action, String permission, String route,
+                                         String method, String outcome, String sourceIp) {
+            throw new AssertionError("authorisation is decided at the boundary, not here");
+        }
     }
 
     private static final class RecordingQueries implements VisitorRequestQueries {

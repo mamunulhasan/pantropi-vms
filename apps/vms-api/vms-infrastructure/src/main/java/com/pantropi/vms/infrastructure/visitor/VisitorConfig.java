@@ -61,8 +61,8 @@ public class VisitorConfig {
     }
 
     @Bean
-    MyVisitorRequests myVisitorRequests(VisitorRequestQueries queries) {
-        return new MyVisitorRequests(queries);
+    MyVisitorRequests myVisitorRequests(VisitorRequestQueries queries, AuditTrail audit) {
+        return new MyVisitorRequests(queries, audit);
     }
 
     @Bean

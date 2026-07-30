@@ -1,5 +1,6 @@
 package com.pantropi.vms.application.visitor.usecase;
 
+import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.shared.PageRequest;
 import com.pantropi.vms.application.visitor.port.VisitorRequestQueries;
 import com.pantropi.vms.domain.visitor.RequestStatus;
@@ -29,9 +30,11 @@ import java.util.stream.Collectors;
 public final class MyVisitorRequests {
 
     private final VisitorRequestQueries queries;
+    private final AuditTrail audit;
 
-    public MyVisitorRequests(VisitorRequestQueries queries) {
+    public MyVisitorRequests(VisitorRequestQueries queries, AuditTrail audit) {
         this.queries = queries;
+        this.audit = audit;
     }
 
     /**
@@ -49,8 +52,28 @@ public final class MyVisitorRequests {
      *                                  answer for both, so the endpoint is not an existence oracle
      *                                  (AC-4)
      */
-    public VisitorRequestQueries.Detail detail(UUID id) {
-        return queries.detail(id).orElseThrow(() -> new RequestDecision.NotFound(id));
+    public VisitorRequestQueries.Detail detail(UUID actor, UUID id) {
+        VisitorRequestQueries.Detail detail = queries.detail(id)
+                .orElseThrow(() -> new RequestDecision.NotFound(id));
+
+        // US-07.3.3 AC-2: this is the read that names people, so the reading of it is itself an
+        // event worth recording. Written before the response is handed back, so it stands whether
+        // or not the client keeps what it asked for (T-07.3.3.1).
+        //
+        // The detail is deliberately null, which T-07.3.3.1 asks for: "after_state is null for a
+        // read and does not duplicate the PII being audited". A read changed nothing, so there is no
+        // state to record — and anything put here would be copied into a table V12 just made
+        // append-only, where a mistake cannot be corrected.
+        //
+        // A visitor count was the tempting thing to include. It is not personal data, but it is also
+        // not what the entry is for: the fact worth keeping is that this person read this request at
+        // this time, and the request itself still says how many visitors it has.
+        audit.record(actor, "visitor_request.view", "visitor_request", id.toString(), null);
+
+        // A read that could not be audited is one nobody can later prove happened, so it is not
+        // caught and swallowed here: if the audit write fails, the caller gets an error rather than
+        // the personal data.
+        return detail;
     }
 
     private static RequestStatus parseStatus(String status) {
