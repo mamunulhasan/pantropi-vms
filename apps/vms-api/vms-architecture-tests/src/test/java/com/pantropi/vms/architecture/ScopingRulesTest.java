@@ -32,7 +32,11 @@ class ScopingRulesTest {
     /** The domain types whose rows belong to one tenant or one reception. */
     private static final List<String> SCOPE_SENSITIVE = List.of(
             "com.pantropi.vms.domain.visitor.VisitorRequest",
-            "com.pantropi.vms.domain.visitor.Visitor");
+            "com.pantropi.vms.domain.visitor.Visitor",
+            // A tenant's staff directory (US-10.1.1). Listed here so the rule below forces the
+            // repository through ScopePolicy: AC-4 puts the cross-tenant refusal in the
+            // repository precisely so no call site can forget it.
+            "com.pantropi.vms.domain.visitor.Host");
 
     private static final String SCOPE_POLICY =
             "com.pantropi.vms.application.identity.usecase.ScopePolicy";

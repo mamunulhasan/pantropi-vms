@@ -71,6 +71,23 @@ public class VisitorConfig {
     }
 
     @Bean
+    com.pantropi.vms.application.visitor.port.HostRepository hostRepository(
+            DataSource dataSource,
+            com.pantropi.vms.application.identity.usecase.ScopePolicy scope) {
+        return new JdbcHostRepository(new JdbcTemplate(dataSource), scope);
+    }
+
+    @Bean
+    com.pantropi.vms.application.visitor.usecase.HostDirectory hostDirectory(
+            com.pantropi.vms.application.visitor.port.HostRepository hosts,
+            TenantDirectory tenants,
+            com.pantropi.vms.application.identity.port.AuditTrail audit,
+            com.pantropi.vms.application.shared.port.TransactionRunner tx) {
+        return new com.pantropi.vms.application.visitor.usecase.HostDirectory(
+                hosts, tenants, audit, tx);
+    }
+
+    @Bean
     TenantDirectory tenantDirectory(DataSource dataSource) {
         return new JdbcTenantDirectory(new JdbcTemplate(dataSource));
     }

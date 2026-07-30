@@ -3,21 +3,22 @@
 /**
  * Submit a visitor request (VJ-1 over US-07.1.1).
  *
- * Two fields the SRS implies are deliberately absent, because the API offers no way to populate
- * them and inventing one is not on the table:
+ * The host selector reads the tenant's own directory (US-10.1.1), which is scoped server-side —
+ * there is no tenant id to send and none would be honoured. Only **active** hosts are offered: a
+ * departed colleague must not be attachable to a new visit (AC-3).
  *
- * - **Host.** `hostId` is optional on the endpoint, and there is no host endpoint anywhere in the
- *   API — `vms.hosts` exists and is validated against, but nothing exposes it. The request is
- *   submitted without a host and the form says so.
- * - **Visitor type.** Choosing one needs `masterdata.view`, which TENANT does not hold.
+ * A tenant whose directory is empty still submits without a host, which the endpoint allows, and
+ * the form says why rather than presenting an empty control. Adding hosts is the directory page of
+ * T-10.1.1.3 and has not shipped; until then they are created through the API.
  *
- * Both are recorded as gaps in the traceability matrix rather than papered over.
+ * **Visitor type is still absent**, and that gap is unchanged: choosing one needs `masterdata.view`,
+ * which the TENANT role does not hold. Recorded in the traceability matrix rather than papered over.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { Field, Input, Textarea } from "@/components/ui/Field";
+import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { useToast } from "@/components/ui/Toast";
 import {
   VisitorRows,
@@ -26,6 +27,7 @@ import {
   validateVisitors,
 } from "@/components/visits/VisitorRows";
 import { localInputToInstant } from "@/lib/datetime";
+import { HostsApi, type HostSummary } from "@/lib/hosts-api";
 import { VisitsApi, visitError, type VisitorPayload } from "@/lib/visits-api";
 
 export default function NewVisitRequestPage() {
@@ -35,9 +37,19 @@ export default function NewVisitRequestPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [purpose, setPurpose] = useState("");
+  const [hostId, setHostId] = useState("");
+  const [hosts, setHosts] = useState<HostSummary[] | null>(null);
   const [visitors, setVisitors] = useState<VisitorPayload[]>([emptyVisitor()]);
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    // A directory that cannot be read is the same as an empty one for this form's purposes: the
+    // request is submitted without a host either way, so a failure here must not block submitting.
+    HostsApi.listActive()
+      .then((page) => setHosts(page.content))
+      .catch(() => setHosts([]));
+  }, []);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,6 +74,7 @@ export default function NewVisitRequestPage() {
     setBusy(true);
     try {
       const { id } = await VisitsApi.submit({
+        hostId: hostId || null,
         scheduledFrom,
         scheduledTo,
         purpose: purpose.trim() || null,
@@ -136,10 +149,26 @@ export default function NewVisitRequestPage() {
               rows={3}
             />
           </Field>
-          <p className="mt-3 text-sm text-text-muted">
-            The visit is registered against your tenant. Naming a specific host is not available
-            yet — the API exposes no host directory.
-          </p>
+          <Field
+            label="Host"
+            hint="Who in your organisation the visitor is coming to see. Optional."
+            className="mt-3"
+          >
+            <Select value={hostId} onChange={(e) => setHostId(e.target.value)}>
+              <option value="">No host named</option>
+              {(hosts ?? []).map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.fullName}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {hosts !== null && hosts.length === 0 && (
+            <p className="mt-2 text-sm text-text-muted">
+              Your organisation has no hosts on file yet, so this request will not name one. That
+              is allowed — the visit is still registered against your tenant.
+            </p>
+          )}
         </fieldset>
 
         <fieldset className="mt-4 rounded-lg border-0 p-0">
