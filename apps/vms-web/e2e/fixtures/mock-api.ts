@@ -59,6 +59,18 @@ export const FM_USER: MockProfile = {
   permissions: ["visitor.approve"],
 };
 
+/**
+ * A floor receptionist: `visitor.register` to pre-register, and `masterdata.view` because
+ * registering needs the visitor-type list. Exactly what V9 grants FLOOR_RECEPTIONIST.
+ */
+export const RECEPTIONIST: MockProfile = {
+  userId: "55555555-5555-5555-5555-555555555555",
+  username: "receptionist",
+  displayName: "Remy Desk",
+  role: "FLOOR_RECEPTIONIST",
+  permissions: ["visitor.register", "masterdata.view"],
+};
+
 /** Signed in and granted nothing at all — no area to enter. */
 export const NO_ACCESS_USER: MockProfile = {
   userId: "33333333-3333-3333-3333-333333333333",
@@ -151,6 +163,7 @@ const PENDING_ROW = {
 };
 
 export const VISIT_REQUEST_ID = VISIT_REQUEST.id;
+export const PRE_REGISTERED_VISITOR_ID = "a1111111-1111-1111-1111-111111111111";
 
 function page1<T>(items: T[]) {
   return { items, page: 0, size: 20, total: items.length };
@@ -228,21 +241,6 @@ const REQUIRED: { match: RegExp; anyOf: string[] }[] = [
   { match: /^\/api\/v1\/visitor-requests\/[^/]+$/, anyOf: ["visitor.request", "visitor.approve"] },
   { match: /^\/api\/v1\/visitor-requests$/, anyOf: ["visitor.request"] },
   { match: /^\/api\/v1\/pre-registrations/, anyOf: ["visitor.register"] },
-/** Which permission the real controller requires, by admin path prefix. */
-const REQUIRED: { prefix: string; anyOf: string[] }[] = [
-  { prefix: "/api/v1/admin/settings", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/buildings", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/tenants", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/receptions", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/visitor-types", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/pass-types", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/holidays", anyOf: ["masterdata.view"] },
-  { prefix: "/api/v1/admin/users", anyOf: ["user.manage"] },
-  { prefix: "/api/v1/admin/roles", anyOf: ["user.manage"] },
-  // The tenant journey: submit/track/amend/cancel all sit behind visitor.request; the FM queue
-  // behind visitor.approve. Mirrors VisitorRequestController's annotations.
-  { prefix: "/api/v1/visitor-requests/pending", anyOf: ["visitor.approve"] },
-  { prefix: "/api/v1/visitor-requests", anyOf: ["visitor.request"] },
 ];
 
 /**
@@ -388,6 +386,48 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
       });
     }
     if (path === "/api/v1/admin/roles") return json(ROLES_OVERVIEW);
+
+    // ---- the reception desk ----
+    if (path === "/api/v1/pre-registrations" && request.method() === "POST") {
+      const body = JSON.parse(request.postData() || "{}");
+      // The floor-hosts-several-tenants refusal, driven by a marker name so a test can ask for it.
+      if (!body.tenantId && String(body.fullName || "").includes("Ambiguous")) {
+        return json(
+          {
+            error: "tenant_required",
+            detail: "This floor hosts 2 tenants; say which the visit is for",
+          },
+          400,
+        );
+      }
+      return json(
+        {
+          requestId: VISIT_REQUEST.id,
+          visitorId: PRE_REGISTERED_VISITOR_ID,
+          tenantId: TENANT.id,
+          receptionId: RECEPTION.id,
+        },
+        201,
+      );
+    }
+    if (path.match(/^\/api\/v1\/pre-registrations\/[^/]+\/cancel$/)) {
+      return json({
+        requestId: VISIT_REQUEST.id,
+        visitorId: PRE_REGISTERED_VISITOR_ID,
+        requestStatus: "cancelled",
+        requestCancelled: true,
+        revocationRequested: false,
+      });
+    }
+    if (path.match(/^\/api\/v1\/pre-registrations\/[^/]+$/)) {
+      return json({
+        requestId: VISIT_REQUEST.id,
+        visitorId: PRE_REGISTERED_VISITOR_ID,
+        requestStatus: "submitted",
+        requestCancelled: false,
+        revocationRequested: false,
+      });
+    }
 
     // ---- the FM approval queue ----
     if (path === "/api/v1/visitor-requests/pending") {

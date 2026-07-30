@@ -74,6 +74,19 @@ export const FM_NAV: readonly NavItem[] = [
 ];
 
 /**
+ * What justifies entering the reception desk: `visitor.register`, held by FLOOR_RECEPTIONIST.
+ *
+ * A receptionist also holds `masterdata.view` — they must read visitor types to register anyone —
+ * which is why {@link homeFor} checks this area *before* the console: the console would otherwise
+ * claim them on the strength of a permission they hold only in service of this screen.
+ */
+export const RECEPTION_ENTRY: readonly Permission[] = [PERMISSIONS.VISITOR_REGISTER];
+
+export const RECEPTION_NAV: readonly NavItem[] = [
+  { href: "/reception", label: "Pre-register", requires: RECEPTION_ENTRY },
+];
+
+/**
  * Where a signed-in principal belongs, from its permissions alone. Null when its grants open no
  * area at all.
  *
@@ -82,9 +95,12 @@ export const FM_NAV: readonly NavItem[] = [
  * no-access wall the moment a second area existed.
  */
 export function homeFor(permissions: readonly string[] | null | undefined): string | null {
-  // Order is most-specific-first among the areas a role actually works in. VJ-3 inserts the
-  // reception desk (`visitor.register`) ahead of the console, so a floor receptionist — who holds
-  // masterdata.view to read floors and tenants — lands at their desk rather than in admin.
+  // Order is most-specific-first among the areas a role actually works in. The desk comes before
+  // the console: a floor receptionist holds masterdata.view only so they can read visitor types
+  // while registering, and landing them in admin would answer the wrong question about their job.
+  if (hasAny(permissions, RECEPTION_ENTRY)) {
+    return "/reception";
+  }
   if (hasAny(permissions, ADMIN_ENTRY)) {
     return "/admin";
   }

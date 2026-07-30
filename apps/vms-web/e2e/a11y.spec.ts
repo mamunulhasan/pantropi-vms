@@ -17,13 +17,13 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import {
   FM_USER,
+  RECEPTIONIST,
   SYSADMIN,
   TENANT_USER,
   VISIT_REQUEST_ID,
   mockApi,
   signIn,
 } from "./fixtures/mock-api";
-import { SYSADMIN, TENANT_USER, VISIT_REQUEST_ID, mockApi, signIn } from "./fixtures/mock-api";
 
 const WCAG_21_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -136,6 +136,15 @@ test.describe("authenticated routes", () => {
     await page.goto("/approvals");
     await expect(page.getByRole("heading", { level: 1, name: "Approvals" })).toBeVisible();
     await scan(page, "/approvals");
+  });
+
+  test("/reception has no critical or serious violations", async ({ page }) => {
+    await mockApi(page, RECEPTIONIST);
+    await page.goto("/reception");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pre-register a visitor" }),
+    ).toBeVisible();
+    await scan(page, "/reception");
   });
 
   test("change-password has no critical or serious violations", async ({ page }) => {
