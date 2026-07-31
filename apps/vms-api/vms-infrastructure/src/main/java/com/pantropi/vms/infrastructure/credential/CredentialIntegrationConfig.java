@@ -22,4 +22,26 @@ public class CredentialIntegrationConfig {
     IssuedCredentials issuedCredentials(DataSource dataSource) {
         return new JdbcIssuedCredentials(new JdbcTemplate(dataSource));
     }
+
+    @Bean
+    com.pantropi.vms.application.credential.port.CredentialRepository credentialRepository(
+            javax.sql.DataSource dataSource) {
+        return new JdbcCredentialRepository(
+                new org.springframework.jdbc.core.JdbcTemplate(dataSource));
+    }
+
+    /**
+     * Issuance needs an {@link com.pantropi.vms.application.acs.port.AcsPort}, and there is only
+     * one when {@code vms.acs.mode} names it. A profile that configures no ACS gets no issuance
+     * bean either — which is the right failure: a building whose passes are not actually reaching
+     * an access control system should not start pretending to issue them.
+     */
+    @Bean
+    com.pantropi.vms.application.credential.usecase.IssueCredential issueCredential(
+            com.pantropi.vms.application.credential.port.CredentialRepository credentials,
+            com.pantropi.vms.application.acs.port.AcsPort acs,
+            com.pantropi.vms.application.identity.port.AuditTrail audit) {
+        return new com.pantropi.vms.application.credential.usecase.IssueCredential(
+                credentials, acs, audit);
+    }
 }
