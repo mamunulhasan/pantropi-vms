@@ -11,9 +11,10 @@ package com.pantropi.vms.application.notification.port;
 public interface NotificationSender {
 
     /**
-     * @param recipient looked up from the visitor record, never supplied by a caller (AC-6)
-     * @param bodyRef   a template or storage reference for the log — not the body itself, which
-     *                  the schema comment on {@code notification_logs.body_ref} rules out
+     * @param message the notification payload; recipient is looked up from the visitor record,
+     *                never supplied by a caller (AC-6), and bodyRef is a template or storage
+     *                reference for the log — not the body itself, which the schema comment on
+     *                {@code notification_logs.body_ref} rules out
      * @return where the message went, for the operator who has to confirm it did
      */
     Sent send(Message message);
