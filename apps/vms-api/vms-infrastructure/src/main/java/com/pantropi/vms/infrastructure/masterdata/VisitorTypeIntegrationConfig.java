@@ -46,4 +46,10 @@ public class VisitorTypeIntegrationConfig {
             DataSource dataSource) {
         return new SettingsRegistrationPolicy(new JdbcSettingsStore(new JdbcTemplate(dataSource)));
     }
+
+    /** US-09.1.2 AC-2 — whether approving a request also mints the passes. */
+    @Bean
+    com.pantropi.vms.application.visitor.port.IssuancePolicy issuancePolicy(DataSource dataSource) {
+        return new SettingsIssuancePolicy(new JdbcSettingsStore(new JdbcTemplate(dataSource)));
+    }
 }

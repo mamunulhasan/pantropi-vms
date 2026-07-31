@@ -65,6 +65,8 @@ export type MyRequestsPage = {
 };
 
 export type VisitorLine = {
+  /** The visitor's own id — what the approvals screen issues and shows a pass against. */
+  id: string;
   fullName: string;
   company: string | null;
   /** The visitor type's display name, not its id. Null when unset. */

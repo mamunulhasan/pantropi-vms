@@ -86,3 +86,8 @@ docker-compose.override.yml
 *.dump
 *.sql.gz
 data-export/
+
+# Messages written by FileNotificationSender in development. Real mail has no adapter (no mail jar
+# is obtainable from this network), so the dev adapter writes .txt files instead — they are output,
+# not source, and they contain visitor names and addresses.
+local-notifications/

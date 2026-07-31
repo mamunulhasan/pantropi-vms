@@ -52,7 +52,10 @@ public final class SettingsCatalogue {
                     "Max outbound ACS retry attempts before dead-letter", false),
             new Entry("pre_registration.past_grace_minutes", Type.INTEGER, "60",
                     "How far into the past a pre-registered appointment may start before it is "
-                            + "treated as a mistyped date (US-08.1.1 AC-5)", false));
+                            + "treated as a mistyped date (US-08.1.1 AC-5)", false),
+            new Entry("credential.auto_issue_on_approval", Type.BOOLEAN, "true",
+                    "Whether approving a visitor request also issues each visitor's pass "
+                            + "(US-09.1.2 AC-2)", false));
 
     /** What a redacted value reads as. Fixed, so it can never be mistaken for a real value. */
     public static final String REDACTED = "********";

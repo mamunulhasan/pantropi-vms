@@ -5,6 +5,10 @@ import com.pantropi.vms.application.acs.port.AcsPort;
 import com.pantropi.vms.application.credential.port.CredentialRepository;
 import com.pantropi.vms.application.credential.usecase.IssueCredential;
 import com.pantropi.vms.application.identity.port.AuditTrail;
+import com.pantropi.vms.application.notification.port.NotificationLog;
+import com.pantropi.vms.application.notification.port.NotificationSender;
+import com.pantropi.vms.application.notification.port.VisitorContacts;
+import com.pantropi.vms.application.notification.usecase.SendCredentialEmail;
 import com.pantropi.vms.domain.credential.Credential;
 import com.pantropi.vms.domain.masterdata.CredentialType;
 import com.pantropi.vms.domain.masterdata.RestrictionType;
@@ -38,8 +42,18 @@ class IssueCredentialTest {
     private final FakeRepo repo = new FakeRepo(journal);
     private final FakeAudit audit = new FakeAudit();
 
+    private final FakeSender mailer = new FakeSender(journal);
+
     private IssueCredential useCase(AcsPort acs) {
-        return new IssueCredential(repo, acs, audit);
+        return useCase(acs, true);
+    }
+
+    private IssueCredential useCase(AcsPort acs, boolean emailEnabled) {
+        SendCredentialEmail send = new SendCredentialEmail(
+                id -> Optional.of(new VisitorContacts.Contact(VISITOR, "Ada Lovelace",
+                        "ada@example.com")),
+                mailer, new FakeLog(journal), emailEnabled);
+        return new IssueCredential(repo, acs, audit, send);
     }
 
     private IssueCredential.Command command() {
@@ -52,7 +66,8 @@ class IssueCredentialTest {
     void rowPrecedesTheCall() {
         Credential issued = useCase(new RecordingAcs(journal)).issue(ACTOR, command());
 
-        assertThat(journal).containsExactly("save:requested", "acs:createCredential", "update:active");
+        assertThat(journal).containsExactly("save:requested", "acs:createCredential",
+                "update:active", "mail:ada@example.com", "log:sent");
         assertThat(issued.state()).isEqualTo(Credential.State.ACTIVE);
     }
 
@@ -133,7 +148,66 @@ class IssueCredentialTest {
         assertThat(journal).isEmpty();
     }
 
+    @Test
+    @DisplayName("the credential survives a mail failure — the pass exists whether or not it was sent")
+    void mailFailureDoesNotUndoIssuance() {
+        mailer.explode = true;
+
+        Credential issued = useCase(new RecordingAcs(journal)).issue(ACTOR, command());
+
+        // Still active, still updated, and the failure is written down rather than raised.
+        assertThat(issued.state()).isEqualTo(Credential.State.ACTIVE);
+        assertThat(journal).contains("update:active", "log:failed");
+        assertThat(audit.payloads).anySatisfy(p -> assertThat(p).contains("FAILED"));
+    }
+
+    @Test
+    @DisplayName("US-16.2.1 AC-3: email switched off sends nothing and raises nothing")
+    void disabledChannelIsNotAFailure() {
+        Credential issued = useCase(new RecordingAcs(journal), false).issue(ACTOR, command());
+
+        assertThat(issued.state()).isEqualTo(Credential.State.ACTIVE);
+        assertThat(journal).doesNotContain("mail:ada@example.com");
+        assertThat(audit.payloads).anySatisfy(p -> assertThat(p).contains("DISABLED"));
+    }
+
+    @Test
+    @DisplayName("the email never carries the QR payload — mail is stored and forwarded elsewhere")
+    void emailNeverCarriesThePayload() {
+        useCase(new RecordingAcs(journal)).issue(ACTOR, command());
+
+        assertThat(mailer.bodies).isNotEmpty();
+        assertThat(mailer.bodies).allSatisfy(b -> assertThat(b).doesNotContain("PAYLOAD-1"));
+    }
+
     // ---- fakes ----
+
+    private static final class FakeSender implements NotificationSender {
+        private final List<String> journal;
+        final List<String> bodies = new ArrayList<>();
+        boolean explode;
+
+        FakeSender(List<String> journal) {
+            this.journal = journal;
+        }
+
+        @Override public Sent send(Message message) {
+            if (explode) {
+                throw new SendFailed("no transport", new RuntimeException());
+            }
+            journal.add("mail:" + message.recipient());
+            bodies.add(message.body());
+            return new Sent("/tmp/fake.txt");
+        }
+    }
+
+    private record FakeLog(List<String> journal) implements NotificationLog {
+        @Override public void record(UUID visitorId, String recipient, String channel,
+                                     String notifyType, String subject, String bodyRef,
+                                     String status) {
+            journal.add("log:" + status);
+        }
+    }
 
     private static final class FakeRepo implements CredentialRepository {
         private final List<String> journal;

@@ -18,14 +18,21 @@ test.describe("the approvals area boundary", () => {
     await expect(page.getByText(FM_USER.displayName)).toBeVisible();
   });
 
-  test("an approver cannot enter the admin console or the tenant area", async ({ page }) => {
+  test("an approver cannot enter the admin console — but the tenant area is now theirs", async ({
+    page,
+  }) => {
     const api = await mockApi(page, FM_USER);
 
     await page.goto("/admin");
     await expect(page.getByRole("heading", { name: "You don’t have access" })).toBeVisible();
-    await page.goto("/visits");
-    await expect(page.getByRole("heading", { name: "You don’t have access" })).toBeVisible();
 
+    // V15 granted FM_ADMIN `visitor.request`, so /visits is theirs now — an approver who can also
+    // raise a request. That is a deliberate widening recorded in the migration, not an accident,
+    // and the test says so rather than continuing to assert a boundary that no longer exists.
+    await page.goto("/visits");
+    await expect(page.getByRole("heading", { name: "You don’t have access" })).toBeHidden();
+
+    // The console boundary is the one that still holds, and it holds without asking for the data.
     expect(api.requests.filter((p) => p.startsWith("/api/v1/admin"))).toEqual([]);
   });
 
@@ -101,7 +108,16 @@ test.describe("deciding", () => {
       await route.fulfill({
         status: 200,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: "x", status: "approved", decidedBy: "u", decidedAt: "t", note: null }),
+        body: JSON.stringify({
+          id: "x",
+          status: "approved",
+          decidedBy: "u",
+          decidedAt: "t",
+          note: null,
+          // Empty: approving mints the passes, but this test is about the decision call itself and
+          // an empty list is the shape a pass-less approval really returns.
+          issued: [],
+        }),
       });
     });
 

@@ -46,7 +46,13 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "vms.identity.enabled=true",
                 "vms.security.jwt.secret=integration-test-secret-least-32-bytes-long-xx",
-                "spring.flyway.enabled=false"
+                "spring.flyway.enabled=false",
+                // US-09.1.2: approval mints the passes, so this class needs an ACS to mint them
+                // against. The simulator is the only one there is, and everything asserted about a
+                // credential here closes at "done against simulator" (ADR-0002, TODO-02).
+                "vms.acs.mode=simulator",
+                // The email adapter writes files; keep them inside build/ rather than the repo root.
+                "vms.notification.outbox-dir=build/test-notifications"
         })
 class VisitorApprovalIT {
 
@@ -136,6 +142,45 @@ class VisitorApprovalIT {
         assertThat(scalar("SELECT after_state->>'decisionReason' FROM vms.audit_logs"
                 + " WHERE action='visitor_request.approve' AND entity_id='" + id + "'"))
                 .isEqualTo("Cleared with building security");
+    }
+
+    @Test
+    @DisplayName("US-09.1.2 AC-1: approving mints a pass for the visitor and emails them")
+    void approvalIssuesThePass() throws Exception {
+        String visitorEmail = "pass-" + UUID.randomUUID() + "@example.test";
+        String id = submit(visitorEmail, futureWindow());
+        String visitorId = scalar("SELECT id::text FROM vms.visitors WHERE request_id='" + id + "'");
+
+        var res = approve(id, null, token("fmadmin", "fm-admin-password-123"));
+        assertThat(res.statusCode()).isEqualTo(200);
+
+        // AC-1: a credential per visitor, active, carrying the reference the simulator returned.
+        assertThat(scalar("SELECT count(*) FROM vms.credentials WHERE visitor_id='" + visitorId + "'"))
+                .isEqualTo("1");
+        assertThat(scalar("SELECT state::text FROM vms.credentials WHERE visitor_id='" + visitorId + "'"))
+                .isEqualTo("active");
+        assertThat(scalar("SELECT acs_credential_id FROM vms.credentials WHERE visitor_id='"
+                + visitorId + "'")).isNotNull();
+
+        // The window is the approved window, not a default and not now-plus-something.
+        assertThat(scalar("SELECT (c.valid_from = r.scheduled_from AND c.valid_to = r.scheduled_to)::text"
+                + " FROM vms.credentials c JOIN vms.visitor_requests r ON r.id='" + id + "'"
+                + " WHERE c.visitor_id='" + visitorId + "'")).isEqualTo("true");
+
+        // The decision response tells the approver what became of each pass (AC-5's reporting half).
+        assertThat(res.body()).contains("\"issued\"").contains("ISSUED").contains(visitorId);
+
+        // US-09.6.1: the visitor is emailed, at their own address, and the log holds a body_ref
+        // rather than the body.
+        assertThat(scalar("SELECT count(*) FROM vms.notification_logs WHERE visitor_id='"
+                + visitorId + "' AND channel='email' AND delivery_status='sent'")).isEqualTo("1");
+        assertThat(scalar("SELECT recipient FROM vms.notification_logs WHERE visitor_id='"
+                + visitorId + "'")).isEqualTo(visitorEmail);
+
+        // The QR payload opens a barrier. It is not in the audit trail and not in the email log.
+        assertThat(scalar("SELECT count(*) FROM vms.audit_logs a, vms.credentials c"
+                + " WHERE c.visitor_id='" + visitorId + "' AND c.qr_payload IS NOT NULL"
+                + " AND a.after_state::text LIKE '%' || c.qr_payload || '%'")).isEqualTo("0");
     }
 
     @Test

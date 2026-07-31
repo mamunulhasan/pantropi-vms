@@ -77,7 +77,10 @@ class MigrationIT {
     @DisplayName("AC-1: baseline creates every table, enum, trigger and comment; history records V1+V2")
     void baselineCreatesFullSchema() throws Exception {
         MigrateResult result = flyway().migrate();
-        assertThat(result.migrationsExecuted).isEqualTo(14);
+        // Every versioned script in db/migration, V1 through V16. Pinned rather than derived so a
+        // script that silently fails to be picked up — wrong prefix, wrong directory — is a failure
+        // here rather than a mystery about missing rows much later.
+        assertThat(result.migrationsExecuted).isEqualTo(16);
 
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             assertThat(query(s, """
@@ -129,7 +132,7 @@ class MigrationIT {
                     SELECT version FROM vms.flyway_schema_history
                      WHERE success AND version IS NOT NULL"""))
                     .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                            "11", "12", "13", "14");
+                            "11", "12", "13", "14", "15", "16");
         }
     }
 
@@ -160,12 +163,19 @@ class MigrationIT {
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.permissions")).isEqualTo("12");
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.visitor_types")).isEqualTo("4");
         assertThat(scalar(s, "SELECT count(*)::text FROM vms.pass_types")).isEqualTo("3");
-        assertThat(scalar(s, "SELECT count(*)::text FROM vms.system_settings")).isEqualTo("5");
+        // Six as of V16's credential.auto_issue_on_approval. The count is pinned because
+        // SettingsCatalogue and this seed must correspond exactly in both directions: a key seeded
+        // but not catalogued is unreadable through the API, and one catalogued but not seeded reads
+        // as its default while appearing to be stored.
+        assertThat(scalar(s, "SELECT count(*)::text FROM vms.system_settings")).isEqualTo("6");
         // V9 states the whole matrix (US-03.1.1, T-03.1.1.2), completing the lift of D-15.
         // RoleGrantMatrixIT asserts it role by role; this only pins the total so a stray grant
         // added elsewhere is noticed here too.
-        // Ten from V9's matrix, plus V12's audit.view grant to SYSTEM_ADMIN.
-        assertThat(scalar(s, "SELECT count(*)::text FROM vms.role_permissions")).isEqualTo("11");
+        // Ten from V9's matrix, plus V12's audit.view grant to SYSTEM_ADMIN, plus V15's two
+        // adds to FM_ADMIN (visitor.request to raise one, credential.issue to read back the pass
+        // approving it minted). The total is pinned precisely so a grant added anywhere else still
+        // has to come past this line.
+        assertThat(scalar(s, "SELECT count(*)::text FROM vms.role_permissions")).isEqualTo("13");
         assertThat(query(s, """
                 SELECT p.code FROM vms.role_permissions rp
                 JOIN vms.roles r ON r.id = rp.role_id AND r.code = 'MASTER_ADMIN'

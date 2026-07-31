@@ -1,6 +1,7 @@
 package com.pantropi.vms.interfaces.rest.credential;
 
 import com.pantropi.vms.application.acs.port.AcsFailure;
+import com.pantropi.vms.application.credential.usecase.GetCredentialPass;
 import com.pantropi.vms.application.credential.usecase.IssueCredential;
 import com.pantropi.vms.domain.credential.Credential;
 import com.pantropi.vms.domain.masterdata.CredentialType;
@@ -21,21 +22,31 @@ import java.util.UUID;
  * <p>Guarded by {@code credential.issue}, which only MASTER_ADMIN holds — the central desk issues
  * passes, and AC-8 requires everyone else to be refused before any work happens.
  *
- * <p>The response never carries {@code qr_payload}. Rendering the pass is US-09.5.1, whose AC-3
- * says generation happens server-side and the raw payload never reaches the browser as a separate
- * value. Returning it here would hand out the secret through a side door the pass endpoint was
- * designed to close.
+ * <p>The issuance response never carries {@code qr_payload}. Rendering the pass is US-09.5.1,
+ * whose AC-3 says generation happens server-side and the raw payload never reaches the browser as
+ * a separate value — and the portal issues from the browser, so putting it in this response would
+ * hand out the secret through a side door.
+ *
+ * <p>{@code GET .../credential} does return it, and is meant for exactly one caller: the portal
+ * <em>server</em>, which renders a PNG the browser can show. That split is a design rather than an
+ * enforcement — the route is reachable by anyone holding {@code credential.issue} — and the gap is
+ * recorded as deferred rather than described as closed.
  */
 @RestController
 @RequestMapping("/api/v1/visitors/{visitorId}/credential")
 @RequiresPermission("credential.issue")
-@ConditionalOnProperty(prefix = "vms.identity", name = "enabled", havingValue = "true")
+// Gated on the ACS mode as well as identity: this controller needs IssueCredential, which needs an
+// AcsPort, which exists only when an ACS is configured. Without this, every profile with identity
+// on and no ACS fails to start on a missing bean — no route is better than no application.
+@ConditionalOnProperty(prefix = "vms.acs", name = "mode")
 public class CredentialController {
 
     private final IssueCredential issueCredential;
+    private final GetCredentialPass getCredentialPass;
 
-    public CredentialController(IssueCredential issueCredential) {
+    public CredentialController(IssueCredential issueCredential, GetCredentialPass getCredentialPass) {
         this.issueCredential = issueCredential;
+        this.getCredentialPass = getCredentialPass;
     }
 
     @PostMapping
@@ -54,6 +65,34 @@ public class CredentialController {
         return ResponseEntity.status(HttpStatus.CREATED).body(new IssuedResponse(
                 issued.id().toString(), issued.state().dbValue(), issued.acsCredentialId(),
                 issued.issuedAt()));
+    }
+
+    /**
+     * The live pass, payload included, for the portal server's renderer (US-09.5.1).
+     *
+     * <p>{@code Cache-Control: no-store} because the body is the thing that opens a barrier: a
+     * proxy or browser cache holding it would outlive the validity window it is supposed to respect.
+     */
+    @GetMapping
+    public ResponseEntity<PassResponse> pass(@PathVariable UUID visitorId) {
+        GetCredentialPass.Pass p = getCredentialPass.forVisitor(visitorId);
+        return ResponseEntity.ok()
+                .header("Cache-Control", "no-store")
+                .body(new PassResponse(p.credentialId().toString(), p.qrPayload(), p.validFrom(),
+                        p.validTo(), p.issuedAt()));
+    }
+
+    @ExceptionHandler(GetCredentialPass.NoPass.class)
+    public ResponseEntity<ErrorResponse> onNoPass() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("no_credential", "This visitor holds no pass", null));
+    }
+
+    /** 409, not 404: the credential exists, it just is not in a state that has a pass to show. */
+    @ExceptionHandler(GetCredentialPass.NotRenderable.class)
+    public ResponseEntity<ErrorResponse> onNotRenderable(GetCredentialPass.NotRenderable e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("not_issued",
+                "The pass is " + e.state.dbValue() + " and cannot be shown yet", null));
     }
 
     /** Refused before any outbound call, so the unique index is never the first line of defence. */
@@ -99,8 +138,12 @@ public class CredentialController {
     public record IssueRequest(UUID passTypeId, String credentialType, String restriction,
                                Instant validFrom, Instant validTo) {}
 
-    /** No {@code qrPayload}: the pass endpoint of US-09.5.1 owns that, server-side. */
+    /** No {@code qrPayload}: the GET above owns that, and only the portal server should read it. */
     public record IssuedResponse(String id, String state, String acsCredentialId, Instant issuedAt) {}
+
+    /** Server-to-server. {@code qrPayload} must not be forwarded to a browser as a value. */
+    public record PassResponse(String credentialId, String qrPayload, Instant validFrom,
+                               Instant validTo, Instant issuedAt) {}
 
     public record ErrorResponse(String error, String detail, String existingCredentialId) {}
 }

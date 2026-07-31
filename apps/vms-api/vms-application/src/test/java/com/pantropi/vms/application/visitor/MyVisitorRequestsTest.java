@@ -105,7 +105,7 @@ class MyVisitorRequestsTest {
                 Instant.parse("2030-06-01T09:00:00Z"), Instant.parse("2030-06-01T11:00:00Z"),
                 Instant.parse("2030-05-01T09:00:00Z"), "Frances Manager",
                 Instant.parse("2030-05-02T09:00:00Z"), "Host is on leave",
-                List.of(new VisitorRequestQueries.VisitorLine("Ada Lovelace", "Analytical Ltd", "Guest",
+                List.of(new VisitorRequestQueries.VisitorLine(UUID.randomUUID(), "Ada Lovelace", "Analytical Ltd", "Guest",
                         "cancelled")));
 
         var detail = useCase.detail(ACTOR, id);
@@ -124,7 +124,7 @@ class MyVisitorRequestsTest {
         queries.detail = new VisitorRequestQueries.Detail(id, "approved", "Host A", "Review",
                 Instant.parse("2030-06-01T09:00:00Z"), Instant.parse("2030-06-01T11:00:00Z"),
                 Instant.parse("2030-05-01T09:00:00Z"), "Frances Manager", null, null,
-                List.of(new VisitorRequestQueries.VisitorLine("Ada Lovelace", "Analytical Ltd",
+                List.of(new VisitorRequestQueries.VisitorLine(UUID.randomUUID(), "Ada Lovelace", "Analytical Ltd",
                         "Guest", "approved")));
 
         useCase.detail(ACTOR, id);

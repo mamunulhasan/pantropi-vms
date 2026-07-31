@@ -4,6 +4,7 @@ import com.pantropi.vms.application.acs.port.AcsFailure;
 import com.pantropi.vms.application.acs.port.AcsPort;
 import com.pantropi.vms.application.credential.port.CredentialRepository;
 import com.pantropi.vms.application.identity.port.AuditTrail;
+import com.pantropi.vms.application.notification.usecase.SendCredentialEmail;
 import com.pantropi.vms.domain.credential.Credential;
 import com.pantropi.vms.domain.masterdata.CredentialType;
 import com.pantropi.vms.domain.masterdata.RestrictionType;
@@ -35,6 +36,10 @@ import java.util.UUID;
  * not join our transaction. The row-first ordering is what makes that survivable — a crash between
  * the two leaves a {@code requested} credential, which is recoverable, rather than a silent one.
  *
+ * <p>The visitor is emailed last, after the credential is already active, and the send cannot
+ * fail this method: {@link SendCredentialEmail} reports its outcome instead of throwing, because a
+ * mail server being down is not a reason to leave a visitor without a pass (US-17.1.1 AC-6).
+ *
  * <p>Pure orchestration over ports; no framework, and no ACS type anywhere (AC-2).
  */
 public final class IssueCredential {
@@ -42,11 +47,14 @@ public final class IssueCredential {
     private final CredentialRepository credentials;
     private final AcsPort acs;
     private final AuditTrail audit;
+    private final SendCredentialEmail sendEmail;
 
-    public IssueCredential(CredentialRepository credentials, AcsPort acs, AuditTrail audit) {
+    public IssueCredential(CredentialRepository credentials, AcsPort acs, AuditTrail audit,
+                           SendCredentialEmail sendEmail) {
         this.credentials = credentials;
         this.acs = acs;
         this.audit = audit;
+        this.sendEmail = sendEmail;
     }
 
     /**
@@ -93,6 +101,13 @@ public final class IssueCredential {
         audit.recordChange(actingUser, "credential.issued", "credential", active.id().toString(),
                 null, "{\"acsCredentialId\":\"" + active.acsCredentialId() + "\",\"hasQr\":"
                         + (active.qrPayload() != null) + "}");
+
+        // Last, and unable to fail the issuance. The outcome is audited so a pass that was issued
+        // but not emailed is visible rather than silently assumed to have been delivered.
+        SendCredentialEmail.Result mail = sendEmail.send(new SendCredentialEmail.Command(
+                command.visitorId(), active.id(), command.validFrom(), command.validTo()));
+        audit.recordChange(actingUser, "credential.notified", "credential", active.id().toString(),
+                null, "{\"outcome\":\"" + mail.outcome() + "\"}");
         return active;
     }
 

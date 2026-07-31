@@ -289,8 +289,8 @@ public class VisitorRequestController {
                 d.scheduledFrom(), d.scheduledTo(), d.submittedAt(), d.decidedBy(), d.decidedAt(),
                 d.decisionReason(),
                 d.visitors().stream()
-                        .map(v -> new VisitorLine(v.fullName(), v.company(), v.visitorType(),
-                                v.status()))
+                        .map(v -> new VisitorLine(v.id().toString(), v.fullName(), v.company(),
+                                v.visitorType(), v.status()))
                         .toList());
     }
 
@@ -301,6 +301,25 @@ public class VisitorRequestController {
      * field name for exactly this reason, so a bad email cannot be reflected back into a response,
      * a log line or an error-reporting payload.
      */
+    /**
+     * The caller belongs to no tenant, so there is nothing to file the visit against.
+     *
+     * <p>409 rather than 400, matching {@code HostController.onNoTenant}: the payload was well
+     * formed, and it is the account's assignment — not anything the caller typed — that would have
+     * to change for this to succeed. A 400 would send them back to edit a form that is already
+     * correct.
+     *
+     * <p>Until V15 this could not be reached: only TENANT held {@code visitor.request}, and every
+     * tenant user has a tenant. Granting the permission to FM_ADMIN made it reachable, and without
+     * a handler {@code NoTenantForUser} — an {@link IllegalStateException}, so not covered by the
+     * global handler's {@code IllegalArgumentException} branch — fell through to a 500.
+     */
+    @ExceptionHandler(SubmitVisitorRequest.NoTenantForUser.class)
+    public ResponseEntity<DecisionError> onNoTenant() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new DecisionError("no_tenant",
+                "Your account is not assigned to a tenant, so it cannot raise a visit request"));
+    }
+
     @ExceptionHandler({Visitor.InvalidVisitorDetail.class,
             SubmitVisitorRequest.UnknownVisitorType.class})
     public ResponseEntity<DecisionError> onInvalidVisitor(RuntimeException e) {
@@ -412,9 +431,7 @@ public class VisitorRequestController {
         RequestDecision decision = approveVisitorRequest.approve(
                 UUID.fromString(principal.userId()), id, body == null ? null : body.note());
 
-        return ResponseEntity.ok(new DecisionResponse(decision.requestId().toString(),
-                decision.status(), decision.decidedBy().toString(), decision.decidedAt(),
-                decision.note()));
+        return ResponseEntity.ok(DecisionResponse.of(decision));
     }
 
     /**
@@ -437,9 +454,7 @@ public class VisitorRequestController {
         RequestDecision decision = rejectVisitorRequest.reject(
                 UUID.fromString(principal.userId()), id, body == null ? null : body.reason());
 
-        return ResponseEntity.ok(new DecisionResponse(decision.requestId().toString(),
-                decision.status(), decision.decidedBy().toString(), decision.decidedAt(),
-                decision.note()));
+        return ResponseEntity.ok(DecisionResponse.of(decision));
     }
 
     /** AC-2: a refusal nobody has to justify is not an accountable decision. */
@@ -517,7 +532,8 @@ public class VisitorRequestController {
                                   String decidedBy, Instant decidedAt, String decisionReason,
                                   List<VisitorLine> visitors) {}
 
-    public record VisitorLine(String fullName, String company, String visitorType,
+    /** @param id the visitor's own id — what an approver needs to issue or show their pass */
+    public record VisitorLine(String id, String fullName, String company, String visitorType,
                              String status) {}
 
     /**
@@ -560,8 +576,31 @@ public class VisitorRequestController {
     /** The reason is required; an absent body is the same as an absent reason, and both are 400. */
     public record RejectRequest(String reason) {}
 
+    /**
+     * @param issued what became of each visitor's pass (US-09.1.2). Empty on a rejection, and on an
+     *               approval that issued nothing. The approver is told which visitors ended up
+     *               without a working credential rather than being left to assume they all have one.
+     */
     public record DecisionResponse(String id, String status, String decidedBy, Instant decidedAt,
-                                   String note) {}
+                                   String note, List<IssuedPass> issued) {
+
+        /** Amend and cancel: they change a request's state without minting anything. */
+        public DecisionResponse(String id, String status, String decidedBy, Instant decidedAt,
+                                String note) {
+            this(id, status, decidedBy, decidedAt, note, List.of());
+        }
+
+        static DecisionResponse of(RequestDecision decision) {
+            return new DecisionResponse(decision.requestId().toString(), decision.status(),
+                    decision.decidedBy().toString(), decision.decidedAt(), decision.note(),
+                    decision.issued().stream()
+                            .map(p -> new IssuedPass(p.visitorId().toString(), p.outcome()))
+                            .toList());
+        }
+    }
+
+    /** @param outcome ISSUED, ALREADY_HELD, DEFERRED, FAILED or SKIPPED */
+    public record IssuedPass(String visitorId, String outcome) {}
 
     public record DecisionError(String error, String detail) {}
 
