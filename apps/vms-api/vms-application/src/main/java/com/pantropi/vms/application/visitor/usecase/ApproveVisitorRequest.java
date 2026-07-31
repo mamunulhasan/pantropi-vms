@@ -4,12 +4,15 @@ import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.visitor.AuditProjection;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
+import com.pantropi.vms.application.visitor.port.CredentialIssuance;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
+import com.pantropi.vms.application.visitor.port.IssuancePolicy;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
 import com.pantropi.vms.domain.visitor.RequestStatus;
 import com.pantropi.vms.domain.visitor.VisitorRequest;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -29,6 +32,25 @@ import java.util.stream.Collectors;
  * together, so a credential can never be ordered for a request this caller did not actually approve,
  * and a crash between the two cannot lose an event that a committed approval promised.
  *
+ * <h2>The passes are minted after the commit (US-09.1.2)</h2>
+ * Approving is what mints the pass — nobody presses a second button. The issuance calls happen
+ * <em>after</em> {@code tx.call} returns, and the placement is the design rather than an accident of
+ * ordering. AC-4 says the approval is never rolled back because the access control system was
+ * unreachable: approval and issuance are separate aggregates with eventual consistency between them.
+ * Inside the transaction, a failing ACS call would undo a decision an FM legitimately took. After
+ * the commit, it cannot — {@code SpringTransactionRunner} has already committed by the time the
+ * method returns, and nothing thrown afterwards can reach back.
+ *
+ * <p>One call per visitor, each outcome captured on its own (AC-5): three passes issued and two
+ * awaiting retry is a real and acceptable result, and reporting it per visitor is the only way the
+ * approver learns which two.
+ *
+ * <p><strong>Deviation, recorded.</strong> The backlog specifies an idempotent Kafka consumer of
+ * {@code VisitorRequestApproved}. No relay exists — the outbox is written and never drained — so the
+ * call is made directly and the event is still published for the consumer that will one day read it.
+ * AC-3's {@code event_id} idempotency therefore has nothing to guard: there is no second delivery.
+ * Duplicate protection comes instead from the credential context's own live-credential check.
+ *
  * <p>No framework imports — this is application code (US-01.2.2).
  */
 public final class ApproveVisitorRequest {
@@ -38,14 +60,19 @@ public final class ApproveVisitorRequest {
     private final AuditTrail audit;
     private final TransactionRunner tx;
     private final ClockPort clock;
+    private final CredentialIssuance issuance;
+    private final IssuancePolicy issuancePolicy;
 
     public ApproveVisitorRequest(VisitorRequestRepository requests, DomainEventPublisher events,
-                                 AuditTrail audit, TransactionRunner tx, ClockPort clock) {
+                                 AuditTrail audit, TransactionRunner tx, ClockPort clock,
+                                 CredentialIssuance issuance, IssuancePolicy issuancePolicy) {
         this.requests = requests;
         this.events = events;
         this.audit = audit;
         this.tx = tx;
         this.clock = clock;
+        this.issuance = issuance;
+        this.issuancePolicy = issuancePolicy;
     }
 
     /**
@@ -74,7 +101,7 @@ public final class ApproveVisitorRequest {
         Instant now = clock.now();
         request.approve(approver, note, now);
 
-        return tx.call(() -> {
+        RequestDecision decided = tx.call(() -> {
             if (!requests.saveDecision(request, previous)) {
                 // Someone decided it between our read and our write. Throwing rolls back the audit
                 // and outbox writes below, which have not happened yet — but the transaction is the
@@ -103,6 +130,39 @@ public final class ApproveVisitorRequest {
             return new RequestDecision(requestId, request.status().dbValue(), approver, now,
                     request.decisionReason());
         });
+
+        // Past this line the approval is durable. Nothing below may throw.
+        return withPasses(approver, request, decided);
+    }
+
+    /**
+     * Mints a pass for each visitor and folds the outcomes into the decision (US-09.1.2 AC-1/AC-5).
+     *
+     * <p>The {@code catch} is belt and braces. {@link CredentialIssuance} promises not to throw, but
+     * this runs after a committed approval, and an adapter that breaks that promise must not be able
+     * to turn a decision the FM successfully took into an error they cannot act on.
+     */
+    private RequestDecision withPasses(UUID approver, VisitorRequest request,
+                                       RequestDecision decided) {
+        if (!issuancePolicy.autoIssueOnApproval()) {
+            // AC-2: switched off means issuance stays manual, not that approval fails.
+            return decided;
+        }
+
+        List<RequestDecision.IssuedPass> issued = new ArrayList<>();
+        for (UUID visitorId : request.visitorIds()) {
+            CredentialIssuance.Outcome outcome;
+            try {
+                outcome = issuance.issueOnApproval(approver, visitorId, request.window().from(),
+                        request.window().to());
+            } catch (RuntimeException e) {
+                outcome = CredentialIssuance.Outcome.FAILED;
+            }
+            issued.add(new RequestDecision.IssuedPass(visitorId, outcome.name()));
+        }
+
+        return new RequestDecision(decided.requestId(), decided.status(), decided.decidedBy(),
+                decided.decidedAt(), decided.note(), issued);
     }
 
     private static String jsonIds(List<UUID> ids) {

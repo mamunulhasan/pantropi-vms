@@ -111,6 +111,29 @@ class TenantRequestsIT {
     // ---- AC-2 ----
 
     @Test
+    @DisplayName("a submitter with no tenant is refused with 409, not a 500")
+    void submitterWithoutATenantIsRefusedCleanly() throws Exception {
+        // fmadmin holds visitor.request as of V15 but is assigned to no tenant — an approver is
+        // building-wide by design. Before this was handled, SubmitVisitorRequest.NoTenantForUser
+        // (an IllegalStateException, so outside the global handler's IllegalArgumentException
+        // branch) reached the catch-all and the caller got "An unexpected error occurred".
+        Instant from = Instant.now().plus(30, ChronoUnit.DAYS);
+        var res = post("/api/v1/visitor-requests",
+                "{\"hostId\":null,\"scheduledFrom\":\"" + from + "\","
+                        + "\"scheduledTo\":\"" + from.plus(2, ChronoUnit.HOURS) + "\","
+                        + "\"purpose\":\"Optional.\","
+                        + "\"visitors\":[{\"fullName\":\"Guest 0\"}]}",
+                token("fmadmin"));
+
+        assertThat(res.statusCode()).isEqualTo(409);
+        // Named and actionable: it is the account's assignment that has to change, not the payload.
+        assertThat(res.body()).contains("no_tenant").contains("not assigned to a tenant");
+        // And nothing was written on the way to refusing.
+        assertThat(scalar("SELECT count(*) FROM vms.visitor_requests WHERE requested_by="
+                + "(SELECT id FROM vms.users WHERE username='fmadmin')")).isEqualTo("0");
+    }
+
+    @Test
     @DisplayName("AC-2: a status filter narrows within my tenant and cannot widen it")
     void statusFilterCannotWiden() throws Exception {
         String mineApproved = submit("tenantuser", 1);

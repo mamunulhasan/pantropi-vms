@@ -97,10 +97,16 @@ public interface VisitorRequestQueries {
      * coming and in what capacity, not how to contact them. TODO-13 keeps the document reference out
      * of every endpoint in this phase.
      *
-     * @param visitorType the type's display name, not its id — a reviewer reads "Contractor", and
-     *                    handing out the id would invite a client to resolve it against master data
+     * <p>The two ids here point in opposite directions, deliberately. The visitor's <em>own</em> id
+     * is present because an approver has to be able to act on that visitor — issuing their pass is
+     * the whole reason the line exists. The visitor <em>type's</em> id is still absent, and the
+     * original argument for that is untouched: a reviewer reads "Contractor", and handing out the
+     * type id would only invite a client to resolve it against master data it has no business
+     * reading. Exposing an id you can act on is not the same as exposing one you can only probe with.
+     *
+     * @param visitorType the type's display name, not its id
      */
-    record VisitorLine(String fullName, String company, String visitorType, String status) {}
+    record VisitorLine(UUID id, String fullName, String company, String visitorType, String status) {}
 
     record Page(List<Summary> content, long totalElements, int page, int size) {}
 }

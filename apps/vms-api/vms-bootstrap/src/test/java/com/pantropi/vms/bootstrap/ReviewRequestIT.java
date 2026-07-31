@@ -95,7 +95,13 @@ class ReviewRequestIT {
                 .contains("Ada Lovelace").contains("Analytical Ltd")
                 // The type's display name, not its id — a reviewer reads "Contractor".
                 .contains("\"visitorType\":\"Contractor\"")
-                .doesNotContain(contractorType.toString());
+                .doesNotContain(contractorType.toString())
+                // The two ids point in opposite directions, and both directions matter. The
+                // visitor's own id IS present as of US-09.1.2 — an approver has to be able to act
+                // on that visitor, and issuing their pass is why the line exists. The visitor
+                // TYPE's id is still absent, because it can only be probed against master data.
+                .contains(scalar("SELECT id::text FROM vms.visitors WHERE request_id='"
+                        + id + "'"));
     }
 
     @Test

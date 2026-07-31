@@ -175,11 +175,13 @@ public final class JdbcVisitorRequestQueries implements VisitorRequestQueries {
         Detail header = found.get(0);
         // One query for all of them, joined to the type — not a lookup per visitor (T-07.3.3.1).
         List<VisitorLine> visitors = jdbc.query("""
-                SELECT v.full_name, v.company, vt.name AS visitor_type, v.status::text AS status
+                SELECT v.id, v.full_name, v.company, vt.name AS visitor_type,
+                       v.status::text AS status
                   FROM vms.visitors v
                   LEFT JOIN vms.visitor_types vt ON vt.id = v.visitor_type_id
                  WHERE v.request_id = ? ORDER BY v.created_at
-                """, (rs, i) -> new VisitorLine(rs.getString("full_name"), rs.getString("company"),
+                """, (rs, i) -> new VisitorLine(rs.getObject("id", UUID.class),
+                rs.getString("full_name"), rs.getString("company"),
                 rs.getString("visitor_type"), rs.getString("status")), id);
 
         // The visitor read is unscoped by design: it runs only after the parent request has already

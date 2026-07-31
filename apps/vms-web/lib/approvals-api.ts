@@ -8,7 +8,7 @@
  *   them. Names live on the detail read, which *writes an audit row every time it is called*, so
  *   fetching one per row would inflate the audit trail by the size of the page on every render.
  * - **Credential type.** A request has no credential; the credential comes from a pass type at
- *   issuance, which is unbuilt.
+ *   issuance, and nothing on a request carries one.
  * - **Bulk approve.** There is no bulk endpoint. Approving n requests would be n calls with n
  *   independent conflict outcomes — "approve all" would be a promise the API cannot keep.
  */
@@ -58,13 +58,50 @@ export function queueQuery(filters: QueueFilters): string {
   return s ? `?${s}` : "";
 }
 
+/** What became of one visitor's pass when the request was approved (US-09.1.2). */
+export type IssuedPass = {
+  visitorId: string;
+  /**
+   * `ISSUED` and `ALREADY_HELD` both mean the visitor has a working pass. `DEFERRED` means it is
+   * recorded and waiting on a retry; `FAILED` means it will not arrive; `SKIPPED` means automatic
+   * issuance is off. The last three are worth telling the approver about — they are the only person
+   * who knows the visit is happening.
+   */
+  outcome: "ISSUED" | "ALREADY_HELD" | "DEFERRED" | "FAILED" | "SKIPPED";
+};
+
 export type Decision = {
   id: string;
   status: RequestStatus;
   decidedBy: string;
   decidedAt: string;
   note: string | null;
+  /** Empty on a rejection, and on an approval that minted nothing. */
+  issued: IssuedPass[];
 };
+
+/** The outcomes that mean "this visitor can get in". */
+export function hasWorkingPass(pass: IssuedPass): boolean {
+  return pass.outcome === "ISSUED" || pass.outcome === "ALREADY_HELD";
+}
+
+/** One line an approver can act on, or null when every pass is fine. */
+export function issuanceWarning(issued: readonly IssuedPass[]): string | null {
+  const deferred = issued.filter((p) => p.outcome === "DEFERRED").length;
+  const failed = issued.filter((p) => p.outcome === "FAILED").length;
+  const skipped = issued.filter((p) => p.outcome === "SKIPPED").length;
+
+  if (failed > 0) {
+    return `${failed} of ${issued.length} passes could not be issued. Those visitors have no pass — contact the security desk.`;
+  }
+  if (deferred > 0) {
+    return `${deferred} of ${issued.length} passes are still pending with the access control system and will be retried.`;
+  }
+  if (skipped > 0) {
+    return "Automatic issuance is switched off, so no passes were created.";
+  }
+  return null;
+}
 
 export const ApprovalsApi = {
   queue: (filters: QueueFilters) =>

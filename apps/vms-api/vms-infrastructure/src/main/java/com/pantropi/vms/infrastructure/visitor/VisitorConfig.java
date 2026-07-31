@@ -109,8 +109,11 @@ public class VisitorConfig {
     @Bean
     ApproveVisitorRequest approveVisitorRequest(VisitorRequestRepository requests,
                                                 DomainEventPublisher events, AuditTrail audit,
-                                                TransactionRunner tx, ClockPort clock) {
-        return new ApproveVisitorRequest(requests, events, audit, tx, clock);
+                                                TransactionRunner tx, ClockPort clock,
+                                                com.pantropi.vms.application.visitor.port.CredentialIssuance issuance,
+                                                com.pantropi.vms.application.visitor.port.IssuancePolicy issuancePolicy) {
+        return new ApproveVisitorRequest(requests, events, audit, tx, clock, issuance,
+                issuancePolicy);
     }
 
     /** US-07.4.3 — the decision trail, read under audit.view rather than a tenant predicate. */

@@ -3,6 +3,7 @@ package com.pantropi.vms.application.visitor;
 import com.pantropi.vms.application.identity.port.AuditTrail;
 import com.pantropi.vms.application.shared.port.ClockPort;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
+import com.pantropi.vms.application.visitor.port.CredentialIssuance;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
 import com.pantropi.vms.application.visitor.port.VisitorRequestRepository;
 import com.pantropi.vms.application.visitor.usecase.ApproveVisitorRequest;
@@ -44,8 +45,9 @@ class ApproveVisitorRequestTest {
     private final FakeEvents events = new FakeEvents();
     private final FakeAudit audit = new FakeAudit();
     private final CountingRunner tx = new CountingRunner();
+    private final RecordingIssuance issuance = new RecordingIssuance();
     private final ApproveVisitorRequest useCase =
-            new ApproveVisitorRequest(repo, events, audit, tx, () -> NOW);
+            new ApproveVisitorRequest(repo, events, audit, tx, () -> NOW, issuance, () -> true);
 
     // ---- AC-1, AC-2, AC-3, AC-4 on the happy path ----
 
@@ -194,7 +196,7 @@ class ApproveVisitorRequestTest {
     @DisplayName("AC-7: an elapsed window is refused before anything is written")
     void elapsedWindow() {
         ApproveVisitorRequest late = new ApproveVisitorRequest(repo, events, audit, tx,
-                () -> WINDOW_TO.plusSeconds(1));
+                () -> WINDOW_TO.plusSeconds(1), issuance, () -> true);
         VisitorRequest request = repo.hold(submitted());
 
         assertThatThrownBy(() -> late.approve(UUID.randomUUID(), request.id(), null))
@@ -213,6 +215,104 @@ class ApproveVisitorRequestTest {
 
         assertThat(events.published).isEmpty();
         assertThat(audit.entries).isEmpty();
+    }
+
+    // ---- US-09.1.2: approval mints the passes ----
+
+    @Test
+    @DisplayName("AC-1: every visitor on the request gets a pass, for the approved window")
+    void approvalIssuesAPassPerVisitor() {
+        VisitorRequest request = repo.hold(submitted());
+        UUID approver = UUID.randomUUID();
+
+        RequestDecision decision = useCase.approve(approver, request.id(), null);
+
+        assertThat(issuance.calls).hasSameSizeAs(request.visitorIds());
+        assertThat(issuance.calls).allSatisfy(c -> {
+            assertThat(c.actor()).isEqualTo(approver);
+            // The approved window is the credential's window — not a default, not now-plus-N.
+            assertThat(c.from()).isEqualTo(WINDOW_FROM);
+            assertThat(c.to()).isEqualTo(WINDOW_TO);
+        });
+        assertThat(issuance.calls).extracting(Call::visitorId)
+                .containsExactlyElementsOf(request.visitorIds());
+        assertThat(decision.issued()).extracting(RequestDecision.IssuedPass::outcome)
+                .containsOnly("ISSUED");
+    }
+
+    @Test
+    @DisplayName("AC-4: an issuance failure does not undo the approval")
+    void issuanceFailureLeavesTheApprovalStanding() {
+        issuance.outcome = CredentialIssuance.Outcome.FAILED;
+        VisitorRequest request = repo.hold(submitted());
+
+        RequestDecision decision = useCase.approve(UUID.randomUUID(), request.id(), null);
+
+        // Approved, persisted, audited and published — the pass is the part that failed.
+        assertThat(decision.status()).isEqualTo("approved");
+        assertThat(request.status()).isEqualTo(RequestStatus.APPROVED);
+        assertThat(events.published).hasSize(1);
+        assertThat(decision.issued()).extracting(RequestDecision.IssuedPass::outcome)
+                .containsOnly("FAILED");
+    }
+
+    @Test
+    @DisplayName("an adapter that breaks its no-throw promise still cannot fail a committed approval")
+    void issuanceExceptionIsContained() {
+        issuance.explode = true;
+        VisitorRequest request = repo.hold(submitted());
+
+        RequestDecision decision = useCase.approve(UUID.randomUUID(), request.id(), null);
+
+        assertThat(decision.status()).isEqualTo("approved");
+        assertThat(decision.issued()).extracting(RequestDecision.IssuedPass::outcome)
+                .containsOnly("FAILED");
+    }
+
+    @Test
+    @DisplayName("AC-2: with automatic issuance switched off, nothing is minted and nothing fails")
+    void switchedOffIssuesNothing() {
+        ApproveVisitorRequest manual = new ApproveVisitorRequest(repo, events, audit, tx,
+                () -> NOW, issuance, () -> false);
+        VisitorRequest request = repo.hold(submitted());
+
+        RequestDecision decision = manual.approve(UUID.randomUUID(), request.id(), null);
+
+        assertThat(decision.status()).isEqualTo("approved");
+        assertThat(issuance.calls).isEmpty();
+        assertThat(decision.issued()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AC-5: one visitor failing does not stop the others being issued")
+    void partialFailureIsPerVisitor() {
+        VisitorRequest request = repo.hold(submitted());
+        issuance.failVisitor = request.visitorIds().get(0);
+
+        RequestDecision decision = useCase.approve(UUID.randomUUID(), request.id(), null);
+
+        assertThat(decision.issued()).hasSize(2);
+        assertThat(decision.issued().get(0).outcome()).isEqualTo("FAILED");
+        assertThat(decision.issued().get(1).outcome()).isEqualTo("ISSUED");
+    }
+
+    /** One call to the issuance port, so the arguments can be asserted rather than assumed. */
+    private record Call(UUID actor, UUID visitorId, Instant from, Instant to) {}
+
+    private static final class RecordingIssuance implements CredentialIssuance {
+        final List<Call> calls = new ArrayList<>();
+        CredentialIssuance.Outcome outcome = CredentialIssuance.Outcome.ISSUED;
+        UUID failVisitor;
+        boolean explode;
+
+        @Override
+        public Outcome issueOnApproval(UUID actor, UUID visitorId, Instant from, Instant to) {
+            calls.add(new Call(actor, visitorId, from, to));
+            if (explode) {
+                throw new IllegalStateException("an adapter that should not have thrown");
+            }
+            return visitorId.equals(failVisitor) ? Outcome.FAILED : outcome;
+        }
     }
 
     // ---- fakes ----

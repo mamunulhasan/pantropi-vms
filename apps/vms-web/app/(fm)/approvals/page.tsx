@@ -23,6 +23,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Dialog } from "@/components/ui/Dialog";
+import { PassDialog, type PassSubject } from "@/components/visits/PassDialog";
 import { Field, Textarea } from "@/components/ui/Field";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
@@ -30,13 +31,16 @@ import {
   ApprovalsApi,
   SEARCH_MAX,
   decisionError,
+  hasWorkingPass,
+  issuanceWarning,
   isStale,
   type PendingPage,
   type PendingRow,
   type QueueFilters,
+  type IssuedPass,
 } from "@/lib/approvals-api";
 import { formatInstant, formatWindow } from "@/lib/datetime";
-import { VisitsApi, type MyRequestDetail } from "@/lib/visits-api";
+import { VisitsApi, type MyRequestDetail, type VisitorLine } from "@/lib/visits-api";
 
 export default function ApprovalsPage() {
   return (
@@ -73,6 +77,8 @@ function ApprovalsScreen() {
   const [tick, setTick] = useState(0);
   const [draft, setDraft] = useState(search ?? "");
   const [opened, setOpened] = useState<PendingRow | null>(null);
+  /** Shown after an approval mints them — the request leaves the queue, so this is the one chance. */
+  const [passes, setPasses] = useState<PassSubject[]>([]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
 
@@ -253,14 +259,37 @@ function ApprovalsScreen() {
         )}
       </div>
 
+      <PassDialog subjects={passes} onClose={() => setPasses([])} />
+
       {opened && (
         <ReviewDialog
           row={opened}
-          onDone={(message) => {
+          onDone={(message, issued, visitors) => {
+            const window = opened;
             setOpened(null);
-            if (message) {
-              toast(message, "success");
-              reload();
+            if (!message) {
+              return;
+            }
+            toast(message, "success");
+            reload();
+
+            if (issued && issued.length > 0) {
+              // Only the visitors who actually have a pass get one shown. Offering a QR for a
+              // credential that failed would be a picture of something that does not exist.
+              setPasses(
+                issued.filter(hasWorkingPass).map((p) => ({
+                  visitorId: p.visitorId,
+                  visitorName:
+                    visitors?.find((v) => v.id === p.visitorId)?.fullName ?? "This visitor",
+                  validFrom: window.scheduledFrom,
+                  validTo: window.scheduledTo,
+                })),
+              );
+
+              const warning = issuanceWarning(issued);
+              if (warning) {
+                toast(warning, "error");
+              }
             }
           }}
           onStale={(message) => {
@@ -288,7 +317,7 @@ function ReviewDialog({
   onStale,
 }: {
   row: PendingRow;
-  onDone: (message: string | null) => void;
+  onDone: (message: string | null, issued?: IssuedPass[], visitors?: VisitorLine[]) => void;
   onStale: (message: string) => void;
 }) {
   const [detail, setDetail] = useState<MyRequestDetail | null>(null);
@@ -323,8 +352,10 @@ function ReviewDialog({
     setBusy(true);
     try {
       if (kind === "approve") {
-        await ApprovalsApi.approve(row.id, note.trim() || null);
-        onDone("Request approved.");
+        const decision = await ApprovalsApi.approve(row.id, note.trim() || null);
+        // Approving is what minted the passes; carry them out so the parent can show them. The
+        // request leaves the pending queue the moment this returns, so this is the only chance.
+        onDone("Request approved.", decision.issued, detail?.visitors ?? []);
       } else {
         await ApprovalsApi.reject(row.id, reason.trim());
         onDone("Request rejected. The tenant sees the reason.");

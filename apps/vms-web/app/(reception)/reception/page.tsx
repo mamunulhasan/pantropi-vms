@@ -69,7 +69,8 @@ export default function ReceptionPage() {
       <h1 className="text-xl font-semibold text-text">Pre-register a visitor</h1>
       <p className="mt-1 text-sm text-text-muted">
         The visit is filed against your floor&rsquo;s tenant and joins the approval queue like any
-        other request.
+        other request. The pass is issued and emailed to the visitor once an FM Admin approves it —
+        there is nothing to hand out from this desk.
       </p>
 
       <RegisterForm
