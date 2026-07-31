@@ -46,6 +46,8 @@ class AcsBoundaryRulesTest {
             noClasses().that().resideInAPackage(ACS_PORT_PKG)
                     .should().dependOnClassesThat().resideInAPackage(ACS_ADAPTER_PKG)
                     .because("the port is defined in VMS terms; if it references adapter types, "
-                            + "the anti-corruption layer has inverted (ADR-0002)")
-                    .allowEmptyShould(true); // port package holds only package-info until F-11.1
+                            + "the anti-corruption layer has inverted (ADR-0002)");
+    // allowEmptyShould is gone as of US-11.1.1: the port package now holds AcsPort, AcsFailure and
+    // AcsEventInbox, so this rule has something to police and passing it means something. While it
+    // was empty the rule passed vacuously, which is the state a fitness test is least useful in.
 }
