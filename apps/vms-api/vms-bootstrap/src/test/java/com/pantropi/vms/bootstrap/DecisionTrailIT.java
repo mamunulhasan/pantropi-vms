@@ -284,6 +284,93 @@ class DecisionTrailIT {
         return field(res.body(), "id");
     }
 
+    // ---- US-02.5.1: the trail across every entity, not one request ----
+
+    @Test
+    @DisplayName("the audit list returns entries beyond visitor requests, newest first")
+    void auditListSpansEntities() throws Exception {
+        String id = submit();
+        post("/api/v1/visitor-requests/" + id + "/approve", null, token("fmadmin"));
+        // A refused call writes an entry of an entirely different entity type. That is exactly the
+        // sort of row JdbcAuditTrail had been recording all along with no endpoint to read it back
+        // — the drill-down only ever answered for one visitor request.
+        get("/api/v1/admin/audit", token("tenantuser"));
+
+        var res = get("/api/v1/admin/audit?size=100", token("sysadmin"));
+
+        assertThat(res.statusCode()).isEqualTo(200);
+        assertThat(res.body()).contains("visitor_request.approve");
+        assertThat(res.body()).contains("authorization.denied").contains("\"entityType\":\"security\"");
+        // Newest first: a log is opened to see what just happened, unlike a decision trail, which
+        // is read forwards to reconstruct a sequence.
+        int approve = res.body().indexOf("visitor_request.approve");
+        int denial = res.body().indexOf("authorization.denied");
+        assertThat(denial).isLessThan(approve);
+    }
+
+    @Test
+    @DisplayName("filters narrow by action and entity type, and the counts follow")
+    void auditFiltersNarrow() throws Exception {
+        String id = submit();
+        post("/api/v1/visitor-requests/" + id + "/approve", null, token("fmadmin"));
+
+        var all = get("/api/v1/admin/audit?size=100", token("sysadmin"));
+        var narrowed = get("/api/v1/admin/audit?action=visitor_request.approve&size=100",
+                token("sysadmin"));
+
+        assertThat(narrowed.statusCode()).isEqualTo(200);
+        assertThat(narrowed.body()).contains("visitor_request.approve");
+        assertThat(narrowed.body()).doesNotContain("visitor_request.submit");
+        assertThat(total(narrowed)).isLessThanOrEqualTo(total(all));
+
+        var byEntity = get("/api/v1/admin/audit?entityType=visitor_request&size=100",
+                token("sysadmin"));
+        assertThat(byEntity.body()).contains("visitor_request");
+    }
+
+    @Test
+    @DisplayName("a window with no entries answers an empty page, not everything")
+    void auditWindowIsExclusiveAtTheTop() throws Exception {
+        submit();
+        // Entirely in the past: `to` is exclusive, so nothing written now can fall inside it.
+        var res = get("/api/v1/admin/audit?from=2000-01-01T00:00:00Z&to=2000-01-02T00:00:00Z",
+                token("sysadmin"));
+
+        assertThat(res.statusCode()).isEqualTo(200);
+        assertThat(total(res)).isZero();
+    }
+
+    @Test
+    @DisplayName("the vocabulary offers what the trail actually contains")
+    void auditVocabularyIsDerivedFromTheData() throws Exception {
+        String id = submit();
+        post("/api/v1/visitor-requests/" + id + "/approve", null, token("fmadmin"));
+
+        var res = get("/api/v1/admin/audit/vocabulary", token("sysadmin"));
+
+        assertThat(res.statusCode()).isEqualTo(200);
+        assertThat(res.body()).contains("visitor_request.approve").contains("visitor_request");
+    }
+
+    @Test
+    @DisplayName("audit.view is required — an approver and a tenant are both refused")
+    void auditListNeedsThePermission() throws Exception {
+        // FM_ADMIN can decide requests and read one request's history; neither implies the log.
+        assertThat(get("/api/v1/admin/audit", token("fmadmin")).statusCode()).isEqualTo(403);
+        assertThat(get("/api/v1/admin/audit", token("tenantuser")).statusCode()).isEqualTo(403);
+        assertThat(get("/api/v1/admin/audit", null).statusCode()).isEqualTo(401);
+    }
+
+    private static long total(HttpResponse<String> res) {
+        String body = res.body();
+        int i = body.indexOf("\"totalElements\":") + 16;
+        int j = i;
+        while (j < body.length() && Character.isDigit(body.charAt(j))) {
+            j++;
+        }
+        return Long.parseLong(body.substring(i, j));
+    }
+
     private String token(String username) throws Exception {
         String password = switch (username) {
             case "tenantuser" -> "tenant-password-1234";

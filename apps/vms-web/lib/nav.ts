@@ -51,6 +51,9 @@ export const CONFIG_TABS: readonly NavItem[] = [
   { href: "/admin/holidays", label: "Holidays", requires: [PERMISSIONS.MASTERDATA_VIEW] },
   { href: "/admin/users", label: "Users", requires: [PERMISSIONS.USER_MANAGE] },
   { href: "/admin/roles", label: "Roles", requires: [PERMISSIONS.USER_MANAGE] },
+  // The trail every other screen writes to. Its own permission, held only by SYSTEM_ADMIN — an
+  // approver can read one request's history without being able to read the whole log.
+  { href: "/admin/audit", label: "Audit log", requires: [PERMISSIONS.AUDIT_VIEW] },
 ];
 
 /**
@@ -135,9 +138,6 @@ export function homeFor(permissions: readonly string[] | null | undefined): stri
   }
   if (hasAny(permissions, FM_ENTRY)) {
     return "/approvals";
-  }
-  if (hasAny(permissions, ADMIN_ENTRY)) {
-    return "/admin";
   }
   if (hasAny(permissions, TENANT_ENTRY)) {
     return "/visits";

@@ -119,6 +119,13 @@ public class IdentityConfig {
                 new org.springframework.transaction.support.TransactionTemplate(tm));
     }
 
+    /** The read side of the same table (US-02.5.1). Separate port: writing and reading a trail
+     *  are different privileges, and nothing that reads it should be able to append. */
+    @Bean
+    com.pantropi.vms.application.identity.port.AuditLogQueries auditLogQueries(DataSource dataSource) {
+        return new JdbcAuditLogQueries(new JdbcTemplate(dataSource));
+    }
+
     @Bean
     com.pantropi.vms.application.identity.port.ActivationStore activationStore(DataSource dataSource) {
         return new JdbcActivationStore(new JdbcTemplate(dataSource));

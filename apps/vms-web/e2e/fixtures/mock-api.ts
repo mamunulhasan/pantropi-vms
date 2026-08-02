@@ -253,6 +253,8 @@ const ROLES_OVERVIEW = {
  */
 const REQUIRED: { match: RegExp; anyOf: string[] }[] = [
   { match: /^\/api\/v1\/admin\/(settings|buildings|tenants|receptions|visitor-types|pass-types|holidays)/, anyOf: ["masterdata.view"] },
+  // The trail across every entity — its own permission, held only by SYSTEM_ADMIN.
+  { match: /^\/api\/v1\/admin\/audit/, anyOf: ["audit.view"] },
   { match: /^\/api\/v1\/admin\/(users|roles)/, anyOf: ["user.manage"] },
   { match: /^\/api\/v1\/visitor-requests\/pending$/, anyOf: ["visitor.approve"] },
   { match: /^\/api\/v1\/visitor-requests\/[^/]+\/(approve|reject)$/, anyOf: ["visitor.approve"] },
@@ -421,6 +423,44 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
     }
 
     // ---- the reception desk ----
+    if (path === "/api/v1/admin/audit/vocabulary") {
+      return json({
+        actions: ["settings.update", "visitor_request.approve"],
+        entityTypes: ["security", "system_setting", "visitor_request"],
+      });
+    }
+    if (path === "/api/v1/admin/audit") {
+      const action = new URL(request.url()).searchParams.get("action");
+      const all = [
+        {
+          id: "12",
+          at: "2026-08-02T09:15:00Z",
+          action: "visitor_request.approve",
+          entityType: "visitor_request",
+          entityId: VISIT_REQUEST.id,
+          actorId: FM_USER.userId,
+          actor: FM_USER.displayName,
+          beforeState: '{"status":"submitted"}',
+          afterState: '{"status":"approved"}',
+          ipAddress: "127.0.0.1/32",
+        },
+        {
+          id: "11",
+          at: "2026-08-02T08:02:00Z",
+          action: "settings.update",
+          entityType: "system_setting",
+          entityId: "default_pass_valid_hours",
+          actorId: SYSADMIN.userId,
+          // An entry whose account has since been removed still reads.
+          actor: null,
+          beforeState: '{"value":"12"}',
+          afterState: '{"value":"13"}',
+          ipAddress: null,
+        },
+      ];
+      const content = action ? all.filter((e) => e.action === action) : all;
+      return json({ content, totalElements: content.length, page: 0, size: 20 });
+    }
     if (path === "/api/v1/pre-registrations" && request.method() === "POST") {
       const body = JSON.parse(request.postData() || "{}");
       // The floor-hosts-several-tenants refusal, driven by a marker name so a test can ask for it.
