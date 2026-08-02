@@ -20,6 +20,7 @@
  */
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Dialog } from "@/components/ui/Dialog";
@@ -183,10 +184,11 @@ function ApprovalsScreen() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Approvals</h1>
-      <p className="mt-1 text-sm text-text-muted">
-        Visitor requests awaiting a decision, newest first. Every decision is audited.
-      </p>
+      <PageHeader
+        kicker="Facility"
+        title="Approvals"
+        description="Visitor requests awaiting a decision, newest first. Every decision is audited."
+      />
 
       <section aria-label="Queue totals" className="mt-4">
         <StatTiles

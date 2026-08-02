@@ -16,6 +16,7 @@
  * sidebar follows (US-06.3.2 AC-1), and the reason the tab list is filtered rather than styled.
  */
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { usePathname } from "next/navigation";
 import { CONFIG_TABS, visibleNavItems } from "@/lib/nav";
 import { useAuth } from "@/lib/use-auth";
@@ -27,10 +28,11 @@ export default function ConfigLayout({ children }: { children: React.ReactNode }
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Configuration</h1>
-      <p className="mt-1 text-sm text-text-muted">
-        The reference data every other screen reads. Changes here are audited.
-      </p>
+      <PageHeader
+        kicker="System"
+        title="Configuration"
+        description="The reference data every other screen reads. Changes here are audited."
+      />
 
       <nav aria-label="Configuration sections" className="mt-4 border-b border-border">
         <ul className="-mb-px flex flex-wrap gap-1">

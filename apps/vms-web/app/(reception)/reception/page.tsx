@@ -18,6 +18,7 @@
  * no floor and no reception — so a desk cannot register a visit against another floor by asking.
  */
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
@@ -66,12 +67,17 @@ export default function ReceptionPage() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-xl font-semibold text-text">Pre-register a visitor</h1>
-      <p className="mt-1 text-sm text-text-muted">
-        The visit is filed against your floor&rsquo;s tenant and joins the approval queue like any
-        other request. The pass is issued and emailed to the visitor once an FM Admin approves it —
-        there is nothing to hand out from this desk.
-      </p>
+      <PageHeader
+        kicker="Reception"
+        title="Pre-register a visitor"
+        description={
+          <>
+            The visit is filed against your floor&rsquo;s tenant and joins the approval queue like
+            any other request. The pass is issued and emailed to the visitor once an FM Admin
+            approves it — there is nothing to hand out from this desk.
+          </>
+        }
+      />
 
       <RegisterForm
         visitorTypes={visitorTypes}

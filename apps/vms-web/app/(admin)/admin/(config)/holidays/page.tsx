@@ -13,6 +13,7 @@
  * preview, and the screen renders it as one (fix the lines, resubmit).
  */
 import { useCallback, useEffect, useState } from "react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { Field, Input } from "@/components/ui/Field";
@@ -64,7 +65,7 @@ export default function HolidaysPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text">Holiday calendar</h2>
+      <PageHeader title="Holiday calendar" level={2} />
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
         <div>

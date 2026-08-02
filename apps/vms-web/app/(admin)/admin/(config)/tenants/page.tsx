@@ -13,6 +13,8 @@
  */
 import { Suspense, useEffect, useState } from "react";
 import { ListToolbar } from "@/components/admin/ListToolbar";
+import { ActiveTag } from "@/components/ui/StatusTag";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -60,7 +62,7 @@ function TenantsScreen() {
     {
       key: "status",
       header: "Status",
-      render: (t) => (t.active ? "Active" : <span className="text-text-muted">Inactive</span>),
+      render: (t) => <ActiveTag active={t.active} />,
     },
     {
       key: "actions",
@@ -103,7 +105,7 @@ function TenantsScreen() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text">Tenants</h2>
+      <PageHeader title="Tenants" level={2} />
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search tenants">
           {canEdit && <Button onClick={() => setEditing("new")}>New tenant</Button>}

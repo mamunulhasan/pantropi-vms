@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { Field, Input, Textarea } from "@/components/ui/Field";
@@ -88,7 +89,7 @@ export default function VisitDetailPage() {
       </nav>
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-xl font-semibold text-text">Visit request</h1>
+        <PageHeader title="Visit request" />
         <StatusTag label={STATUS_LABELS[request.status]} tone={requestTone(request.status)} />
       </div>
 

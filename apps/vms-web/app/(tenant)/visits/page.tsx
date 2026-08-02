@@ -15,6 +15,8 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusTag, requestTone } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
@@ -111,41 +113,36 @@ function VisitsScreen() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-text">My visit requests</h1>
-          <p className="mt-1 text-sm text-text-muted">
+      <PageHeader
+        kicker="Tenant"
+        title="My visit requests"
+        description={
+          <>
             Requests from your tenant, newest first.
             {revalidatedAt && <> Checked for updates at {revalidatedAt}.</>}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setTick((t) => t + 1)} busy={loading}>
-            Check for updates
-          </Button>
-          <Button onClick={() => router.push("/visits/new")}>New request</Button>
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setTick((t) => t + 1)} busy={loading}>
+              Check for updates
+            </Button>
+            <Button onClick={() => router.push("/visits/new")}>New request</Button>
+          </>
+        }
+      />
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
-        <div>
-          <label htmlFor="filter-status" className="block text-sm font-medium text-text">
-            Status
-          </label>
-          <select
-            id="filter-status"
-            value={status ?? "all"}
-            onChange={(e) => updateUrl({ status: e.target.value === "all" ? undefined : e.target.value })}
-            className="mt-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
-          >
-            <option value="all">All</option>
-            {REQUEST_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SegmentedControl
+          label="Status"
+          name="filter-status"
+          value={statusParam ?? "all"}
+          onChange={(next) => updateUrl({ status: next === "all" ? undefined : next })}
+          options={[
+            { value: "all", label: "All" },
+            ...REQUEST_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] })),
+          ]}
+        />
         <div>
           <label htmlFor="filter-from" className="block text-sm font-medium text-text">
             Visits from

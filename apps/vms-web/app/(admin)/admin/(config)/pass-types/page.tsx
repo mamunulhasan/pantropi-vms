@@ -9,6 +9,8 @@
  */
 import { Suspense, useState } from "react";
 import { ListToolbar } from "@/components/admin/ListToolbar";
+import { ActiveTag } from "@/components/ui/StatusTag";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -73,7 +75,7 @@ function PassTypesScreen() {
     {
       key: "status",
       header: "Status",
-      render: (p) => (p.active ? "Active" : <span className="text-text-muted">Inactive</span>),
+      render: (p) => <ActiveTag active={p.active} />,
     },
     {
       key: "actions",
@@ -99,7 +101,7 @@ function PassTypesScreen() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text">Pass types</h2>
+      <PageHeader title="Pass types" level={2} />
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search pass types">
           {canEdit && <Button onClick={() => setEditing("new")}>New pass type</Button>}

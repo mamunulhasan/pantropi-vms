@@ -11,6 +11,7 @@
  * link can never appear here that the nav withheld.
  */
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ADMIN_NAV, CONFIG_TABS, visibleNavItems } from "@/lib/nav";
 import { useAuth } from "@/lib/use-auth";
 
@@ -25,10 +26,11 @@ export default function AdminHome() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Administration</h1>
-      <p className="mt-1 text-sm text-text-muted">
-        Configuration and user administration. Every change here is audited.
-      </p>
+      <PageHeader
+        kicker="System"
+        title="Administration"
+        description="Configuration and user administration. Every change here is audited."
+      />
 
       <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {destinations.map((item) => (

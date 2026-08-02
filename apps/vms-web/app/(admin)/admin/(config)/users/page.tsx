@@ -18,6 +18,8 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ActiveTag } from "@/components/ui/StatusTag";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -208,7 +210,7 @@ function UsersScreen() {
     {
       key: "status",
       header: "Status",
-      render: (u) => (u.active ? "Active" : <span className="text-text-muted">Inactive</span>),
+      render: (u) => <ActiveTag active={u.active} />,
     },
     {
       key: "actions",
@@ -250,7 +252,7 @@ function UsersScreen() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text">Users</h2>
+      <PageHeader title="Users" level={2} />
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-2">
