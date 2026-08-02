@@ -53,13 +53,6 @@ public class CredentialIntegrationConfig {
                     credentials, acs, audit, sendEmail);
         }
 
-        /** Lets an approval mint the passes (US-09.1.2), without the visitor context knowing how. */
-        @Bean
-        com.pantropi.vms.application.visitor.port.CredentialIssuance credentialIssuance(
-                com.pantropi.vms.application.credential.usecase.IssueCredential issueCredential) {
-            return new IssueCredentialBridge(issueCredential);
-        }
-
         /** Reads back the pass for the portal's renderer. No ACS of its own, but the same route. */
         @Bean
         com.pantropi.vms.application.credential.usecase.GetCredentialPass getCredentialPass(
@@ -69,19 +62,33 @@ public class CredentialIntegrationConfig {
     }
 
     /**
-     * What approval does when no access control system is configured: nothing, successfully.
+     * How an approval mints passes — or declines to, when no access control system is configured.
      *
-     * <p>{@code ApproveVisitorRequest} needs a {@link com.pantropi.vms.application.visitor.port.CredentialIssuance}
-     * in every profile, but the real one lives in {@link IssuanceConfig} behind {@code vms.acs.mode}.
-     * Without this fallback, every ACS-less profile would fail to start on a missing bean — which is
-     * exactly the defect that took down the integration tests when the issuance use case was first
-     * wired, and it is worth one bean to not build it a second time.
+     * <p>One bean, chosen at wiring time from whether {@code IssueCredential} exists, rather than
+     * two beans and a condition. The earlier shape had the real bridge inside {@link IssuanceConfig}
+     * and a {@code @ConditionalOnMissingBean} fallback out here, and that is a trap:
+     * {@code @ConditionalOnMissingBean} is only dependable inside auto-configuration, where Spring
+     * controls the order. In a user {@code @Configuration} it is evaluated in definition order, so
+     * whenever the fallback was processed before {@code IssuanceConfig} registered the real one,
+     * <em>both</em> were registered and every injection point saw two candidates. It passed locally
+     * and failed on CI, which is exactly the failure mode a condition-free bean removes.
+     *
+     * <p>{@link ObjectProvider} is what makes that possible: it resolves lazily, so asking for a
+     * bean that the ACS gate never created is an empty answer rather than a startup failure.
      */
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(
-            com.pantropi.vms.application.visitor.port.CredentialIssuance.class)
-    com.pantropi.vms.application.visitor.port.CredentialIssuance noCredentialIssuance() {
-        return (actor, visitorId, from, to) ->
-                com.pantropi.vms.application.visitor.port.CredentialIssuance.Outcome.SKIPPED;
+    com.pantropi.vms.application.visitor.port.CredentialIssuance credentialIssuance(
+            org.springframework.beans.factory.ObjectProvider<
+                    com.pantropi.vms.application.credential.usecase.IssueCredential> issuance) {
+
+        com.pantropi.vms.application.credential.usecase.IssueCredential useCase =
+                issuance.getIfAvailable();
+
+        // No ACS means no issuance, not no application: the approval still stands, and the
+        // per-visitor outcome says plainly that nothing was minted.
+        return useCase == null
+                ? (actor, visitorId, from, to) ->
+                        com.pantropi.vms.application.visitor.port.CredentialIssuance.Outcome.SKIPPED
+                : new IssueCredentialBridge(useCase);
     }
 }
