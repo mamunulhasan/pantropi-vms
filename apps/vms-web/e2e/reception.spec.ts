@@ -7,7 +7,7 @@
  */
 import { expect, test } from "@playwright/test";
 
-// "From" and "To" are matched exactly: role-name matching is substring-based, and "Visitor name"
+// "From" and "To" are matched exactly: role-name matching is substring-based, and "Full name"
 // contains "to".
 import { FM_USER, RECEPTIONIST, TENANT_USER, mockApi, signIn } from "./fixtures/mock-api";
 
@@ -46,13 +46,17 @@ test.describe("pre-registering", () => {
     });
 
     await page.goto("/reception");
-    await page.getByRole("textbox", { name: "Visitor name" }).fill("Grace Lim");
+    await page.getByRole("textbox", { name: "Full name" }).fill("Grace Lim");
     await page.getByRole("textbox", { name: "From", exact: true }).fill("2099-03-01T10:00");
     await page.getByRole("textbox", { name: "To", exact: true }).fill("2099-03-01T12:00");
     await page.getByRole("button", { name: "Pre-register visitor" }).click();
 
     await expect.poll(() => posts.length).toBe(1);
     const body = JSON.parse(posts[0]);
+    // The desk sends the list; the flat field echoes the first person, which is what the API
+    // ignores when `visitors` is present.
+    expect(body.visitors).toHaveLength(1);
+    expect(body.visitors[0].fullName).toBe("Grace Lim");
     expect(body.fullName).toBe("Grace Lim");
     // A desk cannot register against another floor by asking: the command has no such field.
     expect(body).not.toHaveProperty("floorId");
@@ -67,7 +71,7 @@ test.describe("pre-registering", () => {
 
     await expect(page.getByText("Nothing registered yet")).toBeVisible();
 
-    await page.getByRole("textbox", { name: "Visitor name" }).fill("Grace Lim");
+    await page.getByRole("textbox", { name: "Full name" }).fill("Grace Lim");
     await page.getByRole("textbox", { name: "From", exact: true }).fill("2099-03-01T10:00");
     await page.getByRole("textbox", { name: "To", exact: true }).fill("2099-03-01T12:00");
     await page.getByRole("button", { name: "Pre-register visitor" }).click();
@@ -77,6 +81,46 @@ test.describe("pre-registering", () => {
     // The only reason the list exists: these endpoints are keyed on an id the 201 alone carries.
     await expect(page.getByRole("button", { name: "Amend" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+  });
+
+  test("several people register under one visit, and each gets its own desk row", async ({
+    page,
+  }) => {
+    const api = await mockApi(page, RECEPTIONIST);
+    await signIn(page, "**/reception");
+    await page.goto("/reception");
+
+    await page.getByRole("textbox", { name: "Full name" }).first().fill("Grace Lim");
+    await page.getByRole("textbox", { name: "Phone" }).first().fill("+8801710000001");
+    await page.getByRole("button", { name: "Add another visitor" }).click();
+    await page.getByRole("textbox", { name: "Full name" }).nth(1).fill("Ada Lovelace");
+    await page.getByRole("textbox", { name: "Phone" }).nth(1).fill("+8801710000002");
+    await page.getByRole("textbox", { name: "From", exact: true }).fill("2099-03-01T10:00");
+    await page.getByRole("textbox", { name: "To", exact: true }).fill("2099-03-01T12:00");
+
+    const post = page.waitForRequest(
+      (r) => r.url().includes("/api/v1/pre-registrations") && r.method() === "POST",
+    );
+    await page.getByRole("button", { name: "Pre-register visitor" }).click();
+    const body = JSON.parse((await post).postData() || "{}");
+
+    // One request, one window, two people — that is what "under a single visit" means.
+    expect(body.visitors).toHaveLength(2);
+    expect(body.visitors.map((v: { fullName: string }) => v.fullName)).toEqual([
+      "Grace Lim",
+      "Ada Lovelace",
+    ]);
+    // The mobile number is carried for each of them: the desk calls the visitor, not the host.
+    expect(body.visitors.map((v: { phone: string }) => v.phone)).toEqual([
+      "+8801710000001",
+      "+8801710000002",
+    ]);
+    expect(body.appointmentFrom).toBeTruthy();
+
+    // Amend and cancel are per visitor, so each person needs a row of their own.
+    await expect(page.getByRole("row", { name: /Grace Lim/ })).toBeVisible();
+    await expect(page.getByRole("row", { name: /Ada Lovelace/ })).toBeVisible();
+    expect(api.forbidden).toEqual([]);
   });
 
   test("the desk says the list is session-scoped rather than implying a day's record", async ({ page }) => {
@@ -97,7 +141,7 @@ test.describe("pre-registering", () => {
 
     await page.goto("/reception");
     // The stub refuses this name without a tenantId, exactly as a shared floor does.
-    await page.getByRole("textbox", { name: "Visitor name" }).fill("Ambiguous Visitor");
+    await page.getByRole("textbox", { name: "Full name" }).fill("Ambiguous Visitor");
     await page.getByRole("textbox", { name: "From", exact: true }).fill("2099-03-01T10:00");
     await page.getByRole("textbox", { name: "To", exact: true }).fill("2099-03-01T12:00");
     await page.getByRole("button", { name: "Pre-register visitor" }).click();
@@ -120,7 +164,7 @@ test.describe("pre-registering", () => {
     const api = await mockApi(page, RECEPTIONIST);
     await page.goto("/reception");
 
-    await page.getByRole("textbox", { name: "Visitor name" }).fill("Grace Lim");
+    await page.getByRole("textbox", { name: "Full name" }).fill("Grace Lim");
     await page.getByRole("textbox", { name: "From", exact: true }).fill("2099-03-01T12:00");
     await page.getByRole("textbox", { name: "To", exact: true }).fill("2099-03-01T10:00");
     await page.getByRole("button", { name: "Pre-register visitor" }).click();
@@ -144,7 +188,7 @@ test.describe("pre-registering", () => {
     });
 
     await page.goto("/reception");
-    await page.getByRole("textbox", { name: "Visitor name" }).fill("Late Arrival");
+    await page.getByRole("textbox", { name: "Full name" }).fill("Late Arrival");
     await page.getByRole("textbox", { name: "From", exact: true }).fill("2020-03-01T10:00");
     await page.getByRole("textbox", { name: "To", exact: true }).fill("2020-03-01T12:00");
     await page.getByRole("button", { name: "Pre-register visitor" }).click();
@@ -159,7 +203,7 @@ test.describe("cancelling", () => {
     await mockApi(page, RECEPTIONIST);
     await page.goto("/reception");
 
-    await page.getByRole("textbox", { name: "Visitor name" }).fill("Grace Lim");
+    await page.getByRole("textbox", { name: "Full name" }).fill("Grace Lim");
     await page.getByRole("textbox", { name: "From", exact: true }).fill("2099-03-01T10:00");
     await page.getByRole("textbox", { name: "To", exact: true }).fill("2099-03-01T12:00");
     await page.getByRole("button", { name: "Pre-register visitor" }).click();

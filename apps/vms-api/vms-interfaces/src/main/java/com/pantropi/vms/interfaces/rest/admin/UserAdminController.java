@@ -95,11 +95,12 @@ public class UserAdminController {
     @GetMapping
     public Page list(@RequestParam(required = false) String role,
                      @RequestParam(required = false) UUID receptionId,
+                     @RequestParam(required = false) UUID tenantId,
                      @RequestParam(required = false) Boolean active,
                      @RequestParam(defaultValue = "0") int page,
                      @RequestParam(defaultValue = "20") int size,
                      @RequestParam(defaultValue = "username") String sort) {
-        return users.list(new UserFilter(role, receptionId, active, page, size, sort));
+        return users.list(new UserFilter(role, receptionId, tenantId, active, page, size, sort));
     }
 
     // ---- uniform 400s for validation failures ----

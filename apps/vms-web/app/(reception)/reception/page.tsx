@@ -18,6 +18,13 @@
  * no floor and no reception — so a desk cannot register a visit against another floor by asking.
  */
 import { useEffect, useState } from "react";
+import { type VisitorPayload } from "@/lib/visits-api";
+import {
+  VisitorRows,
+  cleanVisitors,
+  emptyVisitor,
+  validateVisitors,
+} from "@/components/visits/VisitorRows";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
@@ -220,15 +227,14 @@ function RegisterForm({
   onRegistered: (entry: DeskEntry) => void;
 }) {
   const [values, setValues] = useState({
-    fullName: "",
-    company: "",
-    email: "",
-    phone: "",
     visitorTypeId: "",
     purpose: "",
     from: "",
     to: "",
   });
+  // One visit, one window, one or many people (US-08.1.1). VisitorRows already owns add/remove,
+  // the 50 cap and the per-row validation the tenant form uses — the desk asks the same questions.
+  const [visitors, setVisitors] = useState<VisitorPayload[]>([emptyVisitor()]);
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -239,16 +245,8 @@ function RegisterForm({
   const [tenantId, setTenantId] = useState("");
 
   function reset() {
-    setValues({
-      fullName: "",
-      company: "",
-      email: "",
-      phone: "",
-      visitorTypeId: "",
-      purpose: "",
-      from: "",
-      to: "",
-    });
+    setValues({ visitorTypeId: "", purpose: "", from: "", to: "" });
+    setVisitors([emptyVisitor()]);
     setTenantChoice(null);
     setTenantId("");
   }
@@ -256,8 +254,7 @@ function RegisterForm({
   async function submit(withTenantId: string | null) {
     const appointmentFrom = localInputToInstant(values.from);
     const appointmentTo = localInputToInstant(values.to);
-    const found: string[] = [];
-    if (!values.fullName.trim()) found.push("A visitor name is required.");
+    const found: string[] = [...validateVisitors(visitors)];
     if (!appointmentFrom) found.push("Choose when the appointment starts.");
     if (!appointmentTo) found.push("Choose when the appointment ends.");
     if (appointmentFrom && appointmentTo && appointmentTo <= appointmentFrom) {
@@ -268,33 +265,48 @@ function RegisterForm({
       return;
     }
 
+    // The visitor type is chosen once for the visit and carried onto each person: a group walking
+    // up to the desk together is one kind of visit. The API takes it per visitor, so if that ever
+    // needs to differ the shape already allows it.
+    const people = cleanVisitors(visitors).map((v) => ({
+      ...v,
+      visitorTypeId: values.visitorTypeId || null,
+    }));
+
     const req: PreRegistrationRequest = {
-      fullName: values.fullName.trim(),
-      company: values.company.trim() || null,
-      email: values.email.trim() || null,
-      phone: values.phone.trim() || null,
+      // The flat fields are what a single-visitor caller sends; this screen always sends the list,
+      // and the API ignores the flat ones when it is present.
+      fullName: people[0]?.fullName ?? "",
       visitorTypeId: values.visitorTypeId || null,
       purpose: values.purpose.trim() || null,
       tenantId: withTenantId,
       appointmentFrom,
       appointmentTo,
+      visitors: people,
     };
 
     setBusy(true);
     try {
       const result = await ReceptionApi.register(req);
-      onRegistered({
-        visitorId: result.visitorId,
-        requestId: result.requestId,
-        fullName: req.fullName,
-        company: req.company ?? null,
-        email: req.email ?? null,
-        phone: req.phone ?? null,
-        visitorTypeId: req.visitorTypeId ?? null,
-        appointmentFrom,
-        appointmentTo,
-        registeredAt: new Date().toISOString(),
-        cancelled: false,
+      // One desk row per person, keyed by the id the API returned for each — amend and cancel are
+      // per visitor, so a group registered together is still cancelled one at a time.
+      const registeredAt = new Date().toISOString();
+      result.visitorIds.forEach((visitorId, i) => {
+        const person = people[i];
+        if (!person) return;
+        onRegistered({
+          visitorId,
+          requestId: result.requestId,
+          fullName: person.fullName,
+          company: person.company ?? null,
+          email: person.email ?? null,
+          phone: person.phone ?? null,
+          visitorTypeId: values.visitorTypeId || null,
+          appointmentFrom,
+          appointmentTo,
+          registeredAt,
+          cancelled: false,
+        });
       });
       reset();
     } catch (e) {
@@ -336,43 +348,9 @@ function RegisterForm({
           </ul>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Visitor name" required>
-            <Input
-              value={values.fullName}
-              onChange={(e) => setValues({ ...values, fullName: e.target.value })}
-              required
-              maxLength={200}
-              autoComplete="off"
-              autoFocus
-            />
-          </Field>
-          <Field label="Company">
-            <Input
-              value={values.company}
-              onChange={(e) => setValues({ ...values, company: e.target.value })}
-              maxLength={200}
-              autoComplete="off"
-            />
-          </Field>
-          <Field label="Email">
-            <Input
-              type="email"
-              value={values.email}
-              onChange={(e) => setValues({ ...values, email: e.target.value })}
-              maxLength={320}
-              autoComplete="off"
-            />
-          </Field>
-          <Field label="Phone">
-            <Input
-              type="tel"
-              value={values.phone}
-              onChange={(e) => setValues({ ...values, phone: e.target.value })}
-              maxLength={40}
-              autoComplete="off"
-            />
-          </Field>
+        <VisitorRows visitors={visitors} onChange={setVisitors} disabled={busy} />
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field label="Visitor type">
             <Select
               value={values.visitorTypeId}

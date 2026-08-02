@@ -329,6 +329,8 @@ export type AdminUser = {
 export type UserListParams = {
   role?: string;
   receptionId?: string;
+  /** Narrows to one tenant organisation's accounts. */
+  tenantId?: string;
   active?: boolean;
   page?: number;
   size?: number;
@@ -340,6 +342,7 @@ export function userListQuery(params: UserListParams): string {
   const q = new URLSearchParams();
   if (params.role) q.set("role", params.role);
   if (params.receptionId) q.set("receptionId", params.receptionId);
+  if (params.tenantId) q.set("tenantId", params.tenantId);
   if (params.active !== undefined) q.set("active", String(params.active));
   if (params.page) q.set("page", String(params.page));
   if (params.size !== undefined) q.set("size", String(params.size));

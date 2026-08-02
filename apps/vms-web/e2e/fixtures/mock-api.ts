@@ -424,7 +424,10 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
     if (path === "/api/v1/pre-registrations" && request.method() === "POST") {
       const body = JSON.parse(request.postData() || "{}");
       // The floor-hosts-several-tenants refusal, driven by a marker name so a test can ask for it.
-      if (!body.tenantId && String(body.fullName || "").includes("Ambiguous")) {
+      const firstName = String(
+        body.visitors?.[0]?.fullName ?? body.fullName ?? "",
+      );
+      if (!body.tenantId && firstName.includes("Ambiguous")) {
         return json(
           {
             error: "tenant_required",
@@ -433,12 +436,23 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
           400,
         );
       }
+      // One id per person, so a group registered together gets a desk row each. The first is
+      // repeated as `visitorId` exactly as the API does, for callers that predate the list.
+      const count: number = Array.isArray(body.visitors) && body.visitors.length > 0
+        ? body.visitors.length
+        : 1;
+      const visitorIds = Array.from({ length: count }, (_, i) =>
+        i === 0
+          ? PRE_REGISTERED_VISITOR_ID
+          : `${PRE_REGISTERED_VISITOR_ID.slice(0, -1)}${i}`,
+      );
       return json(
         {
           requestId: VISIT_REQUEST.id,
-          visitorId: PRE_REGISTERED_VISITOR_ID,
+          visitorId: visitorIds[0],
           tenantId: TENANT.id,
           receptionId: RECEPTION.id,
+          visitorIds,
         },
         201,
       );

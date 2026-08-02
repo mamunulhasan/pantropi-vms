@@ -95,9 +95,14 @@ public final class PreRegisterVisitor {
         if (command.hostId() != null && !tenants.hostBelongsToTenant(command.hostId(), tenantId)) {
             throw new SubmitVisitorRequest.HostNotInTenant();
         }
-        if (command.visitorTypeId() != null
-                && !visitorTypes.isSelectable(command.visitorTypeId())) {
-            throw new SubmitVisitorRequest.UnknownVisitorType();
+        List<Guest> guests = command.guests();
+        // Every type is resolved before a single Visitor is built, so an unknown or retired one
+        // refuses the whole registration rather than half of it — the same rule the tenant path
+        // applies in SubmitVisitorRequest.
+        for (Guest guest : guests) {
+            if (guest.visitorTypeId() != null && !visitorTypes.isSelectable(guest.visitorTypeId())) {
+                throw new SubmitVisitorRequest.UnknownVisitorType();
+            }
         }
 
         // AC-1: the appointment window is the request window. vms.visitors.appointment_from/to are
@@ -107,10 +112,13 @@ public final class PreRegisterVisitor {
 
         VisitorRequest request = VisitorRequest.submit(tenantId, command.hostId(), receptionist,
                 window, command.purpose(),
-                List.of(Visitor.named(command.fullName(), command.email(), command.phone(),
-                        command.company(), command.visitorTypeId())));
+                guests.stream()
+                        .map(g -> Visitor.named(g.fullName(), g.email(), g.phone(), g.company(),
+                                g.visitorTypeId()))
+                        .toList());
 
-        UUID visitorId = request.visitors().get(0).id();
+        List<UUID> visitorIds = request.visitorIds();
+        UUID visitorId = visitorIds.get(0);
 
         return tx.call(() -> {
             requests.save(request);
@@ -118,8 +126,10 @@ public final class PreRegisterVisitor {
             // AC-3: who registered it, from which reception point, and for whom — by id. The
             // projection decides what may appear; the reception id is added because "which desk did
             // this come from" is the question an incident review asks first.
-            audit.record(receptionist, "visitor.pre_register", "visitor", visitorId.toString(),
-                    null);
+            // One row per person, not one per request: an incident review asks about a visitor.
+            for (UUID id : visitorIds) {
+                audit.record(receptionist, "visitor.pre_register", "visitor", id.toString(), null);
+            }
             audit.recordChange(receptionist, "visitor_request.pre_register", "visitor_request",
                     request.id().toString(), null,
                     AuditProjection.start()
@@ -127,6 +137,7 @@ public final class PreRegisterVisitor {
                             .put("receptionId", station.receptionId())
                             .put("tenantId", tenantId)
                             .put("visitorId", visitorId)
+                            .putRaw("visitorCount", String.valueOf(visitorIds.size()))
                             .put("appointmentFrom", window.from())
                             .put("appointmentTo", window.to())
                             .put("tenantDerived", command.tenantId() == null)
@@ -136,14 +147,22 @@ public final class PreRegisterVisitor {
             events.publish("VisitorPreRegistered", "visitor_request", request.id(),
                     "{\"requestId\":\"" + request.id() + "\","
                             + "\"visitorId\":\"" + visitorId + "\","
+                            + "\"visitorIds\":" + jsonIds(visitorIds) + ","
                             + "\"tenantId\":\"" + tenantId + "\","
                             + "\"receptionId\":\"" + station.receptionId() + "\","
                             + "\"registeredBy\":\"" + receptionist + "\","
                             + "\"appointmentFrom\":\"" + window.from() + "\","
                             + "\"appointmentTo\":\"" + window.to() + "\"}");
 
-            return new Registered(request.id(), visitorId, tenantId, station.receptionId());
+            return new Registered(request.id(), visitorId, tenantId, station.receptionId(),
+                    visitorIds);
         });
+    }
+
+    /** Ids only, same shape the approval event uses. */
+    private static String jsonIds(List<UUID> ids) {
+        return ids.stream().map(id -> "\"" + id + "\"")
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
     }
 
     /**
@@ -193,11 +212,43 @@ public final class PreRegisterVisitor {
      * server-determined. {@code tenantId} is present but is a selection within the caller's own
      * floor, checked above; it cannot widen what they may do.
      */
+    /**
+     * @param visitors several people arriving on one visit. Empty or null means the flat fields
+     *                 above describe the single visitor — the shape every existing caller sends,
+     *                 and its behaviour is unchanged. When this list is present it is
+     *                 authoritative and the flat fields are ignored, so there is never a question
+     *                 of which of two sources won.
+     */
     public record Command(String fullName, String email, String phone, String company,
                           UUID visitorTypeId, UUID hostId, UUID tenantId, String purpose,
-                          Instant appointmentFrom, Instant appointmentTo) {}
+                          Instant appointmentFrom, Instant appointmentTo, List<Guest> visitors) {
 
-    public record Registered(UUID requestId, UUID visitorId, UUID tenantId, UUID receptionId) {}
+        /** The single-visitor form, kept so existing callers read unchanged. */
+        public Command(String fullName, String email, String phone, String company,
+                       UUID visitorTypeId, UUID hostId, UUID tenantId, String purpose,
+                       Instant appointmentFrom, Instant appointmentTo) {
+            this(fullName, email, phone, company, visitorTypeId, hostId, tenantId, purpose,
+                    appointmentFrom, appointmentTo, List.of());
+        }
+
+        /** The people, however the caller expressed them. Never empty — the domain refuses that. */
+        List<Guest> guests() {
+            return visitors == null || visitors.isEmpty()
+                    ? List.of(new Guest(fullName, email, phone, company, visitorTypeId))
+                    : visitors;
+        }
+    }
+
+    /** One arriving person. Phone is carried through: a desk calls the visitor, not the host. */
+    public record Guest(String fullName, String email, String phone, String company,
+                        UUID visitorTypeId) {}
+
+    /**
+     * @param visitorId  the first visitor, kept so existing callers read unchanged
+     * @param visitorIds every visitor on the request, in the order they were given
+     */
+    public record Registered(UUID requestId, UUID visitorId, UUID tenantId, UUID receptionId,
+                             List<UUID> visitorIds) {}
 
     // ---- failures ----
 

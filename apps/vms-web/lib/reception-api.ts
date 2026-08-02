@@ -31,6 +31,21 @@ export type PreRegistrationRequest = {
   purpose?: string | null;
   appointmentFrom: string;
   appointmentTo: string;
+  /**
+   * Several people arriving together on one visit. Omit it and the flat fields above describe the
+   * single visitor, which is what every caller sent before this existed. Send it and it wins, so
+   * there is never a question of which of two sources the API read.
+   */
+  visitors?: PreRegistrationVisitor[];
+};
+
+/** One arriving person. Phone is kept: the desk calls the visitor, not only the host. */
+export type PreRegistrationVisitor = {
+  fullName: string;
+  email?: string | null;
+  phone?: string | null;
+  company?: string | null;
+  visitorTypeId?: string | null;
 };
 
 export type Registered = {
@@ -38,6 +53,8 @@ export type Registered = {
   visitorId: string;
   tenantId: string;
   receptionId: string;
+  /** Every visitor on the request, in the order they were sent. */
+  visitorIds: string[];
 };
 
 /** Amend coalesces against stored values: an absent field is left alone. */

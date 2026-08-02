@@ -52,6 +52,8 @@ export default function UsersPage() {
 }
 
 function UsersScreen() {
+  // The same active-tenant list the assignment pickers use — one fetch shape, not two.
+  const { tenants } = useAssignmentOptions();
   useAuth(); // the shell guards; reading keeps this screen re-rendering on session changes
   const { toast } = useToast();
   const router = useRouter();
@@ -63,6 +65,7 @@ function UsersScreen() {
     const active = searchParams.get("active");
     return {
       role: searchParams.get("role") ?? undefined,
+      tenantId: searchParams.get("tenantId") ?? undefined,
       active: active === null ? undefined : active === "true",
       page: Number.isInteger(pageRaw) && pageRaw > 0 ? pageRaw : 0,
       size: 20,
@@ -71,7 +74,13 @@ function UsersScreen() {
   }, [searchParams]);
 
   const updateUrl = useCallback(
-    (next: Partial<{ role: string | undefined; active: boolean | undefined; page: number; sort: string }>) => {
+    (next: Partial<{
+      role: string | undefined;
+      tenantId: string | undefined;
+      active: boolean | undefined;
+      page: number;
+      sort: string;
+    }>) => {
       const q = new URLSearchParams(searchParams);
       const merged = { ...params, ...next };
       const page = Object.keys(next).some((k) => k !== "page") ? 0 : (merged.page ?? 0);
@@ -270,6 +279,27 @@ function UsersScreen() {
               {roles.map((r) => (
                 <option key={r.code} value={r.code}>
                   {r.code}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            {/* "Which accounts belong to this tenant" had no answer before: the tenant list could
+                report a dependent count and nothing else. It is the question an administrator asks
+                before deactivating an organisation. */}
+            <label htmlFor="filter-tenant" className="block text-sm font-medium text-text">
+              Tenant
+            </label>
+            <select
+              id="filter-tenant"
+              value={params.tenantId ?? ""}
+              onChange={(e) => updateUrl({ tenantId: e.target.value || undefined })}
+              className="mt-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+            >
+              <option value="">All tenants</option>
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
                 </option>
               ))}
             </select>
