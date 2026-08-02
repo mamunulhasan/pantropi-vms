@@ -15,6 +15,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { StatusTag, requestTone } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
 import { formatInstant, formatWindow } from "@/lib/datetime";
@@ -34,13 +35,6 @@ export default function VisitsPage() {
     </Suspense>
   );
 }
-
-const STATUS_CLASSES: Record<RequestStatus, string> = {
-  submitted: "bg-surface-sunken text-text",
-  approved: "bg-success text-success-contrast",
-  rejected: "bg-danger text-danger-contrast",
-  cancelled: "bg-surface-sunken text-text-muted",
-};
 
 function VisitsScreen() {
   const router = useRouter();
@@ -211,11 +205,10 @@ function VisitsScreen() {
                           {formatInstant(row.submittedAt)}
                         </p>
                       </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_CLASSES[row.status]}`}
-                      >
-                        {STATUS_LABELS[row.status]}
-                      </span>
+                      <StatusTag
+                        label={STATUS_LABELS[row.status]}
+                        tone={requestTone(row.status)}
+                      />
                     </div>
                     {row.decisionReason && (
                       <p className="mt-2 text-sm text-text">

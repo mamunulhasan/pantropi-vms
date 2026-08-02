@@ -23,6 +23,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Dialog } from "@/components/ui/Dialog";
+import { StatTiles } from "@/components/ui/StatTiles";
 import { PassDialog, type PassSubject } from "@/components/visits/PassDialog";
 import { Field, Textarea } from "@/components/ui/Field";
 import { useToast } from "@/components/ui/Toast";
@@ -81,6 +82,13 @@ function ApprovalsScreen() {
   const [passes, setPasses] = useState<PassSubject[]>([]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
+
+  // Summed from the rows this page actually returned, so the note says "on this page" rather than
+  // implying a total the queue never gave us. The endpoint reports visitorCount per request and no
+  // aggregate, and inventing one here would be arithmetic nobody could check.
+  const visitorsOnPage = data
+    ? data.content.reduce((total, row) => total + row.visitorCount, 0)
+    : null;
 
   useEffect(() => {
     setDraft(search ?? "");
@@ -180,18 +188,27 @@ function ApprovalsScreen() {
         Visitor requests awaiting a decision, newest first. Every decision is audited.
       </p>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:w-2/3">
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <p className="text-sm text-text-muted">Awaiting decision</p>
-          <p className="mt-1 text-2xl font-semibold text-text">
-            {data ? data.totalElements : "—"}
-          </p>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <p className="text-sm text-text-muted">Arriving today</p>
-          <p className="mt-1 text-2xl font-semibold text-text">{arrivingToday ?? "—"}</p>
-        </div>
-      </div>
+      <section aria-label="Queue totals" className="mt-4">
+        <StatTiles
+          stats={[
+            {
+              label: "Awaiting decision",
+              value: data ? data.totalElements : null,
+              note: "across every tenant you cover",
+            },
+            {
+              label: "Arriving today",
+              value: arrivingToday,
+              note: "awaiting a decision today",
+            },
+            {
+              label: "Visitors on this page",
+              value: visitorsOnPage,
+              note: "people, not requests",
+            },
+          ]}
+        />
+      </section>
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
         <form

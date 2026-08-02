@@ -30,6 +30,7 @@ import {
   validateVisitors,
 } from "@/components/visits/VisitorRows";
 import { formatInstant, formatWindow, instantToLocalInput, localInputToInstant } from "@/lib/datetime";
+import { StatusTag, requestTone } from "@/components/ui/StatusTag";
 import {
   STATUS_LABELS,
   VisitsApi,
@@ -88,9 +89,7 @@ export default function VisitDetailPage() {
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-xl font-semibold text-text">Visit request</h1>
-        <span className="rounded-full bg-surface-sunken px-3 py-1 text-sm font-medium text-text">
-          {STATUS_LABELS[request.status]}
-        </span>
+        <StatusTag label={STATUS_LABELS[request.status]} tone={requestTone(request.status)} />
       </div>
 
       {/* The outcome first: it is why a tenant opens this page (US-07.1.2). */}

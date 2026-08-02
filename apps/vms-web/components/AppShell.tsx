@@ -16,12 +16,17 @@
  * restore them. And none of this is an authorization decision: every API call behind this shell
  * is enforced server-side (US-03.2.1); hiding is usability.
  *
+ * The rail marks where you are (`aria-current="page"`) and, below `md`, folds into a disclosure in
+ * the header. It stays one `<nav>` element in both shapes rather than a desktop copy and a mobile
+ * copy: two would be two navigation landmarks for a screen reader to choose between, and the one
+ * that is visually hidden is the one that would rot.
+ *
  * The `pageshow` listener covers the back/forward cache (AC-4): after logout a bfcache restore
  * would resurrect the last-rendered DOM without re-running effects — `event.persisted` is that
  * exact case, and re-checking the store then is what keeps a signed-out browser from showing
  * authenticated content on the back button.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AccessDenied } from "@/components/AccessDenied";
@@ -50,8 +55,21 @@ export function AppShell({
   const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [navOpen, setNavOpen] = useState(false);
 
   const signedOut = !auth.resuming && !auth.accessToken;
+  const items = visibleNavItems(navItems, auth.me?.permissions);
+
+  // Longest match wins. `/visits` and `/visits/new` are siblings, so a plain prefix test would
+  // light up both while you are on the second — whereas `/admin/buildings/{id}/floors` genuinely
+  // should keep Buildings current. Picking the most specific href satisfies both without a rule
+  // per area.
+  const currentHref = items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .reduce<string | null>(
+      (best, item) => (best === null || item.href.length > best.length ? item.href : best),
+      null,
+    );
 
   useEffect(() => {
     if (signedOut) {
@@ -68,6 +86,11 @@ export function AppShell({
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
   }, [router]);
+
+  // A tap that navigates should not leave the panel covering what it navigated to.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!auth.resuming && auth.mustChangePassword) {
@@ -109,10 +132,25 @@ export function AppShell({
           Skip to content
         </a>
 
-        <header className="flex items-center justify-between border-b border-border bg-brand px-6 py-3 text-brand-contrast">
-          <BrandMark className="text-brand-contrast" />
-          <div className="flex items-center gap-4 text-sm">
-            <span aria-label="Signed in as">
+        <header className="flex items-center justify-between border-b border-border bg-brand px-4 py-3 text-brand-contrast sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* Only a control below md, where the rail is folded away. Hidden from the
+                accessibility tree above it, so a desktop reader is not offered a toggle for
+                something already on screen. */}
+            <button
+              type="button"
+              aria-expanded={navOpen}
+              aria-controls="area-nav"
+              onClick={() => setNavOpen((open) => !open)}
+              className="rounded-md border border-brand-contrast/40 px-2 py-1 text-sm md:hidden"
+            >
+              <span aria-hidden="true">☰</span>
+              <span className="sr-only">{navOpen ? "Hide" : "Show"} {navLabel} menu</span>
+            </button>
+            <BrandMark className="text-brand-contrast" />
+          </div>
+          <div className="flex items-center gap-3 text-sm sm:gap-4">
+            <span aria-label="Signed in as" className="truncate">
               {auth.me?.displayName ?? auth.me?.username ?? "…"}
             </span>
             <button
@@ -125,30 +163,41 @@ export function AppShell({
           </div>
         </header>
 
-        <div className="flex">
+        <div className="flex flex-col md:flex-row">
           {/* Unheld destinations are absent, never disabled (US-06.3.2 AC-1). */}
           <nav
+            id="area-nav"
             aria-label={navLabel}
-            className="w-56 shrink-0 border-r border-border bg-surface p-4"
+            className={`shrink-0 border-border bg-surface p-4 max-md:border-b md:block md:w-56 md:border-r ${
+              navOpen ? "block" : "max-md:hidden"
+            }`}
           >
             <ul className="space-y-1 text-sm">
-              {visibleNavItems(navItems, auth.me?.permissions).map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="block rounded-md px-3 py-2 hover:bg-surface-sunken"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
+              {items.map((item) => {
+                const current = item.href === currentHref;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={current ? "page" : undefined}
+                      className={
+                        current
+                          ? "block rounded-md bg-surface-sunken px-3 py-2 font-medium text-brand"
+                          : "block rounded-md px-3 py-2 text-text hover:bg-surface-sunken"
+                      }
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </nav>
 
           {deniedEntry ? (
             <AccessDenied username={auth.me?.username} description={deniedDescription} />
           ) : (
-            <main id="main-content" className="min-h-screen flex-1 bg-surface p-8">
+            <main id="main-content" className="min-h-screen flex-1 bg-surface p-4 sm:p-6 lg:p-8">
               {children}
             </main>
           )}
