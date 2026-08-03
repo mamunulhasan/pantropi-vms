@@ -41,7 +41,13 @@ public interface UserAdministrationStore {
     record UserView(UUID id, String username, String email, String fullName, String roleCode,
                     UUID receptionId, UUID tenantId, boolean active) {}
 
-    record UserFilter(String roleCode, UUID receptionId, Boolean active,
+    /**
+     * @param tenantId narrows to one tenant organisation's accounts. Added because the tenant list
+     *                 could report a dependent <em>count</em> and nothing else, so "show me the
+     *                 users of tenant X" — the question an administrator actually asks before
+     *                 deactivating one — had no answer anywhere in the API.
+     */
+    record UserFilter(String roleCode, UUID receptionId, UUID tenantId, Boolean active,
                       int page, int size, String sort) {}
 
     record Page(List<UserView> content, long totalElements, int page, int size) {}

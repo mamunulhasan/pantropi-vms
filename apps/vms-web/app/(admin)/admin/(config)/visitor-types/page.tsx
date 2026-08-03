@@ -9,6 +9,8 @@
  */
 import { Suspense, useState } from "react";
 import { ListToolbar } from "@/components/admin/ListToolbar";
+import { ActiveTag } from "@/components/ui/StatusTag";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -51,7 +53,7 @@ function VisitorTypesScreen() {
     {
       key: "status",
       header: "Status",
-      render: (v) => (v.active ? "Active" : <span className="text-text-muted">Inactive</span>),
+      render: (v) => <ActiveTag active={v.active} />,
     },
     {
       key: "actions",
@@ -77,7 +79,7 @@ function VisitorTypesScreen() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text">Visitor types</h2>
+      <PageHeader title="Visitor types" level={2} />
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search visitor types">
           {canEdit && <Button onClick={() => setEditing("new")}>New visitor type</Button>}

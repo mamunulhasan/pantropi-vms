@@ -13,6 +13,8 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ListToolbar } from "@/components/admin/ListToolbar";
+import { ActiveTag } from "@/components/ui/StatusTag";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -87,7 +89,7 @@ function FloorsScreen() {
     {
       key: "status",
       header: "Status",
-      render: (f) => (f.active ? "Active" : <span className="text-text-muted">Inactive</span>),
+      render: (f) => <ActiveTag active={f.active} />,
     },
     {
       key: "actions",
@@ -125,7 +127,7 @@ function FloorsScreen() {
           {building ? `${building.code} — ${building.name}` : "…"}
         </span>
       </nav>
-      <h2 className="mt-2 text-xl font-semibold text-text">Floors</h2>
+      <PageHeader title="Floors" level={2} />
 
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search floors">

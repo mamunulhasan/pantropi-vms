@@ -14,6 +14,7 @@
  * Changes take effect on each affected user's next request — no re-login.
  */
 import { useCallback, useEffect, useState } from "react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
@@ -122,7 +123,7 @@ export default function RolesPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text">Roles and permissions</h2>
+      <PageHeader title="Roles and permissions" level={2} />
       <p className="mt-1 text-sm text-text-muted">
         A change takes effect on each affected user&rsquo;s next request. Saving is per role and
         refuses to overwrite someone else&rsquo;s concurrent edit.

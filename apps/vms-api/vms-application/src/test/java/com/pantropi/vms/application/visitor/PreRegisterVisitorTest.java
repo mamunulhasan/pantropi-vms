@@ -300,6 +300,102 @@ class PreRegisterVisitorTest {
 
     // ---- helpers ----
 
+    // ---- several visitors on one visit ----
+
+    @Test
+    @DisplayName("several visitors register as one request, one window, one reference")
+    void severalVisitorsShareOneRequest() {
+        stations.on(FLOOR, List.of(TENANT_A));
+
+        PreRegisterVisitor.Registered result =
+                useCase().preRegister(RECEPTIONIST, groupCommand());
+
+        VisitorRequest saved = repo.saved;
+        assertThat(saved.visitors()).hasSize(3);
+        assertThat(saved.visitors()).extracting(v -> v.fullName())
+                .containsExactly("Ada Lovelace", "Alan Turing", "Grace Hopper");
+        // One request, one appointment window — that is what "under a single visit" means.
+        assertThat(result.visitorIds()).hasSize(3);
+        assertThat(result.visitorId()).isEqualTo(result.visitorIds().get(0));
+    }
+
+    @Test
+    @DisplayName("the phone number survives the trip — a desk calls the visitor, not only the host")
+    void phoneIsCarriedForEveryVisitor() {
+        stations.on(FLOOR, List.of(TENANT_A));
+
+        useCase().preRegister(RECEPTIONIST, groupCommand());
+
+        assertThat(repo.saved.visitors()).extracting(v -> v.phoneValue())
+                .containsExactly(PHONE, "+880171000002", "+880171000003");
+    }
+
+    @Test
+    @DisplayName("one audit row per person, because an incident review asks about a visitor")
+    void everyVisitorIsAudited() {
+        stations.on(FLOOR, List.of(TENANT_A));
+
+        useCase().preRegister(RECEPTIONIST, groupCommand());
+
+        assertThat(audit.simple).containsExactly("visitor.pre_register", "visitor.pre_register",
+                "visitor.pre_register");
+        assertThat(audit.changes).hasSize(1);
+        assertThat(audit.changes.get(0)).contains("\"visitorCount\":3");
+    }
+
+    @Test
+    @DisplayName("the event carries every id and still no personal data")
+    void eventCarriesEveryId() {
+        stations.on(FLOOR, List.of(TENANT_A));
+
+        PreRegisterVisitor.Registered result =
+                useCase().preRegister(RECEPTIONIST, groupCommand());
+
+        String payload = events.published.get(0).payload();
+        for (UUID id : result.visitorIds()) {
+            assertThat(payload).contains(id.toString());
+        }
+        assertThat(payload).doesNotContain("Ada").doesNotContain("Grace")
+                .doesNotContain("ada@example.test").doesNotContain(PHONE);
+    }
+
+    @Test
+    @DisplayName("an unusable type on the third visitor refuses the whole registration")
+    void oneBadTypeRefusesAllOfThem() {
+        stations.on(FLOOR, List.of(TENANT_A));
+        UUID retired = UUID.randomUUID();
+        types.retired.add(retired);
+
+        PreRegisterVisitor.Command bad = new PreRegisterVisitor.Command(
+                null, null, null, null, null, HOST, null, "Site inspection",
+                NOW.plus(2, ChronoUnit.HOURS), NOW.plus(4, ChronoUnit.HOURS),
+                List.of(guest("Ada Lovelace", PHONE, null),
+                        guest("Alan Turing", "+880171000002", null),
+                        guest("Grace Hopper", "+880171000003", retired)));
+
+        assertThatThrownBy(() -> useCase().preRegister(RECEPTIONIST, bad))
+                .isInstanceOf(SubmitVisitorRequest.UnknownVisitorType.class);
+        // Nothing written: half a group registered is worse than none of it.
+        assertThat(repo.saved).isNull();
+    }
+
+    private PreRegisterVisitor.Command groupCommand() {
+        Instant from = NOW.plus(2, ChronoUnit.HOURS);
+        return new PreRegisterVisitor.Command(
+                // The flat fields are ignored when the list is present; deliberately different so
+                // a regression that reads them instead would show up as the wrong name.
+                "Ignored Name", "ignored@example.test", "+880000000000", "Ignored Ltd",
+                null, HOST, null, "Site inspection", from, from.plus(2, ChronoUnit.HOURS),
+                List.of(guest("Ada Lovelace", PHONE, null),
+                        guest("Alan Turing", "+880171000002", null),
+                        guest("Grace Hopper", "+880171000003", null)));
+    }
+
+    private static PreRegisterVisitor.Guest guest(String name, String phone, UUID typeId) {
+        return new PreRegisterVisitor.Guest(name, name.toLowerCase().replace(' ', '.')
+                + "@example.test", phone, "Analytical Ltd", typeId);
+    }
+
     private PreRegisterVisitor.Command command(UUID tenantId) {
         return commandAt(NOW.plus(2, ChronoUnit.HOURS), tenantId);
     }

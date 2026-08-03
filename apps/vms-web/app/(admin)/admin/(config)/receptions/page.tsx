@@ -14,6 +14,8 @@
  */
 import { Suspense, useEffect, useState } from "react";
 import { ListToolbar } from "@/components/admin/ListToolbar";
+import { ActiveTag } from "@/components/ui/StatusTag";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -102,7 +104,7 @@ function ReceptionsScreen() {
     {
       key: "status",
       header: "Status",
-      render: (r) => (r.active ? "Active" : <span className="text-text-muted">Inactive</span>),
+      render: (r) => <ActiveTag active={r.active} />,
     },
     {
       key: "actions",
@@ -149,7 +151,7 @@ function ReceptionsScreen() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text">Receptions</h2>
+      <PageHeader title="Receptions" level={2} />
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search receptions">
           {canEdit && <Button onClick={() => setEditing("new")}>New reception</Button>}

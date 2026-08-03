@@ -44,6 +44,7 @@ const ADMIN_ROUTES: { path: string; heading: string }[] = [
   { path: "/admin/holidays", heading: "Configuration" },
   { path: "/admin/users", heading: "Configuration" },
   { path: "/admin/roles", heading: "Configuration" },
+  { path: "/admin/audit", heading: "Configuration" },
 ];
 
 /** The tenant area (VJ-1) — scanned as its own principal, since its shell renders different nav. */

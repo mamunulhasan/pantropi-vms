@@ -15,6 +15,7 @@
  * redaction marker, not data. Editing needs `settings.manage`; viewing only `masterdata.view`.
  */
 import { useCallback, useEffect, useState } from "react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Field, Input, Select } from "@/components/ui/Field";
@@ -54,10 +55,11 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-text">Settings</h1>
-      <p className="mt-1 text-sm text-text-muted">
-        System-wide configuration. Changes take effect immediately and are audited.
-      </p>
+      <PageHeader
+        kicker="System"
+        title="Settings"
+        description="System-wide configuration. Changes take effect immediately and are audited."
+      />
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-border">
         <table className="w-full border-collapse bg-surface text-sm">

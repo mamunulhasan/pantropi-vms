@@ -329,6 +329,8 @@ export type AdminUser = {
 export type UserListParams = {
   role?: string;
   receptionId?: string;
+  /** Narrows to one tenant organisation's accounts. */
+  tenantId?: string;
   active?: boolean;
   page?: number;
   size?: number;
@@ -340,6 +342,7 @@ export function userListQuery(params: UserListParams): string {
   const q = new URLSearchParams();
   if (params.role) q.set("role", params.role);
   if (params.receptionId) q.set("receptionId", params.receptionId);
+  if (params.tenantId) q.set("tenantId", params.tenantId);
   if (params.active !== undefined) q.set("active", String(params.active));
   if (params.page) q.set("page", String(params.page));
   if (params.size !== undefined) q.set("size", String(params.size));
@@ -501,3 +504,58 @@ export function fieldError(error: unknown): { field: string; message: string } |
   }
   return null;
 }
+
+// ---- audit trail (US-02.5.1) ----
+
+export type AuditEntry = {
+  id: string;
+  at: string;
+  action: string;
+  entityType: string | null;
+  entityId: string | null;
+  actorId: string | null;
+  /** A display name, or null once the account is removed — the entry outlives it. */
+  actor: string | null;
+  beforeState: string | null;
+  afterState: string | null;
+  ipAddress: string | null;
+};
+
+export type AuditPage = {
+  content: AuditEntry[];
+  totalElements: number;
+  page: number;
+  size: number;
+};
+
+export type AuditVocabulary = { actions: string[]; entityTypes: string[] };
+
+export type AuditFilters = {
+  action?: string;
+  entityType?: string;
+  actorId?: string;
+  from?: string;
+  /** Exclusive, so a single day is [00:00, next 00:00) and nothing lands in two days. */
+  to?: string;
+  page?: number;
+  size?: number;
+};
+
+export function auditQuery(filters: AuditFilters): string {
+  const q = new URLSearchParams();
+  if (filters.action) q.set("action", filters.action);
+  if (filters.entityType) q.set("entityType", filters.entityType);
+  if (filters.actorId) q.set("actorId", filters.actorId);
+  if (filters.from) q.set("from", filters.from);
+  if (filters.to) q.set("to", filters.to);
+  if (filters.page) q.set("page", String(filters.page));
+  if (filters.size !== undefined) q.set("size", String(filters.size));
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export const AuditApi = {
+  list: (filters: AuditFilters) =>
+    apiFetch<AuditPage>(`/api/v1/admin/audit${auditQuery(filters)}`),
+  vocabulary: () => apiFetch<AuditVocabulary>("/api/v1/admin/audit/vocabulary"),
+};

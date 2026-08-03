@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -152,13 +153,18 @@ public class PreRegistrationController {
                 UUID.fromString(principal.userId()),
                 new PreRegisterVisitor.Command(body.fullName(), body.email(), body.phone(),
                         body.company(), body.visitorTypeId(), body.hostId(), body.tenantId(),
-                        body.purpose(), body.appointmentFrom(), body.appointmentTo()));
+                        body.purpose(), body.appointmentFrom(), body.appointmentTo(),
+                        body.visitors() == null ? List.of() : body.visitors().stream()
+                                .map(v -> new PreRegisterVisitor.Guest(v.fullName(), v.email(),
+                                        v.phone(), v.company(), v.visitorTypeId()))
+                                .toList()));
 
         return ResponseEntity
                 .created(URI.create("/api/v1/visitor-requests/" + result.requestId()))
                 .body(new RegisteredResponse(result.requestId().toString(),
                         result.visitorId().toString(), result.tenantId().toString(),
-                        result.receptionId().toString()));
+                        result.receptionId().toString(),
+                        result.visitorIds().stream().map(UUID::toString).toList()));
     }
 
     /**
@@ -248,16 +254,31 @@ public class PreRegistrationController {
      * @param tenantId optional; required only when the floor hosts more than one tenant, and always
      *                 checked against the caller's own floor
      */
+    /**
+     * @param visitors several people arriving together on one visit. Omit it and the flat fields
+     *                 describe the single visitor, exactly as before — no existing caller changes.
+     *                 Send it and it is authoritative, so there is never a question of which of
+     *                 two sources won.
+     */
     public record PreRegistrationRequest(String fullName, String email, String phone, String company,
                                          UUID visitorTypeId, UUID hostId, UUID tenantId,
                                          String purpose,
                                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
                                          Instant appointmentFrom,
                                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-                                         Instant appointmentTo) {}
+                                         Instant appointmentTo,
+                                         List<VisitorPayload> visitors) {}
 
+    /** One arriving person. Phone is carried: the desk calls the visitor, not only the host. */
+    public record VisitorPayload(String fullName, String email, String phone, String company,
+                                 UUID visitorTypeId) {}
+
+    /**
+     * @param visitorId  the first visitor — kept so every existing caller reads unchanged
+     * @param visitorIds every visitor on the request, in the order they were sent
+     */
     public record RegisteredResponse(String requestId, String visitorId, String tenantId,
-                                     String receptionId) {}
+                                     String receptionId, List<String> visitorIds) {}
 
     /** A partial edit: absent means "leave alone". No tenant, floor, status or host — ever. */
     public record AmendPreRegistrationRequest(String fullName, String email, String phone,

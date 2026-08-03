@@ -90,6 +90,7 @@ public final class JdbcUserAdministrationStore implements UserAdministrationStor
         List<Object> args = new java.util.ArrayList<>();
         if (f.roleCode() != null) { where.append(" AND r.code = ?"); args.add(f.roleCode()); }
         if (f.receptionId() != null) { where.append(" AND u.reception_id = ?"); args.add(f.receptionId()); }
+        if (f.tenantId() != null) { where.append(" AND u.tenant_id = ?"); args.add(f.tenantId()); }
         if (f.active() != null) { where.append(" AND u.is_active = ?"); args.add(f.active()); }
 
         long total = count("SELECT count(*) FROM vms.users u JOIN vms.roles r ON r.id = u.role_id"

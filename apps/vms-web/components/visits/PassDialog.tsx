@@ -119,10 +119,10 @@ export function PassDialog({
           </div>
         )}
 
-        <div className="flex justify-center rounded-md border border-slate-200 bg-white p-4">
-          {loading && <p className="py-16 text-sm text-slate-600">Preparing the pass…</p>}
+        <div className="flex justify-center rounded-md border border-border bg-surface p-4">
+          {loading && <p className="py-16 text-sm text-text-muted">Preparing the pass…</p>}
           {error && (
-            <p role="alert" className="py-16 text-sm text-red-700">
+            <p role="alert" className="py-16 text-sm text-danger">
               {error}
             </p>
           )}
@@ -138,23 +138,23 @@ export function PassDialog({
         </div>
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="text-slate-600">Visitor</dt>
+          <dt className="text-text-muted">Visitor</dt>
           <dd>{subject.visitorName}</dd>
           {subject.validFrom && subject.validTo && (
             <>
-              <dt className="text-slate-600">Valid</dt>
+              <dt className="text-text-muted">Valid</dt>
               <dd>{formatWindow(subject.validFrom, subject.validTo)}</dd>
             </>
           )}
           {subject.notifiedTo && (
             <>
-              <dt className="text-slate-600">Emailed to</dt>
+              <dt className="text-text-muted">Emailed to</dt>
               <dd>{subject.notifiedTo}</dd>
             </>
           )}
         </dl>
 
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-text-muted">
           Show this code at the barrier. It is not sent by email — ask the visitor to open their
           pass here on arrival.
         </p>

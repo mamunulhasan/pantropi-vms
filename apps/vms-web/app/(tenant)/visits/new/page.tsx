@@ -17,6 +17,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { useToast } from "@/components/ui/Toast";
@@ -99,7 +100,7 @@ export default function NewVisitRequestPage() {
           New request
         </span>
       </nav>
-      <h1 className="mt-2 text-xl font-semibold text-text">New visit request</h1>
+      <PageHeader kicker="Tenant" title="New visit request" />
       <p className="mt-1 text-sm text-text-muted">
         Facility management reviews every request. You will see the outcome, and the reason if it is
         declined, on this list.

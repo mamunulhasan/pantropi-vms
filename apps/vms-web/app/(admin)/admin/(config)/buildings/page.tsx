@@ -10,6 +10,8 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { ListToolbar } from "@/components/admin/ListToolbar";
+import { ActiveTag } from "@/components/ui/StatusTag";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -52,7 +54,7 @@ function BuildingsScreen() {
     {
       key: "status",
       header: "Status",
-      render: (b) => (b.active ? "Active" : <span className="text-text-muted">Inactive</span>),
+      render: (b) => <ActiveTag active={b.active} />,
     },
     {
       key: "actions",
@@ -87,7 +89,7 @@ function BuildingsScreen() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text">Buildings</h2>
+      <PageHeader title="Buildings" level={2} />
       <div className="mt-4">
         <ListToolbar list={list} searchLabel="Search buildings">
           {canEdit && <Button onClick={() => setEditing("new")}>New building</Button>}
