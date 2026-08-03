@@ -125,6 +125,14 @@ subprojects {
         // -PitOnly runs only *IT. No property = full suite (local default).
         if (project.hasProperty('unitOnly'))  { exclude '**/*IT.class' }
         if (project.hasProperty('itOnly'))    { include '**/*IT.class' }
+
+        // Half the cores. The integration suite is the wall clock — 32 of the 33 *IT classes
+        // start their own EmbeddedPostgres, and run one after another they simply queue. Each
+        // fork carries a Postgres and a Spring context, so half is the point where more forks
+        // stop buying time and start buying swap; the value is capped so a bigger CI runner does
+        // not quietly try to hold sixteen databases at once.
+        maxParallelForks = Math.max(1, Math.min(4, Runtime.runtime.availableProcessors().intdiv(2)))
+
         // AC-5: no retry-until-green, ever.
     }
 
