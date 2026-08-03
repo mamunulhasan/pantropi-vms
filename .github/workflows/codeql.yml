@@ -32,7 +32,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Build for analysis
         working-directory: apps/vms-api
-        run: ./gradlew classes --console=plain
+        # CodeQL builds its database by tracing a real compiler run, so this step must actually
+        # compile. --no-build-cache is load-bearing: the repository enables the Gradle build cache,
+        # and setup-gradle restores it, so on a pull request that touches no Java every task is
+        # UP-TO-DATE, nothing is compiled, and analyze fails with "could not process any code
+        # written in Java/Kotlin" — an empty database rather than a clean bill of health.
+        run: ./gradlew classes --console=plain --no-build-cache --rerun-tasks
       - uses: github/codeql-action/analyze@v3
         with:
           category: java
