@@ -18,22 +18,30 @@ test.describe("the approvals area boundary", () => {
     await expect(page.getByText(FM_USER.displayName)).toBeVisible();
   });
 
-  test("an approver cannot enter the admin console — but the tenant area is now theirs", async ({
-    page,
-  }) => {
+  test("an approver cannot enter the admin console or the tenant area", async ({ page }) => {
     const api = await mockApi(page, FM_USER);
 
     await page.goto("/admin");
     await expect(page.getByRole("heading", { name: "You don’t have access" })).toBeVisible();
 
-    // V15 granted FM_ADMIN `visitor.request`, so /visits is theirs now — an approver who can also
-    // raise a request. That is a deliberate widening recorded in the migration, not an accident,
-    // and the test says so rather than continuing to assert a boundary that no longer exists.
+    // V15 briefly granted FM_ADMIN `visitor.request` so one sign-in could walk a demo; V17
+    // withdrew it. The facility role reviews requests and does not raise them, which is what the
+    // prototype's facility navigation shows and what V2's role description always said.
     await page.goto("/visits");
-    await expect(page.getByRole("heading", { name: "You don’t have access" })).toBeHidden();
+    await expect(page.getByRole("heading", { name: "You don’t have access" })).toBeVisible();
 
-    // The console boundary is the one that still holds, and it holds without asking for the data.
+    // Both boundaries hold without the screen asking for the data first.
     expect(api.requests.filter((p) => p.startsWith("/api/v1/admin"))).toEqual([]);
+  });
+
+  test("the approvals rail offers no way to raise a request", async ({ page }) => {
+    await mockApi(page, FM_USER);
+    await signIn(page, "**/approvals");
+
+    const nav = page.getByRole("navigation", { name: "Facilities" });
+    await expect(nav.getByRole("link", { name: "Approvals" })).toBeVisible();
+    // Absent, not disabled — the rule the whole navigation follows.
+    await expect(nav.getByRole("link", { name: "New request" })).toHaveCount(0);
   });
 
   test("a tenant and a system administrator are both refused the queue", async ({ page }) => {

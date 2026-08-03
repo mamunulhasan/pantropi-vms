@@ -113,24 +113,28 @@ class TenantRequestsIT {
     @Test
     @DisplayName("a submitter with no tenant is refused with 409, not a 500")
     void submitterWithoutATenantIsRefusedCleanly() throws Exception {
-        // fmadmin holds visitor.request as of V15 but is assigned to no tenant — an approver is
-        // building-wide by design. Before this was handled, SubmitVisitorRequest.NoTenantForUser
-        // (an IllegalStateException, so outside the global handler's IllegalArgumentException
-        // branch) reached the catch-all and the caller got "An unexpected error occurred".
+        // orphanuser holds visitor.request through the TENANT role but is assigned to no tenant.
+        // Before this was handled, SubmitVisitorRequest.NoTenantForUser (an IllegalStateException,
+        // so outside the global handler's IllegalArgumentException branch) reached the catch-all
+        // and the caller got "An unexpected error occurred".
+        //
+        // The case was originally found through fmadmin, who briefly held visitor.request under
+        // V15. V17 withdrew that, so the account that reaches this path is now one whose tenant
+        // assignment is genuinely missing rather than one that never had a tenant by design.
         Instant from = Instant.now().plus(30, ChronoUnit.DAYS);
         var res = post("/api/v1/visitor-requests",
                 "{\"hostId\":null,\"scheduledFrom\":\"" + from + "\","
                         + "\"scheduledTo\":\"" + from.plus(2, ChronoUnit.HOURS) + "\","
                         + "\"purpose\":\"Optional.\","
                         + "\"visitors\":[{\"fullName\":\"Guest 0\"}]}",
-                token("fmadmin"));
+                token("orphanuser"));
 
         assertThat(res.statusCode()).isEqualTo(409);
         // Named and actionable: it is the account's assignment that has to change, not the payload.
         assertThat(res.body()).contains("no_tenant").contains("not assigned to a tenant");
         // And nothing was written on the way to refusing.
         assertThat(scalar("SELECT count(*) FROM vms.visitor_requests WHERE requested_by="
-                + "(SELECT id FROM vms.users WHERE username='fmadmin')")).isEqualTo("0");
+                + "(SELECT id FROM vms.users WHERE username='orphanuser')")).isEqualTo("0");
     }
 
     @Test

@@ -45,17 +45,14 @@ class RoleGrantMatrixIT {
         m.put("TENANT", Set.of(Permissions.VISITOR_REQUEST));
         m.put("FLOOR_RECEPTIONIST", Set.of(Permissions.VISITOR_REGISTER,
                 Permissions.MASTERDATA_VIEW));
-        // V15's two additions to FM_ADMIN, stated here so the widening is visible in the test that
-        // exists to state the matrix rather than only in a migration nobody re-reads.
-        //   VISITOR_REQUEST  — lets an approver raise a request as well as decide one, which the V2
-        //                      role description ("Reviews and approves") does not justify. A demo
-        //                      convenience, and an approver approving their own work.
-        //   CREDENTIAL_ISSUE — reading, not minting: US-09.1.2 issues passes server-side on
-        //                      approval with no permission consulted, but CredentialController is
-        //                      guarded by this permission and the FM has to fetch the pass to show
-        //                      it.
-        m.put("FM_ADMIN", Set.of(Permissions.VISITOR_APPROVE, Permissions.VISITOR_REQUEST,
-                Permissions.CREDENTIAL_ISSUE));
+        // CREDENTIAL_ISSUE is reading, not minting: US-09.1.2 issues passes server-side on
+        // approval with no permission consulted, but CredentialController is guarded by this
+        // permission and the FM has to fetch the pass to show it.
+        //
+        // VISITOR_REQUEST is deliberately absent. V15 granted it so one sign-in could walk the
+        // whole demo; V17 withdrew it, because the facility role reviews requests and does not
+        // raise them — and FM_ADMIN holds no tenant, so it could never have submitted one anyway.
+        m.put("FM_ADMIN", Set.of(Permissions.VISITOR_APPROVE, Permissions.CREDENTIAL_ISSUE));
         m.put("MASTER_ADMIN", Set.of(Permissions.VISITOR_APPROVE, Permissions.CREDENTIAL_ISSUE));
         // AUDIT_VIEW is US-07.4.3's, and SYSTEM_ADMIN is the only role that gets it: reading back
         // who decided what is oversight, not part of taking the decision.
