@@ -30,7 +30,7 @@ export function StatTiles({ stats, className }: { stats: readonly Stat[]; classN
       {stats.map((stat) => (
         // The note lives inside the <dd>, not beside it: axe's definition-list rule allows a div
         // wrapper to hold only dt/dd, and the note is part of what the number means anyway.
-        <div key={stat.label} className="rounded-lg border border-border bg-surface p-4">
+        <div key={stat.label} className="rounded-lg border border-border bg-surface-raised p-4">
           <dt className="text-sm text-text-muted">{stat.label}</dt>
           <dd className="mt-1">
             <span className="block text-2xl font-semibold tabular-nums text-text">

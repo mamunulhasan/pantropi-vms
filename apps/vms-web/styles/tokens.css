@@ -17,20 +17,24 @@
 
 :root {
   /* ---- colour ---- */
-  --color-brand: #1e3a5f;            /* deep navy — header, primary actions */
+  --color-brand: #416180;            /* deep navy — header, primary actions */
   --color-brand-contrast: #ffffff;
-  --color-brand-hover: #2c5282;
+  --color-brand-hover: #2c455d;
 
-  --color-surface: #ffffff;          /* page background */
-  --color-surface-sunken: #f4f6f8;   /* page-level wells, table stripes */
+  --color-surface: #f2f2f3;          /* page background */
+  --color-surface-sunken: #e9e9ea;   /* page-level wells, table stripes */
+  /* Panels lift off the ground rather than tinting into it. The page is grey now, so a card
+     painted --color-surface would be the same colour as what it sits on and would read as flat;
+     white is what makes it a panel. The reference design tints its cards darker instead — the
+     same layering, the other direction — and either works as long as one of them is chosen. */
   --color-surface-raised: #ffffff;   /* cards, dialogs (paired with shadow) */
 
-  --color-text: #1a202c;
-  --color-text-muted: #4a5568;       /* AA on surface — do not lighten without re-checking */
+  --color-text: #1d1f20;
+  --color-text-muted: #5d5d60;       /* AA on surface — do not lighten without re-checking */
   --color-text-inverted: #ffffff;
 
-  --color-border: #cbd5e0;
-  --color-border-strong: #718096;
+  --color-border: #d4d4d7;
+  --color-border-strong: #98989b;
 
   --color-danger: #9b2c2c;           /* destructive actions, error text on surface */
   --color-danger-contrast: #ffffff;
@@ -41,12 +45,18 @@
   --color-warning: #975a16;          /* dark enough to be text on surface */
   --color-warning-contrast: #ffffff;
 
-  --color-focus: #2b6cb0;            /* focus ring — always visible (F-06.4) */
-  --color-scrim: #1a202c;            /* dialog backdrop, used with an opacity modifier */
+  --color-focus: #416180;            /* focus ring — always visible (F-06.4) */
+  --color-scrim: #2b2b2d;            /* dialog backdrop, used with an opacity modifier */
 
   /* ---- typography ---- */
-  --font-family-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+  /* Barlow for reading, Barlow Condensed for headings — the pairing the design prototype uses.
+     Both are self-hosted (app/fonts.ts); the variables below are set by next/font on <html>, and
+     the system stack after them is what renders if a face ever fails to load. */
+  --font-family-sans: var(--font-barlow), system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
+  --font-family-heading: var(--font-barlow-condensed), var(--font-family-sans);
+  /* The condensed cut needs weight to hold its own against body text at the same size. */
+  --font-weight-heading: 600;
   --font-size-sm: 0.875rem;
   --font-size-base: 1rem;
   --font-size-lg: 1.125rem;
@@ -65,9 +75,9 @@
   --space-12: 3rem;
 
   /* ---- radius ---- */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 7px;
 
   /* ---- elevation ---- */
   --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.12), 0 1px 2px rgb(0 0 0 / 0.24);

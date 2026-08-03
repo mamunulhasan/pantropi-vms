@@ -34,6 +34,7 @@
   --color-focus: var(--color-focus);
 
   --font-sans: var(--font-family-sans);
+  --font-heading: var(--font-family-heading);
 
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -49,4 +50,18 @@ body {
   font-family: var(--font-family-sans);
   font-size: var(--font-size-base);
   line-height: var(--line-height-base);
+}
+
+/*
+ * Headings take the condensed cut. Set once here rather than as a utility on every heading: the
+ * prototype's density comes from the pairing, and a screen that forgot the class would silently
+ * fall back to the body face and look like a different product.
+ */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-family-heading);
+  font-weight: var(--font-weight-heading);
+  letter-spacing: 0.01em;
 }

@@ -77,7 +77,7 @@ export function DataTable<T>({
   return (
     <div aria-busy={loading || undefined} className={loading ? "opacity-60" : undefined}>
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full border-collapse bg-surface text-sm">
+        <table className="w-full border-collapse bg-surface-raised text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr className="border-b border-border bg-surface-sunken text-left">
