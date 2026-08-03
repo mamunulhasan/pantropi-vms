@@ -56,9 +56,10 @@ export const FM_USER: MockProfile = {
   username: "fmadmin",
   displayName: "Fiona Manager",
   role: "FM_ADMIN",
-  // V15 also grants visitor.request and credential.issue — the latter so an approver can read back
-  // the pass their approval minted (US-09.1.2).
-  permissions: ["visitor.approve", "visitor.request", "credential.issue"],
+  // credential.issue so an approver can read back the pass their approval minted (US-09.1.2).
+  // Not visitor.request: V17 withdrew it — the facility role reviews requests, it does not raise
+  // them.
+  permissions: ["visitor.approve", "credential.issue"],
 };
 
 /**

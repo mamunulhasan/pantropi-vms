@@ -77,10 +77,10 @@ class MigrationIT {
     @DisplayName("AC-1: baseline creates every table, enum, trigger and comment; history records V1+V2")
     void baselineCreatesFullSchema() throws Exception {
         MigrateResult result = flyway().migrate();
-        // Every versioned script in db/migration, V1 through V16. Pinned rather than derived so a
+        // Every versioned script in db/migration, V1 through V17. Pinned rather than derived so a
         // script that silently fails to be picked up — wrong prefix, wrong directory — is a failure
         // here rather than a mystery about missing rows much later.
-        assertThat(result.migrationsExecuted).isEqualTo(16);
+        assertThat(result.migrationsExecuted).isEqualTo(17);
 
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             assertThat(query(s, """
@@ -132,7 +132,7 @@ class MigrationIT {
                     SELECT version FROM vms.flyway_schema_history
                      WHERE success AND version IS NOT NULL"""))
                     .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                            "11", "12", "13", "14", "15", "16");
+                            "11", "12", "13", "14", "15", "16", "17");
         }
     }
 
@@ -171,11 +171,11 @@ class MigrationIT {
         // V9 states the whole matrix (US-03.1.1, T-03.1.1.2), completing the lift of D-15.
         // RoleGrantMatrixIT asserts it role by role; this only pins the total so a stray grant
         // added elsewhere is noticed here too.
-        // Ten from V9's matrix, plus V12's audit.view grant to SYSTEM_ADMIN, plus V15's two
-        // adds to FM_ADMIN (visitor.request to raise one, credential.issue to read back the pass
-        // approving it minted). The total is pinned precisely so a grant added anywhere else still
-        // has to come past this line.
-        assertThat(scalar(s, "SELECT count(*)::text FROM vms.role_permissions")).isEqualTo("13");
+        // Ten from V9's matrix, plus V12's audit.view grant to SYSTEM_ADMIN, plus V15's
+        // credential.issue to FM_ADMIN so an approver can read back the pass their approval
+        // minted. V15's other add, visitor.request, was withdrawn by V17. The total is pinned
+        // precisely so a grant added anywhere else still has to come past this line.
+        assertThat(scalar(s, "SELECT count(*)::text FROM vms.role_permissions")).isEqualTo("12");
         assertThat(query(s, """
                 SELECT p.code FROM vms.role_permissions rp
                 JOIN vms.roles r ON r.id = rp.role_id AND r.code = 'MASTER_ADMIN'
