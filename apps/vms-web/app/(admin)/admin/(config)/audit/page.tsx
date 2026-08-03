@@ -124,7 +124,13 @@ function AuditScreen() {
       key: "actor",
       header: "Who",
       // A display name, never a username or email — the same rule the decision trail follows.
-      render: (e) => e.actor ?? <span className="text-text-muted">Account removed</span>,
+      //
+      // A null actor is genuinely ambiguous and must not be reported as though it were not.
+      // `user_id` is ON DELETE SET NULL, so an entry with no actor is either one that had no
+      // signed-in user (an authorization denial before authentication is the common case) or one
+      // whose account has since been removed. The row cannot distinguish them, so the cell says
+      // what is true of both rather than picking the more dramatic reading.
+      render: (e) => e.actor ?? <span className="text-text-muted">Not recorded</span>,
     },
     { key: "ip", header: "From", render: (e) => e.ipAddress ?? "—" },
     {

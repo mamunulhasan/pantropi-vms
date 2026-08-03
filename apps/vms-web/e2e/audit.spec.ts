@@ -22,14 +22,18 @@ test.describe("the audit log", () => {
     await expect(rows.filter({ hasText: "settings.update" })).toBeVisible();
   });
 
-  test("an entry whose account has been removed still reads", async ({ page }) => {
+  test("an entry with no actor says so without claiming the account was deleted", async ({
+    page,
+  }) => {
     await mockApi(page, SYSADMIN);
     await signIn(page);
     await page.goto("/admin/audit");
 
-    // user_id is ON DELETE SET NULL: the entry outlives the account, and must still say so
-    // rather than rendering an empty cell.
-    await expect(page.getByText("Account removed")).toBeVisible();
+    // user_id is ON DELETE SET NULL, so a null actor is either an entry that never had a signed-in
+    // user — an authorization denial before authentication — or one whose account has since gone.
+    // The row cannot tell them apart, so the cell must not assert either.
+    await expect(page.getByText("Not recorded")).toBeVisible();
+    await expect(page.getByText("Account removed")).toHaveCount(0);
   });
 
   test("the before/after projection is one click away, not shouted", async ({ page }) => {
