@@ -99,10 +99,6 @@ export const FM_ENTRY: readonly Permission[] = [PERMISSIONS.VISITOR_APPROVE];
 
 export const FM_NAV: readonly NavItem[] = [
   { href: "/approvals", label: "Approvals", requires: FM_ENTRY },
-  // FM_ADMIN holds visitor.request as of V15, so the tenant request form admits them and no
-  // separate screen is needed. Guarded on the permission rather than the area: if that grant is
-  // ever rolled back, the entry disappears with it instead of leading to a 403.
-  { href: "/visits/new", label: "New request", requires: [PERMISSIONS.VISITOR_REQUEST] },
 ];
 
 /**
