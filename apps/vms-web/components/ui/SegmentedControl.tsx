@@ -42,7 +42,7 @@ export function SegmentedControl<T extends string>({
   return (
     <fieldset className="min-w-0" disabled={disabled}>
       <legend className="mb-1 text-sm font-medium text-text">{label}</legend>
-      <div className="inline-flex flex-wrap rounded-md border border-border bg-surface p-0.5">
+      <div className="inline-flex flex-wrap rounded-md border border-border bg-surface-raised p-0.5">
         {options.map((option) => {
           const selected = option.value === value;
           return (
