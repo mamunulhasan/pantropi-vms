@@ -359,6 +359,148 @@ class PreRegistrationIT {
         return field(res.body(), "requestId");
     }
 
+    // ---- EPIC-12: arrival lookup and the entry lifecycle ----
+
+    @Test
+    @DisplayName("US-12.1.1: a pre-registered visitor can be found again — the desk had no read-back")
+    void arrivalSearchFindsAPreRegisteredVisitor() throws Exception {
+        String visitorId = arrival("Ada Lovelace");
+
+        var res = get("/api/v1/arrivals?search=Ada", token("floorrec"));
+
+        assertThat(res.statusCode()).isEqualTo(200);
+        assertThat(res.body()).contains("Ada Lovelace").contains(visitorId);
+        // AC-2: enough context to tell two people of the same name apart without opening each.
+        assertThat(res.body()).contains("host").contains("tenant").contains("appointmentFrom");
+    }
+
+    @Test
+    @DisplayName("US-12.1.2: a submitted visit reads as not appointed and offers no check-in")
+    void unapprovedVisitorIsNotAppointed() throws Exception {
+        String visitorId = arrival("Alan Turing");
+
+        var res = get("/api/v1/arrivals/" + visitorId, token("floorrec"));
+
+        assertThat(res.statusCode()).isEqualTo(200);
+        assertThat(res.body()).contains("\"outcome\":\"NOT_APPOINTED\"");
+        assertThat(res.body()).contains("\"mayCheckIn\":false");
+    }
+
+    @Test
+    @DisplayName("US-12.2.1 AC-4: check-in is refused for a visit that was never approved")
+    void checkInIsNotARouteAroundApproval() throws Exception {
+        String visitorId = arrival("Grace Hopper");
+
+        var res = send("POST", "/api/v1/arrivals/" + visitorId + "/check-in", null,
+                token("floorrec"));
+
+        assertThat(res.statusCode()).isEqualTo(422);
+        assertThat(res.body()).contains("not_appointed");
+        // A refusal must not leave a timestamp behind.
+        assertThat(scalar("SELECT checked_in_at FROM vms.visitors WHERE id='" + visitorId + "'"))
+                .isNull();
+        assertThat(scalar("SELECT status::text FROM vms.visitors WHERE id='" + visitorId + "'"))
+                .isEqualTo("pending");
+    }
+
+    @Test
+    @DisplayName("US-12.2.1/US-12.2.2: an approved visitor checks in, then out, with both stamps")
+    void checkInThenOut() throws Exception {
+        String visitorId = arrival("Katherine Johnson");
+        approve(visitorId);
+
+        var in = send("POST", "/api/v1/arrivals/" + visitorId + "/check-in", null,
+                token("floorrec"));
+        assertThat(in.statusCode()).isEqualTo(200);
+        assertThat(in.body()).contains("\"status\":\"checked_in\"");
+        assertThat(scalar("SELECT status::text FROM vms.visitors WHERE id='" + visitorId + "'"))
+                .isEqualTo("checked_in");
+        assertThat(scalar("SELECT checked_in_at FROM vms.visitors WHERE id='" + visitorId + "'"))
+                .isNotNull();
+
+        var out = send("POST", "/api/v1/arrivals/" + visitorId + "/check-out", null,
+                token("floorrec"));
+        assertThat(out.statusCode()).isEqualTo(200);
+        assertThat(out.body()).contains("\"status\":\"checked_out\"");
+        // No card has ever been issued, so the list is empty — correct, not a stub.
+        assertThat(out.body()).contains("\"outstandingCards\":[]");
+        assertThat(scalar("SELECT checked_out_at FROM vms.visitors WHERE id='" + visitorId + "'"))
+                .isNotNull();
+
+        // AC-2: both moves attributed to the acting user, and one event each for the downstream.
+        assertThat(scalar("SELECT count(*) FROM vms.audit_logs WHERE entity_id='" + visitorId
+                + "' AND action IN ('visitor.check_in','visitor.check_out')")).isEqualTo("2");
+        assertThat(scalar("SELECT count(*) FROM vms.domain_events WHERE aggregate_id='" + visitorId
+                + "' AND event_type IN ('VisitorCheckedIn','VisitorCheckedOut')")).isEqualTo("2");
+    }
+
+    @Test
+    @DisplayName("US-12.2.1 AC-3: a second check-in is refused and the first timestamp survives")
+    void noSecondCheckIn() throws Exception {
+        String visitorId = arrival("Margaret Hamilton");
+        approve(visitorId);
+        send("POST", "/api/v1/arrivals/" + visitorId + "/check-in", null, token("floorrec"));
+        String firstStamp =
+                scalar("SELECT checked_in_at FROM vms.visitors WHERE id='" + visitorId + "'");
+
+        var again = send("POST", "/api/v1/arrivals/" + visitorId + "/check-in", null,
+                token("floorrec"));
+
+        assertThat(again.statusCode()).isEqualTo(409);
+        assertThat(scalar("SELECT checked_in_at FROM vms.visitors WHERE id='" + visitorId + "'"))
+                .isEqualTo(firstStamp);
+    }
+
+    @Test
+    @DisplayName("the search is audited with the terms and the count, never the people")
+    void searchIsAudited() throws Exception {
+        arrival("Dorothy Vaughan");
+
+        get("/api/v1/arrivals?search=Dorothy", token("floorrec"));
+
+        String detail = scalar("SELECT after_state::text FROM vms.audit_logs"
+                + " WHERE action='visitor.arrival_search' ORDER BY id DESC LIMIT 1");
+        assertThat(detail).contains("Dorothy").contains("results");
+        // The terms, yes. The names that came back, no — that is a second copy of personal data.
+        assertThat(detail).doesNotContain("Vaughan");
+    }
+
+    @Test
+    @DisplayName("AC-5: visitor.register is required, and an anonymous caller is 401")
+    void arrivalsNeedThePermission() throws Exception {
+        assertThat(get("/api/v1/arrivals", token("tenantuser")).statusCode()).isEqualTo(403);
+        assertThat(get("/api/v1/arrivals", null).statusCode()).isEqualTo(401);
+    }
+
+    /** Pre-registers somebody at the desk and returns their visitor id. */
+    private String arrival(String name) throws Exception {
+        // The window has to include now, or the confirmation correctly reports EARLY and check-in
+        // is refused — five minutes back is inside the pre-registration grace period.
+        Instant from = Instant.now().minus(5, ChronoUnit.MINUTES);
+        var res = post("""
+                {"fullName":"%s","tenantId":"%s","appointmentFrom":"%s","appointmentTo":"%s"}
+                """.formatted(name, sharedFloorTenantA, from, from.plus(2, ChronoUnit.HOURS)),
+                token("floorrec"));
+        assertThat(res.statusCode()).isEqualTo(201);
+        return field(res.body(), "visitorId");
+    }
+
+    /**
+     * Approves straight in the database rather than through the API.
+     *
+     * <p>What is under test here is the arrival path, not the approval one — going through
+     * /approve would make these tests fail for reasons belonging to another story.
+     */
+    private void approve(String visitorId) throws Exception {
+        try (Connection c = pg.getPostgresDatabase().getConnection();
+             Statement s = c.createStatement()) {
+            s.execute("UPDATE vms.visitor_requests SET status='approved'"
+                    + " WHERE id = (SELECT request_id FROM vms.visitors WHERE id='"
+                    + visitorId + "')");
+            s.execute("UPDATE vms.visitors SET status='approved' WHERE id='" + visitorId + "'");
+        }
+    }
+
     private String token(String username) throws Exception {
         String password = switch (username) {
             case "tenantuser" -> "tenant-password-1234";

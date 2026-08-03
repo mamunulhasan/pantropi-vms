@@ -141,6 +141,13 @@ test.describe("authenticated routes", () => {
     await scan(page, "/approvals");
   });
 
+  test("/reception/arrivals has no critical or serious violations", async ({ page }) => {
+    await mockApi(page, RECEPTIONIST);
+    await page.goto("/reception/arrivals");
+    await expect(page.getByRole("heading", { level: 1, name: "Arrivals" })).toBeVisible();
+    await scan(page, "/reception/arrivals");
+  });
+
   test("/reception has no critical or serious violations", async ({ page }) => {
     await mockApi(page, RECEPTIONIST);
     await page.goto("/reception");

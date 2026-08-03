@@ -111,6 +111,9 @@ export const FM_NAV: readonly NavItem[] = [
 export const RECEPTION_ENTRY: readonly Permission[] = [PERMISSIONS.VISITOR_REGISTER];
 
 export const RECEPTION_NAV: readonly NavItem[] = [
+  // Arrivals first: it is what a desk opens at the start of a shift and returns to all day.
+  // Pre-registering is the exception path, taken when nobody matches the search.
+  { href: "/reception/arrivals", label: "Arrivals", requires: RECEPTION_ENTRY },
   { href: "/reception", label: "Pre-register", requires: RECEPTION_ENTRY },
 ];
 
