@@ -1,6 +1,7 @@
 package com.pantropi.vms.infrastructure.visitor;
 
 import com.pantropi.vms.application.identity.port.AuditTrail;
+import com.pantropi.vms.application.identity.usecase.ScopePolicy;
 import com.pantropi.vms.application.shared.port.TransactionRunner;
 import com.pantropi.vms.application.visitor.port.DecisionTrail;
 import com.pantropi.vms.application.visitor.port.DomainEventPublisher;
@@ -172,5 +173,46 @@ public class VisitorConfig {
                                               DomainEventPublisher events, AuditTrail audit,
                                               TransactionRunner tx, ClockPort clock) {
         return new RejectVisitorRequest(requests, events, audit, tx, clock);
+    }
+
+    // ---- EPIC-12: arrival lookup and the entry lifecycle ----
+
+    /** The desk's read-back path (US-12.1.1). Scoped like every other visitor read. */
+    @Bean
+    com.pantropi.vms.application.visitor.port.ArrivalDirectory arrivalDirectory(
+            DataSource dataSource, ScopePolicy scope) {
+        return new JdbcArrivalDirectory(new JdbcTemplate(dataSource), scope);
+    }
+
+    /** Status moves for one person, compare-and-set (US-12.2.1, US-12.2.2). */
+    @Bean
+    com.pantropi.vms.application.visitor.port.VisitorLifecycle visitorLifecycle(
+            DataSource dataSource) {
+        return new JdbcVisitorLifecycle(new JdbcTemplate(dataSource));
+    }
+
+    /** What a departing visitor still holds (US-12.2.2 AC-2). Empty until F-15.1 writes cards. */
+    @Bean
+    com.pantropi.vms.application.visitor.port.OutstandingCards outstandingCards(
+            DataSource dataSource) {
+        return new JdbcOutstandingCards(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    com.pantropi.vms.application.visitor.usecase.FindArrivals findArrivals(
+            com.pantropi.vms.application.visitor.port.ArrivalDirectory directory,
+            AuditTrail audit, ClockPort clock) {
+        return new com.pantropi.vms.application.visitor.usecase.FindArrivals(directory, audit,
+                clock);
+    }
+
+    @Bean
+    com.pantropi.vms.application.visitor.usecase.RecordArrival recordArrival(
+            com.pantropi.vms.application.visitor.port.ArrivalDirectory directory,
+            com.pantropi.vms.application.visitor.port.VisitorLifecycle lifecycle,
+            com.pantropi.vms.application.visitor.port.OutstandingCards cards,
+            DomainEventPublisher events, AuditTrail audit, TransactionRunner tx, ClockPort clock) {
+        return new com.pantropi.vms.application.visitor.usecase.RecordArrival(directory, lifecycle,
+                cards, events, audit, tx, clock);
     }
 }

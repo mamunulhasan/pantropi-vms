@@ -184,6 +184,7 @@ export const HOST_ID = HOST.id;
 export const HOST_NAME = HOST.fullName;
 
 export const VISIT_REQUEST_ID = VISIT_REQUEST.id;
+export const APPOINTED_VISITOR_ID = "11111111-1111-1111-1111-111111111111";
 export const PRE_REGISTERED_VISITOR_ID = "a1111111-1111-1111-1111-111111111111";
 
 function page1<T>(items: T[]) {
@@ -264,6 +265,8 @@ const REQUIRED: { match: RegExp; anyOf: string[] }[] = [
   { match: /^\/api\/v1\/visitor-requests\/[^/]+$/, anyOf: ["visitor.request", "visitor.approve"] },
   { match: /^\/api\/v1\/visitor-requests$/, anyOf: ["visitor.request"] },
   { match: /^\/api\/v1\/pre-registrations/, anyOf: ["visitor.register"] },
+  // The arrival desk — the same permission the pre-registration desk uses (US-12.1.1 AC-5).
+  { match: /^\/api\/v1\/arrivals/, anyOf: ["visitor.register"] },
   // The host directory is a tenant maintaining its own people (US-10.1.1 AC-1).
   { match: /^\/api\/v1\/hosts/, anyOf: ["visitor.request"] },
 ];
@@ -461,6 +464,64 @@ export async function mockApi(page: Page, profile: MockProfile = SYSADMIN): Prom
       ];
       const content = action ? all.filter((e) => e.action === action) : all;
       return json({ content, totalElements: content.length, page: 0, size: 20 });
+    }
+    if (path.match(/^\/api\/v1\/arrivals\/[^/]+\/check-in$/)) {
+      return json({
+        visitorId: APPOINTED_VISITOR_ID,
+        status: "checked_in",
+        at: "2030-06-01T09:30:00Z",
+        outstandingCards: [],
+      });
+    }
+    if (path.match(/^\/api\/v1\/arrivals\/[^/]+\/check-out$/)) {
+      return json({
+        visitorId: APPOINTED_VISITOR_ID,
+        status: "checked_out",
+        at: "2030-06-01T10:45:00Z",
+        // A card the visitor never handed back: the desk must be told at the last moment it can act.
+        outstandingCards: [
+          { issuanceId: "c1111111-1111-1111-1111-111111111111", acsCardId: "RF-1042",
+            issuedAt: "2030-06-01T09:31:00Z" },
+        ],
+      });
+    }
+    if (path === "/api/v1/arrivals") {
+      const terms = (new URL(request.url()).searchParams.get("search") ?? "").toLowerCase();
+      const all = [
+        {
+          visitorId: APPOINTED_VISITOR_ID, requestId: VISIT_REQUEST.id,
+          fullName: "Ada Lovelace", company: "Analytical Ltd", visitorType: "Contractor",
+          phone: "+8801711111111", host: HOST_NAME, tenant: TENANT.name,
+          appointmentFrom: "2030-06-01T09:00:00Z", appointmentTo: "2030-06-01T11:00:00Z",
+          requestStatus: "approved", visitorStatus: "approved",
+          checkedInAt: null, checkedOutAt: null,
+          outcome: "APPOINTED", reason: null, mayCheckIn: true,
+        },
+        {
+          visitorId: "22222222-2222-2222-2222-222222222222", requestId: VISIT_REQUEST.id,
+          fullName: "Alan Turing", company: "NPL", visitorType: "Guest",
+          phone: null, host: HOST_NAME, tenant: TENANT.name,
+          appointmentFrom: "2030-06-01T09:00:00Z", appointmentTo: "2030-06-01T11:00:00Z",
+          requestStatus: "submitted", visitorStatus: "pending",
+          checkedInAt: null, checkedOutAt: null,
+          outcome: "NOT_APPOINTED", reason: "This visit has not been approved yet.",
+          mayCheckIn: false,
+        },
+        {
+          visitorId: "33333333-3333-3333-3333-333333333333", requestId: VISIT_REQUEST.id,
+          fullName: "Grace Hopper", company: "Navy", visitorType: "Guest",
+          phone: null, host: HOST_NAME, tenant: TENANT.name,
+          appointmentFrom: "2030-06-01T09:00:00Z", appointmentTo: "2030-06-01T11:00:00Z",
+          requestStatus: "approved", visitorStatus: "checked_in",
+          checkedInAt: "2030-06-01T09:05:00Z", checkedOutAt: null,
+          outcome: "ALREADY_ARRIVED", reason: "This visitor is already checked in.",
+          mayCheckIn: false,
+        },
+      ];
+      const rows = terms
+        ? all.filter((a) => a.fullName.toLowerCase().includes(terms))
+        : all;
+      return json(rows);
     }
     if (path === "/api/v1/pre-registrations" && request.method() === "POST") {
       const body = JSON.parse(request.postData() || "{}");
